@@ -1,7 +1,50 @@
+@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap');
+
 body {
-    background-color: black
+    background-color: black;
+    font-family: "Lato-light", sans-serif;
+    /* Changed font-family */
+    text-align: center;
+    /* Center align all content */
 }
 
 h1 {
     color: grey;
+}
+
+.logo {
+    margin: auto;
+}
+
+.social-links li a i {
+    width: 4rem;
+    height: 4rem;
+    padding: 1.2rem 0;
+    border-radius: 50%;
+    font-size: 1.6rem;
+    text-align: center;
+    color: #fafafa;
+    background: #8f8f8f;
+    transition: all 0.35s ease-in-out;
+    -moz-transition: all 0.35s ease-in-out;
+    -webkit-transition: all 0.35s ease-in-out;
+    -o-transition: all 0.35s ease-in-out;
+}
+
+.social-links li a i:hover {
+    background: #dd9208;
+}
+
+.social {
+    margin: 0 .7rem;
+}
+
+/* Mobile-specific adjustments */
+@media (max-width: 576px) {
+    .social-links li a i {
+        width: 3rem;
+        height: 3rem;
+        font-size: 1.4rem;
+        padding: 1rem 0;
+    }
 }
