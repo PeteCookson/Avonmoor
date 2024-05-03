@@ -1,19 +1,25 @@
-@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap');
+/*@import url('https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&display=swap');*/
 
 body {
     background-color: black;
-    font-family: "Lato-light", sans-serif;
     /* Changed font-family */
     text-align: center;
     /* Center align all content */
 }
 
-h1 {
+h1,
+h3 {
     color: grey;
 }
 
 .logo {
     margin: auto;
+}
+
+.lato-light {
+    font-family: "Lato", sans-serif;
+    font-weight: 300;
+    font-style: normal;
 }
 
 .social-links li a i {
