@@ -6,91 +6,187 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Email Signature</title>
     <style>
-        /* Reset styles */
-        body,
-        html {
+        body {
             margin: 0;
             padding: 0;
-            font-family: Helvetica Neue, Arial, sans-serif;
-            font-size: 14px;
+            width: 100%;
+        }
+
+        /* Logo */
+        .first-row {
+            height: auto;
+            margin-top: 20px;
+            margin-bottom: 20px;
+        }
+
+        .first-row .logo img {
+            padding: 20px;
+            max-width: 80%;
+        }
+
+        /* Separator --------*/
+        .first-row .logo {
+            border-right: 1px solid #878583;
         }
 
         /* Signature container */
-        .email-signature {
-            max-width: 500px;
-            /* Adjust as needed */
-            margin: 0 auto;
-            padding: 20px;
-            border: 1px solid #ccc;
-            border-radius: 5px;
-        }
+
 
         /* Name styling */
         .name {
-            font-size: 18px;
-            font-weight: light;
-            margin-bottom: 5px;
+            width: 50%;
+            color: #878583;
+            font-size: 2rem;
+            font-family: 'Times New Roman', Times, serif;
+            text-align: center;
+            margin: 0;
+            padding: 20px;
         }
 
         /* Job title styling */
-        .job-title {
-            font-size: 14px;
-            margin-bottom: 10px;
-        }
+
 
         /* Contact details styling */
-        .contact-details {
-            font-size: 14px;
+        .second-row {
+            max-width: 100%;
+            /* Take up full width */
+            background-color: #878583;
+            font-family: Verdana, Arial, Helvetica, sans-serif;
+            font-weight: 300;
+            font-size: 15px;
+            color: white;
+            display: flex;
+            /* Use flexbox for layout */
+            justify-content: center;
+            /* Center content horizontally */
+            align-items: center;
+            /* Center content vertically */
+        }
+
+        /* Second Row Contact text */
+        a {
+            text-decoration: none;
+            color: white;
+        }
+
+        /* Second Row Contact Icon */
+        .second-row img {
+            width: 30px;
+            vertical-align: middle;
+            padding: 5px;
+        }
+
+        .second-row td {
+            padding-right: 10px;
+            padding-left: 10px;
+            text-align: center;
+            /* Center content within table cell */
         }
 
         /* Social media links styling */
-        .social-media {
-            margin-top: 10px;
+        .socials {
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            /* Align the contents of "socials" div both horizontally and vertically */
         }
 
-        .social-media a {
-            display: inline-block;
-            margin-right: 10px;
+        .socials img {
+            width: 20px;
+            padding: 20px;
+        }
+
+
+        /* Media query for smaller screens */
+        @media screen and (max-width: 500px) {
+
+            .first-row .logo,
+            .name {
+                width: 100%;
+                display: block;
+            }
+
+            .first-row .logo {
+                border-bottom: 1px solid #878583;
+                /* Add border-bottom instead of border-right */
+                border-right: none;
+                /* Hide border-right on small screens */
+            }
+
+            .name {
+                padding: 0;
+            }
+
+            .second-row td {
+                display: block;
+                text-align: center;
+                padding: 10px 0;
+            }
+
         }
     </style>
 </head>
 
 <body>
-    <div class="email-signature">
-        <a href="https://imgbb.com/"><img src="https://i.ibb.co/mJJxhx2/master-logo-white.png" alt="master-logo-white" border="0"></a>
-        <div class="name">Pete Cookson</div>
-        <div class="job-title">Handyman</div>
-        <div class="contact-details">
-            Email: <a href="mailto:youremail@example.com">hello@avonmoor.co.uk</a><br>
-            Phone: 01364809656
-        </div>
-        <div class="social-media">
-            <ul class="list-inline social-links">
-                <li class="list-inline-item social">
-                    <a target="_blank" href="#">
-                        <img src="https://i.ibb.co/BzP4CzQ/facebook-brands.png" alt="facebook">
+    <div class="first-row">
+        <table cellspacing="0" cellpadding="0">
+            <tr>
+                <td class="logo">
+                    <a href="avonmoor.co.uk" target="_blank">
+                        <img alt="Logo" src="https://i.ibb.co/djv4nKq/email-logo.png">
                     </a>
-                </li>
-                <li class="list-inline-item social">
-                    <a target="_blank" href="#">
-                        <i class="fab fa-instagram" aria-hidden="true"></i>
-                        <span class="visually-hidden">Instagram</span>
+                </td>
+                <td class="name">
+                    <p>PETE COOKSON</p>
+                    <div class="socials">
+                        <table cellspacing="0" cellpadding="0" role="Presentation">
+                            <tr>
+                                <td>
+                                    <a target="_blank" href="https://facebook.com">
+                                        <img src="https://i.ibb.co/t4LN1Kp/facebook-brands-3.png" alt="facebook-brands-3" aria-hidden="true">
+                                    </a>
+                                </td>
+                                <td>
+                                    <a target="_blank" href="https://instagram.com">
+                                        <img src="https://i.ibb.co/F05mzkb/instagram-brands.png" alt="instagram-brands">
+                                    </a>
+                                </td>
+                                <td>
+                                    <a target="_blank" href="https://tiktok.com">
+                                        <img src="https://i.ibb.co/M6B6pHt/tiktok.png" alt="tiktok">
+                                    </a>
+                                </td>
+                                <td>
+                                    <a target="_blank" href="https://youtube.com">
+                                        <img src="https://i.ibb.co/zGp0jF8/youtube-brands-1.png" alt="youtube-brands-1">
+                                    </a>
+                                </td>
+                            </tr>
+                        </table>
+                    </div>
+                </td>
+            </tr>
+
+        </table>
+    </div>
+    <div class="second-row">
+        <table cellspacing="0" cellpadding="0">
+            <tr class="contact">
+                <td>
+                    <a href="https://avonmoor.co.uk" target="_blank">
+                        <img src="https://i.ibb.co/NKt72pZ/globe.png" alt="Web Address">www.avonmoor.co.uk</a>
+                </td>
+                <td>
+                    <a href="tel:+123456789">
+                        <img src="https://i.ibb.co/ZSZ8hfM/phone.png" alt="Phone">+123456789</a>
+                </td>
+                <td>
+                    <a href="mailto:hello@avonmoor.co.uk">
+                        <img src="https://i.ibb.co/ZzLFsbk/envelope.png" alt="Email">hello@avonmoor.co.uk
                     </a>
-                </li>
-                <li class="list-inline-item social">
-                    <a target="_blank" href="#">
-                        <i class="fab fa-youtube" aria-hidden="true"></i>
-                        <span class="visually-hidden">YouTube</span>
-                    </a>
-                </li>
-                <li class="list-inline-item social">
-                    <a target="_blank" href="#">
-                        <i class="fab fa-tiktok" aria-hidden="true"></i>
-                        <span class="visually-hidden">TikTok</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
+                </td>
+            </tr>
+        </table>
     </div>
 </body>
 
