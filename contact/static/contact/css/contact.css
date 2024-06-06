@@ -104,7 +104,9 @@ textarea {
 input[type=submit] {
     background-color: #cd7f32;
     color: white;
-    padding: 14px 20px;
+    font-family: 'Lato', 'Times New Roman', Times, serif;
+    font-weight: 300;
+    padding: 12px 24px;
     margin: 8px 0;
     border: none;
     border-radius: 4px;

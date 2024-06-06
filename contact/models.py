@@ -4,7 +4,7 @@ class Contact(models.Model):
     SUBJECT_CHOICES = [
         ('Garden', 'Garden'),
         ('Property', 'Property'),
-        ('Combination', 'Combination'),
+        ('Garden & Property', 'Garden & Property'),
         ('Other', 'Other'),
     ]
 
