@@ -20,6 +20,17 @@ h3 {
     font-weight: 300;
 }
 
+.footer-text {
+    color: rgba(255, 255, 255, 0.8);
+    font-family: "Bellefair", serif;
+    margin: 10px;
+    text-align: left;
+}
+
+.spaced-text {
+    letter-spacing: -0.2em;
+}
+
 /*--------------------------------------------Navbar*/
 .container-fluid-navbar {
     padding-left: 2rem;

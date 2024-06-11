@@ -8,13 +8,17 @@ class Contact(models.Model):
         ('Other', 'Other'),
     ]
 
-    name = models.CharField(max_length=255, null=True, blank=True)  # Default name
-    email = models.EmailField()  # Email field
-    phone_number = models.CharField(max_length=20, null=True, blank=True)  # Default phone number
+    name = models.CharField(max_length=255, null=True, blank=True)
+    email = models.EmailField()
+    phone_number = models.CharField(max_length=20, null=True, blank=True)
     postcode = models.CharField(max_length=20, null=True, blank=True)
-    subject = models.CharField(max_length=255, choices=SUBJECT_CHOICES)  # Subject field with choices
-    message = models.TextField()  # Message field
+    subject = models.CharField(max_length=255, choices=SUBJECT_CHOICES)
+    message = models.TextField()
 
     def __str__(self):
-        return f"{self.name} - {self.email}"  # Adjusted to display name and email
+        return f"{self.name} - {self.email}"
 
+    def save(self, *args, **kwargs):
+        if self.postcode:
+            self.postcode = self.postcode.replace(" ", "").upper()
+        super().save(*args, **kwargs)

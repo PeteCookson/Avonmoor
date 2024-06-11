@@ -1,12 +1,12 @@
 from django import forms
-from django.core.validators import EmailValidator
-from django.core.validators import MinLengthValidator
+from django.core.validators import EmailValidator, MinLengthValidator
 from django.core.exceptions import ValidationError
 from .constants import VALID_POSTCODES
 from .models import Contact
 
 def validate_postcode(value):
-    if value not in VALID_POSTCODES:
+    normalized_value = value.replace(" ", "").upper()  # Remove spaces and convert to uppercase
+    if normalized_value not in VALID_POSTCODES:
         raise ValidationError('Invalid postcode')
 
 class ContactForm(forms.ModelForm):
@@ -19,7 +19,7 @@ class ContactForm(forms.ModelForm):
             'phone_number': forms.TextInput(attrs={'placeholder': 'Phone', 'class': 'form-control phone-field'}),
             'postcode': forms.TextInput(attrs={'placeholder': 'Postcode', 'class': 'form-control postcode-field'}),
             'subject': forms.Select(attrs={'class': 'form-control subject-field'}, choices=[
-                ('', 'Enquiry Subject'),  # Placeholder choice
+                ('', 'Enquiry Subject'),
                 ('Garden', 'Garden'),
                 ('Property', 'Property'),
                 ('Garden & Property', 'Garden & Property'),
@@ -30,8 +30,9 @@ class ContactForm(forms.ModelForm):
 
     def clean_postcode(self):
         postcode = self.cleaned_data['postcode']
-        validate_postcode(postcode)  # Validate postcode against the list of valid postcodes
-        return postcode
+        normalized_postcode = postcode.replace(" ", "").upper()
+        validate_postcode(normalized_postcode)  # Validate normalized postcode
+        return normalized_postcode
 
     def clean_email(self):
         email = self.cleaned_data['email']
@@ -41,9 +42,7 @@ class ContactForm(forms.ModelForm):
 
     def clean_phone_number(self):
         phone_number = self.cleaned_data['phone_number']
-        # Add any custom phone number validation here if needed
         return phone_number
-
 
     def clean_subject(self):
         subject = self.cleaned_data['subject']
@@ -56,9 +55,3 @@ class ContactForm(forms.ModelForm):
         validator = MinLengthValidator(10)  # Minimum 10 characters for message
         validator(message)  # Raises ValidationError if message length is less than 10
         return message
-
-
-
-
-
-
