@@ -14,10 +14,12 @@ SECRET_KEY = 'django-insecure-h8)dirb4zue-32vn4-1s+a71jssl!qr#fs#cd6^r)9b_s0d*ev
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = True
 
-ALLOWED_HOSTS = ['8000-petecookson-avonmoor-jiqppey2tgk.ws-eu114.gitpod.io']
+ALLOWED_HOSTS = ['127.0.0.1']
 
 CSRF_TRUSTED_ORIGINS = [
     'https://8000-petecookson-avonmoor-jiqppey2tgk.ws-eu114.gitpod.io',
+    'http://127.0.0.1',
+    'https://127.0.0.1',
     # Add any other trusted origins if needed
 ]
 
@@ -72,10 +74,9 @@ DATABASES = {
 }
 
 # Email settings
-EMAIL_BACKEND = 'django.core.mail.backends.smtp.EmailBackend'
 EMAIL_HOST = config('EMAIL_HOST')
 EMAIL_PORT = config('EMAIL_PORT', cast=int)
-EMAIL_USE_SSL = config('EMAIL_USE_SSL', cast=bool)
+EMAIL_USE_SSL = config('EMAIL_USE_SSL', default=True, cast=bool)  # Use SSL instead of TLS
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 
