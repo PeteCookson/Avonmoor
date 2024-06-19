@@ -167,13 +167,19 @@
         });
     </script>
     {% if success %}
-    <!-- Bootstrap Modal Script -->
+    <!-- Script to show success modal -->
     <script>
-        // Show the modal if the form was successfully submitted
-        var successModal = new bootstrap.Modal(document.getElementById('successModal'));
-        successModal.show();
+        document.addEventListener('DOMContentLoaded', function () {
+            var successModal = new bootstrap.Modal(document.getElementById('successModal'));
+            successModal.show();
+            setTimeout(function () {
+                successModal.hide();
+                // Optional: Redirect to remove success parameter from URL
+                history.replaceState(null, '', window.location.href.split('?')[0]);
+            }, 3000);
+        });
     </script>
-    {% endif %}
+{% endif %}
 </body>
 
 </html>

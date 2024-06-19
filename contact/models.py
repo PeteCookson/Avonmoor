@@ -1,4 +1,5 @@
 from django.db import models
+from django.utils import timezone
 
 class Contact(models.Model):
     SUBJECT_CHOICES = [
@@ -14,6 +15,7 @@ class Contact(models.Model):
     postcode = models.CharField(max_length=20, null=True, blank=True)
     subject = models.CharField(max_length=255, choices=SUBJECT_CHOICES)
     message = models.TextField()
+    created_at = models.DateTimeField(auto_now_add=True)
 
     def __str__(self):
         return f"{self.name} - {self.email}"
