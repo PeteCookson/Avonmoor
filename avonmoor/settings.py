@@ -114,7 +114,8 @@ USE_TZ = True
 STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
-    os.path.join(BASE_DIR, 'contact/static'),
+    os.path.join(BASE_DIR, 'contact', 'static'),
+    # Add other directories if you have additional apps
 ]
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
