@@ -24,3 +24,6 @@ class Contact(models.Model):
         if self.postcode:
             self.postcode = self.postcode.replace(" ", "").upper()
         super().save(*args, **kwargs)
+
+    def created_at_local(self):
+        return timezone.localtime(self.created_at)

@@ -16,6 +16,10 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1']
 
+TIME_ZONE = 'Europe/London'
+
+USE_TZ = True
+
 CSRF_TRUSTED_ORIGINS = [
     'https://8000-petecookson-avonmoor-jiqppey2tgk.ws-eu114.gitpod.io',
     'http://127.0.0.1',
