@@ -14,7 +14,8 @@ body {
 }
 
 h1,
-h3 {
+h3,
+h5 {
     color: rgb(255, 255, 255);
     font-family: 'Lato', 'Times New Roman', Times, serif;
     font-weight: 300;
@@ -31,7 +32,7 @@ h3 {
     letter-spacing: -0.2em;
 }
 
-/*--------------------------------------------Navbar*/
+/*-------------------------------------------- Navbar*/
 .container-fluid-navbar {
     padding-left: 2rem;
     padding-right: 2rem;
@@ -136,7 +137,7 @@ input[type=submit] {
     /* You can adjust the background color if needed */
 }
 
-/* General input field styling */
+/* -------------------------------------------- General input field styling */
 input.form-control,
 textarea.form-control,
 select.form-control,
@@ -171,7 +172,37 @@ input[type=submit]:hover {
     background-color: #28a745;
 }
 
-/*--------------------------------------------Main and Footer*/
+/*--------------------------------------------invalid alert*/
+/*.alert-danger {
+    color: red;
+    background-color: #f8d7da;
+    border-color: #f5c6cb;
+}
+
+.invalid-feedback {
+    color: red;
+    font-size: 0.9em;
+    margin-top: 5px;
+}
+
+.form-control.is-invalid {
+    border-color: red;
+}*/
+
+/*-------------------------------------------- Modal*/
+.alert-success {
+    background-color: #28a745; /* Green background for success */
+    color: #fff; /* White text color */
+    border: 1px solid #218838; /* Darker green border */
+}
+
+.alert-danger {
+    background-color: #dc3545; /* Red background for error */
+    color: #fff; /* White text color */
+    border: 1px solid #c82333; /* Darker red border */
+}
+
+/*-------------------------------------------- Main and Footer*/
 main {
     flex: 1;
     display: flex;
@@ -224,7 +255,7 @@ footer {
     margin: 0 0.7rem;
 }
 
-/* contact.css */
+/* -------------------------------------------- contact.css */
 
 .form-columns {
     display: flex;
@@ -239,7 +270,7 @@ footer {
     /* Ensure columns don't collapse on smaller screens */
 }
 
-/* Mobile-specific adjustments */
+/* -------------------------------------------- Mobile-specific adjustments */
 @media (max-width: 768px) {
     body {
         background-size: cover;
