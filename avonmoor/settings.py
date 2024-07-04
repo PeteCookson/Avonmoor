@@ -16,8 +16,7 @@ DEBUG = True
 
 ALLOWED_HOSTS = ['127.0.0.1']
 
-TIME_ZONE = 'Europe/London'
-
+TIME_ZONE = 'Europe/London'  # Use local timezone
 USE_TZ = True
 
 CSRF_TRUSTED_ORIGINS = [
@@ -85,7 +84,6 @@ EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
 
-
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
 AUTH_PASSWORD_VALIDATORS = [
@@ -107,11 +105,9 @@ AUTH_PASSWORD_VALIDATORS = [
 # https://docs.djangoproject.com/en/5.0/topics/i18n/
 LANGUAGE_CODE = 'en-us'
 
-TIME_ZONE = 'UTC'
-
+TIME_ZONE = 'Europe/London'  # Set this to your local time zone
 USE_I18N = True
-
-USE_TZ = True
+USE_TZ = True  # Ensure this is set to True
 
 # Static files (CSS, JavaScript, Images)
 # https://docs.djangoproject.com/en/3.2/howto/static-files/
