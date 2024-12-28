@@ -30,22 +30,31 @@
             <div class="container-fluid col-lg-8 col-md-12 col-12">
                 <a class="navbar-brand logo" href="#" id="home">
                     <img src="{% static '/img/master-logo-black.png' %}" alt="Logo for Avonmoor" style="width: 200px" /></a>
-                <!--<button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
+                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
                     <span class="navbar-toggler-icon"></span>
                 </button>
                 <div class="collapse navbar-collapse" id="navbarNav">
                     <ul class="navbar-nav ms-auto">
                         <li class="nav-item">
-                            <a class="nav-font nav-link" href="#" id="home">ABOUT</a>
+                            <a class="nav-font nav-link" href="#" id="about">ABOUT</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-font nav-link" href="#" id="about">CONTACT</a>
+                            <a class="nav-font nav-link" href="#" id="garden">GARDEN</a>
                         </li>
                         <li class="nav-item">
-                            <a class="nav-font nav-link" href="#">BLOG</a>
+                            <a class="nav-font nav-link" href="#" id="property">PROPERTY</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-font nav-link" href="#" id="gallery">GALLERY</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-font nav-link" href="#" id="contact">CONTACT</a>
+                        </li>
+                        <li class="nav-item">
+                            <a class="nav-font nav-link" href="#" id="blog">BLOG</a>
                         </li>
                     </ul>
-                </div>-->
+                </div>
             </div>
         </nav>
     </header>
@@ -95,41 +104,9 @@
     </main>
 
     <!-- Footer -->
-    <footer class="container-fluid">
-        <div>
-            <ul class="list-inline social-links">
-                <li class="list-inline-item social">
-                    <a target="_blank" href="https://www.facebook.com/profile.php?id=61559721330836&sk=about">
-                        <i class="fab fa-facebook" aria-hidden="true"></i>
-                        <span class="visually-hidden">Facebook</span>
-                    </a>
-                </li>
-                <li class="list-inline-item social">
-                    <a target="_blank" href="https://www.instagram.com/avon_moor/">
-                        <i class="fab fa-instagram" aria-hidden="true"></i>
-                        <span class="visually-hidden">Instagram</span>
-                    </a>
-                </li>
-                <li class="list-inline-item social">
-                    <a target="_blank" href="https://www.youtube.com/@Avonmoor">
-                        <i class="fab fa-youtube" aria-hidden="true"></i>
-                        <span class="visually-hidden">YouTube</span>
-                    </a>
-                </li>
-                <li class="list-inline-item social">
-                    <a target="_blank" href="https://www.tiktok.com/@avonmoor?_t=8myTGdBGY3F&_r=1">
-                        <i class="fab fa-tiktok" aria-hidden="true"></i>
-                        <span class="visually-hidden">TikTok</span>
-                    </a>
-                </li>
-            </ul>
-        </div>
-        <div class="footer-text">
-            <p>
-                © <span class="spaced-text">AVONMOOR</span> MMXXIV
-            </p>
-        </div>
-    </footer>
+    {% include 'includes/footer.html' %}
+
+    
     <!-- Success/Error Modal -->
     <div class="modal fade" id="successModal" tabindex="-1" aria-labelledby="successModalLabel" aria-hidden="true">
         <div class="modal-dialog">
