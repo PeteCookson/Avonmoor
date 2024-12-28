@@ -15,49 +15,17 @@
     <script src="https://kit.fontawesome.com/6e1477af15.js" crossorigin="anonymous"></script>
     <!-- Custom Styles -->
     {% load static %}
-    <link rel="stylesheet" type="text/css" href="{% static '/css/contact.css' %}" />
+    <link rel="stylesheet" type="text/css" href="{% staticfiles '/css/contact'  %}" />
     <!-- Favicon -->
-    <link rel="apple-touch-icon" sizes="180x180" href="{% static '/img/apple-touch-icon.png' %}" />
-    <link rel="icon" type="image/png" sizes="32x32" href="{% static '/img/favicon-32x32.png' %}" />
-    <link rel="icon" type="image/png" sizes="16x16" href="{% static '/img/favicon-16x16.png' %}" />
+    <link rel="apple-touch-icon" sizes="180x180" href="{% staticfiles '/img/apple-touch-icon.png' %}" />
+    <link rel="icon" type="image/png" sizes="32x32" href="{% staticfiles '/img/favicon-32x32.png' %}" />
+    <link rel="icon" type="image/png" sizes="16x16" href="{% staticfiles '/img/favicon-16x16.png' %}" />
     <link rel=“manifest” href="/src/manifest.json">
 </head>
 
 <body>
     <!--Navbar-->
-    <header>
-        <nav class="navbar navbar-expand-lg navbar-light">
-            <div class="container-fluid col-lg-8 col-md-12 col-12">
-                <a class="navbar-brand logo" href="#" id="home">
-                    <img src="{% static '/img/master-logo-black.png' %}" alt="Logo for Avonmoor" style="width: 200px" /></a>
-                <button class="navbar-toggler" type="button" data-bs-toggle="collapse" data-bs-target="#navbarNav" aria-controls="navbarNav" aria-expanded="false" aria-label="Toggle navigation">
-                    <span class="navbar-toggler-icon"></span>
-                </button>
-                <div class="collapse navbar-collapse" id="navbarNav">
-                    <ul class="navbar-nav ms-auto">
-                        <li class="nav-item">
-                            <a class="nav-font nav-link" href="#" id="about">ABOUT</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-font nav-link" href="#" id="garden">GARDEN</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-font nav-link" href="#" id="property">PROPERTY</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-font nav-link" href="#" id="gallery">GALLERY</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-font nav-link" href="#" id="contact">CONTACT</a>
-                        </li>
-                        <li class="nav-item">
-                            <a class="nav-font nav-link" href="#" id="blog">BLOG</a>
-                        </li>
-                    </ul>
-                </div>
-            </div>
-        </nav>
-    </header>
+    {% include 'includes/header.html' %}
 
     <main>
         <div class="container">
