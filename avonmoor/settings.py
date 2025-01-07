@@ -52,7 +52,7 @@ ROOT_URLCONF = 'avonmoor.urls'
 TEMPLATES = [
     {
         'BACKEND': 'django.template.backends.django.DjangoTemplates',
-        'DIRS': [],
+        'DIRS': [os.path.join(BASE_DIR, 'templates')],
         'APP_DIRS': True,
         'OPTIONS': {
             'context_processors': [
@@ -115,8 +115,9 @@ STATIC_URL = '/static/'
 
 STATICFILES_DIRS = [
     os.path.join(BASE_DIR, 'contact', 'static'),
-    # Add other directories if you have additional apps
+    os.path.join(BASE_DIR, 'static'),  # For a global static folder
 ]
+
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
 
