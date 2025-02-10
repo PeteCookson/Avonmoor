@@ -1,0 +1,88 @@
+/* Global Navbar Styles */
+.navbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #000; /* Navbar background */
+  padding: 10px 20px;
+}
+
+/* Navbar Items: Visible on large screens only */
+@media (max-width: 991px) {
+  .navbar-nav-icon   display: none;
+  }
+
+  .collapse {
+      display: none;
+  }
+}
+
+@media (min-width: 992px) {
+  .nav-icon {
+      display: none;
+  }
+}
+
+/* Burger Wrapper (Small Screens Only) */
+
+#nav-icon span:nth-child(1) {
+  top: 0px;
+}
+
+#nav-icon span:nth-child(2),#nav-icon span:nth-child(3) {
+  top: 18px;
+}
+
+#nav-icon span:nth-child(4) {
+  top: 36px;
+}
+
+#nav-icon.open span:nth-child(1) {
+  top: 18px;
+  width: 0%;
+  left: 50%;
+}
+
+#nav-icon.open span:nth-child(2) {
+  -webkit-transform: rotate(45deg);
+  -moz-transform: rotate(45deg);
+  -o-transform: rotate(45deg);
+  transform: rotate(45deg);
+}
+
+#nav-icon.open span:nth-child(3) {
+  -webkit-transform: rotate(-45deg);
+  -moz-transform: rotate(-45deg);
+  -o-transform: rotate(-45deg);
+  transform: rotate(-45deg);
+}
+
+#nav-icon.open span:nth-child(4) {
+  top: 18px;
+  width: 0%;
+  left: 50%;
+}
+
+
+/* Navbar Dropdown on Small Screens */
+@media (max-width: 991px) {
+  .menu-trigger:checked ~ .collapse {
+      display: block;
+      position: absolute;
+      top: 60px;
+      right: 0;
+      background-color: #000;
+      width: 100%;
+      z-index: 1000;
+  }
+
+  .navbar-nav-icon   display: block;
+      text-align: center;
+  }
+
+  .navbar-nav-icon{
+      color: white !important;
+      padding: 10px 15px;
+      display: block;
+  }
+}
