@@ -15,10 +15,15 @@ Including another URLconf
     2. Add a URL to urlpatterns:  path('blog/', include('blog.urls'))
 """
 from django.contrib import admin
-from django.urls import path
+from django.urls import path, include
 from contact import views as contact_views
 
 urlpatterns = [
-    path('', contact_views.contact_view, name='contact'),  # Root URL redirects
-    path('admin/', admin.site.urls),
+    path('', include('about.urls')),  # This line tells Django to use the 'about' app's URLs
+    path('contact/', contact_views.contact_view, name='contact'),  # Contact page at '/contact/'
+    path('blog/', include('blog.urls')),  # Include blog app URLs 
+    path('gallery/', include('gallery.urls')),
+    path('garden/', include('garden.urls')),
+    path('property/', include('property.urls')),
+    path('admin/', admin.site.urls),   
 ]
