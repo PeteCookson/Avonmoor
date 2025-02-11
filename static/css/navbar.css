@@ -1,35 +1,197 @@
-/* Global Navbar Styles */
+/* ============================================
+   Global Navbar Styles (Applies to All Screens)
+=============================================== */
 .navbar {
-  display: flex;
-  justify-content: space-between;
-  align-items: center;
-  background-color: #000; /* Navbar background */
-  padding: 10px 20px;
+  display: flex; /* Aligns items horizontally */
+  justify-content: space-between; /* Pushes items to both ends */
+  align-items: center; /* Vertically centers items */
+  padding: 10px 20px; /* Adds spacing around navbar */
+  position: relative; /* Keeps it positioned properly */
 }
 
-/* Navbar Items: Visible on large screens only */
-@media (max-width: 991px) {
-  .navbar-nav-icon   display: none;
-  }
-
-  .collapse {
-      display: none;
-  }
+/* ============================================
+   Navbar Container (Controls Padding)
+=============================================== */
+.container-fluid-navbar {
+  padding-left: 2rem;
+  padding-right: 2rem;
 }
 
+/* ============================================
+   Navbar Font Styling
+=============================================== */
+.nav-font {
+  color: rgb(255, 255, 255); /* White text */
+  font-size: 1rem; /* Standard font size */
+}
+
+.navbar-light .navbar-nav .nav-link {
+  color: rgb(255, 255, 255); /* White links */
+  font-family: 'Lato', 'Times New Roman', Times, serif; /* Font styling */
+  font-weight: 300; /* Light font weight */
+}
+
+/* ============================================
+   Navbar Items (Spacing & Alignment)
+=============================================== */
+.nav-item {
+  padding-left: 2rem; /* Adds spacing between menu items */
+  text-align: left; /* Aligns text to the right */
+}
+
+/* Adjusted padding to prevent vertical expansion */
+.navbar {
+  padding: 1rem 2rem;
+  height: auto; /* Default height based on content */
+    transition: padding 0.3s ease, height 0.3s ease; /* Smooth transition when height changes */
+}
+
+/* Navbar when scrolled */
+.navbar.scrolled {
+  padding: 0.5rem 2rem; /* Reduce padding when scrolled */
+  height: auto; /* Keeps height based on content */
+}
+
+.navbar .navbar-brand img {
+  transition: max-height 0.3s ease; /* Smooth transition for logo */
+}
+
+/* Logo when scrolled */
+.navbar.scrolled .navbar-brand img {
+  max-height: 100px; /* Limit the logo height when scrolling */
+  width: auto; /* Keep the logo's aspect ratio */
+}
+
+/* ============================================
+   Navbar Hover Effects
+=============================================== */
+#navbarNav a:hover {
+  color: #dd9208; /* Changes text color on hover */
+  border-bottom: 1px solid #dd9208; /* Adds underline effect */
+}
+
+/* ============================================
+   Sticky Header
+=============================================== */
+header {
+  position: sticky;
+  top: 0;
+  width: 100%;
+  z-index: 1050; /* Ensures it's above other content */
+  background-color: transparent;
+}
+
+/* When scrolled, add background */
+header.scrolled {
+  background-color: rgba(106, 106, 106, 0.563); /* Adjust color as needed */
+  padding: 0.5rem 0; /* Reduce padding when scrolled */
+  height: 60px; /* Adjusted height when scrolled */
+}
+
+#home img {
+  transition: max-height 0.3s ease-in-out; /* Smooth transition for logo size */
+  max-height: 200px; /* Default size */
+}
+
+header.scrolled #home img {
+  width: auto;
+  object-fit: contain; /* Ensures the image scales correctly within its box */
+}
+
+
+/* ============================================
+   Desktop Navigation (Visible on Large Screens)
+=============================================== */
 @media (min-width: 992px) {
-  .nav-icon {
-      display: none;
+  .navbar-collapse {
+    display: flex !important; /* Ensures menu is always visible on larger screens */
+  }
+  #nav-icon {
+    display: none !important; /* Ensures it's completely hidden */
+  }
+}
+/* ============================================
+   Mobile Navigation (Hides Menu by Default)
+=============================================== */
+@media (max-width: 991px) {
+  .nav-font {
+    font-size: 1.5rem;
+  }
+
+  .navbar-collapse {
+    padding-left: 60px;
+    padding-top: 60px;
+    display: none; /* Hides menu on smaller screens */
+    position: fixed; /* Fixes it to cover the whole screen */
+    background-color: #000000ca;
+    top: 0px;
+    right: 0;
+    width: 100vw; /* Full screen width */
+    height: 100vh; /* Full screen height */
+    z-index: 1000; /* Keeps it above other elements */
+  }
+
+  /* When menu is toggled open */
+  .navbar-collapse.open {
+    display: block; /* Show menu */
+  }
+
+  /* Adjust menu padding for better spacing */
+  .navbar-nav {
+    padding: 10px 0;
+  }
+
+  .nav-item {
+    padding: 10px 0;
   }
 }
 
-/* Burger Wrapper (Small Screens Only) */
 
-#nav-icon span:nth-child(1) {
-  top: 0px;
+/* Hamburger Menu */
+#nav-icon {
+  border: none;
+  width: 60px;
+  height: 45px;
+  position: relative;
+  cursor: pointer;
+  -webkit-transform: rotate(0deg);
+  -moz-transform: rotate(0deg);
+  -o-transform: rotate(0deg);
+  transform: rotate(0deg);
+  -webkit-transition: .5s ease-in-out;
+  -moz-transition: .5s ease-in-out;
+  -o-transition: .5s ease-in-out;
+  transition: .5s ease-in-out;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  z-index: 1100; /* Higher than the menu */
 }
 
-#nav-icon span:nth-child(2),#nav-icon span:nth-child(3) {
+/* Hamburger Bars */
+#nav-icon span {
+  display: block;
+  position: absolute;
+  height: 9px;
+  width: 100%;
+  background: #ffffff;
+  border-radius: 9px;
+  opacity: 1;
+  left: 0;
+  -webkit-transition: .25s ease-in-out;
+  -moz-transition: .25s ease-in-out;
+  -o-transition: .25s ease-in-out;
+  transition: .25s ease-in-out;
+}
+
+/* Positioning for Default State */
+#nav-icon span:nth-child(1) {
+  top: 0;
+}
+
+#nav-icon span:nth-child(2), 
+#nav-icon span:nth-child(3) {
   top: 18px;
 }
 
@@ -37,52 +199,21 @@
   top: 36px;
 }
 
-#nav-icon.open span:nth-child(1) {
-  top: 18px;
-  width: 0%;
-  left: 50%;
-}
-
-#nav-icon.open span:nth-child(2) {
-  -webkit-transform: rotate(45deg);
-  -moz-transform: rotate(45deg);
-  -o-transform: rotate(45deg);
-  transform: rotate(45deg);
-}
-
-#nav-icon.open span:nth-child(3) {
-  -webkit-transform: rotate(-45deg);
-  -moz-transform: rotate(-45deg);
-  -o-transform: rotate(-45deg);
-  transform: rotate(-45deg);
-}
-
+/* Open State Animation */
+#nav-icon.open span:nth-child(1),
 #nav-icon.open span:nth-child(4) {
   top: 18px;
   width: 0%;
   left: 50%;
 }
 
-
-/* Navbar Dropdown on Small Screens */
-@media (max-width: 991px) {
-  .menu-trigger:checked ~ .collapse {
-      display: block;
-      position: absolute;
-      top: 60px;
-      right: 0;
-      background-color: #000;
-      width: 100%;
-      z-index: 1000;
-  }
-
-  .navbar-nav-icon   display: block;
-      text-align: center;
-  }
-
-  .navbar-nav-icon{
-      color: white !important;
-      padding: 10px 15px;
-      display: block;
-  }
+#nav-icon.open span:nth-child(2) {
+  transform: rotate(45deg);
 }
+
+#nav-icon.open span:nth-child(3) {
+  transform: rotate(-45deg);
+}
+
+
+

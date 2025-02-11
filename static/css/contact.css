@@ -31,48 +31,6 @@ h3 {
     letter-spacing: -0.2em;
 }
 
-/*--------------------------------------------Navbar*/
-.container-fluid-navbar {
-    padding-left: 2rem;
-    padding-right: 2rem;
-}
-
-.nav-font {
-    color: rgb(255, 255, 255);
-    font-size: 1rem;
-}
-
-.navbar-light .navbar-nav .nav-link {
-    color: rgb(255, 255, 255);
-    font-family: 'Lato', 'Times New Roman', Times, serif;
-    font-weight: 300;
-}
-
-
-.nav-item {
-    padding-left: 2rem;
-    /* Adjusted to make it look better on smaller screens */
-    text-align: right;
-}
-
-.navbar {
-    padding: 1rem 2rem;
-    /* Adjusted padding to prevent vertical expansion */
-}
-
-/* .navbar-toggler .navbar-toggler-icon {
-    width: 2rem !important;
-    height: 2rem !important;
-} */
-
-#navbarNav a:hover {
-    color: #dd9208;
-    border-bottom: 1px solid #dd9208;
-}
-
-.active {
-    border-bottom: 1px solid #dd9208;
-}
 
 .form-columns {
     display: flex;
