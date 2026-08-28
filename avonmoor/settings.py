@@ -9,22 +9,25 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 # See https://docs.djangoproject.com/en/5.0/howto/deployment/checklist/
 
 # SECURITY WARNING: keep the secret key used in production secret!
-SECRET_KEY = 'django-insecure-h8)dirb4zue-32vn4-1s+a71jssl!qr#fs#cd6^r)9b_s0d*ev'
+SECRET_KEY = config('DJANGO_SECRET_KEY')
 
 # SECURITY WARNING: don't run with debug turned on in production!
-DEBUG = True
+DEBUG = config('DEBUG', cast=bool, default=False)
 
-ALLOWED_HOSTS = ['127.0.0.1']
+ALLOWED_HOSTS = config(
+    'ALLOWED_HOSTS',
+    default='127.0.0.1,localhost',
+    cast=lambda value: [host.strip() for host in value.split(',') if host.strip()],
+)
 
 TIME_ZONE = 'Europe/London'  # Use local timezone
 USE_TZ = True
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://8000-petecookson-avonmoor-jiqppey2tgk.ws-eu114.gitpod.io',
-    'http://127.0.0.1',
-    'https://127.0.0.1',
-    # Add any other trusted origins if needed
-]
+CSRF_TRUSTED_ORIGINS = config(
+    'CSRF_TRUSTED_ORIGINS',
+    default='',
+    cast=lambda value: [origin.strip() for origin in value.split(',') if origin.strip()],
+)
 
 # Application definition
 INSTALLED_APPS = [
@@ -84,7 +87,7 @@ DATABASES = {
 # Email settings
 EMAIL_BACKEND = config('EMAIL_BACKEND')
 EMAIL_HOST = config('EMAIL_HOST')
-EMAIL_PORT = config('EMAIL_PORT')
+EMAIL_PORT = config('EMAIL_PORT', cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
