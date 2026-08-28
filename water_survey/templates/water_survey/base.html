@@ -1,0 +1,26 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#18352d">
+    <title>{% block title %}Survey tool{% endblock %} | Avonmoor Water</title>
+    <link rel="stylesheet" href="{% static 'css/water_survey.css' %}">
+</head>
+<body class="survey-app">
+    <header class="app-header">
+        <a href="{% url 'water_survey:survey-list' %}" class="brand">
+            <span class="brand-mark">A</span>
+            <span><strong>Avonmoor Water</strong><small>Roof survey</small></span>
+        </a>
+        <form method="post" action="{% url 'logout' %}">
+            {% csrf_token %}
+            <button type="submit" class="text-button">Sign out</button>
+        </form>
+    </header>
+    <main class="app-main">
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>
