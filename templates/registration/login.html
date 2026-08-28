@@ -1,0 +1,24 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Survey login | Avonmoor Water</title>
+    <link rel="stylesheet" href="{% static 'css/water_survey.css' %}">
+</head>
+<body class="survey-app survey-auth">
+    <main class="auth-card">
+        <p class="eyebrow">Avonmoor Water</p>
+        <h1>Survey tool</h1>
+        <p class="lede">Internal access for property surveys and yield estimates.</p>
+        {% if form.errors %}<p class="form-error">The username or password was not recognised.</p>{% endif %}
+        <form method="post" class="stacked-form">
+            {% csrf_token %}
+            {{ form.as_div }}
+            <input type="hidden" name="next" value="{{ next }}">
+            <button type="submit" class="button button-primary">Sign in</button>
+        </form>
+    </main>
+</body>
+</html>
