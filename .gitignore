@@ -2,9 +2,22 @@ core.Microsoft*
 core.mongo*
 core.python*
 .env
+.env.*
+!.env.example
 env.py
 __pycache__/
 *.py[cod]
 node_modules/
 .github/
 cloudinary_python.txt
+db.sqlite3
+*.sqlite3
+*.sqlite3.*
+*.backup-*
+staticfiles/
+.DS_Store
+venv/
+.venv/
+
+# VS Code-related
+.vscode/
