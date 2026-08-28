@@ -1,0 +1,43 @@
+{% extends 'water_survey/base.html' %}
+{% block title %}{{ survey }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'water_survey:survey-list' %}">← All surveys</a>
+<div class="detail-heading">
+    <div>
+        <span class="status status-{{ survey.status }}">{{ survey.get_status_display }}</span>
+        <h1>{{ survey.property_name|default:survey.address_line_1 }}</h1>
+        <p>{{ survey.address_line_1 }}{% if survey.town %}, {{ survey.town }}{% endif %} · {{ survey.postcode|upper }}</p>
+    </div>
+    <a class="button button-secondary" href="{% url 'water_survey:roof-section-create' survey.pk %}">Add roof</a>
+</div>
+
+<section class="result-panel">
+    <p class="eyebrow">Current estimate</p>
+    {% if survey.estimated_annual_yield_litres is not None %}
+        <strong class="yield-number">{{ survey.estimated_annual_yield_litres|floatformat:'0g' }}</strong>
+        <span class="yield-unit">litres/year</span>
+        <p>From {{ survey.total_roof_area_m2|floatformat:1 }} m² of selected roof using {{ survey.annual_rainfall_mm|floatformat:0 }} mm annual rainfall.</p>
+    {% else %}
+        <h2>Rainfall required</h2>
+        <p>Add an annual rainfall figure to calculate the estimated yield.</p>
+    {% endif %}
+</section>
+
+<section class="section-block">
+    <div class="section-heading"><h2>Roof sections</h2><span>{{ survey.roof_sections.count }}</span></div>
+    {% for roof in survey.roof_sections.all %}
+    <article class="roof-row">
+        <div><h3>{{ roof.name }}</h3><p>{{ roof.get_roof_material_display }}{% if roof.downpipe_label %} · {{ roof.downpipe_label }}{% endif %}</p></div>
+        <dl>
+            <div><dt>Area</dt><dd>{{ roof.area_m2|floatformat:1 }} m²</dd></div>
+            {% if roof.estimated_annual_yield_litres is not None %}<div><dt>Yield</dt><dd>{{ roof.estimated_annual_yield_litres|floatformat:'0g' }} L</dd></div>{% endif %}
+            <div><dt>Runoff</dt><dd>{{ roof.runoff_coefficient }}</dd></div>
+        </dl>
+    </article>
+    {% empty %}
+    <div class="inline-empty"><p>No roof areas measured yet.</p><a href="{% url 'water_survey:roof-section-create' survey.pk %}">Add the first roof section →</a></div>
+    {% endfor %}
+</section>
+
+{% if survey.notes %}<section class="section-block"><h2>Survey notes</h2><p>{{ survey.notes|linebreaksbr }}</p></section>{% endif %}
+{% endblock %}
