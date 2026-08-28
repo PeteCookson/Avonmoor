@@ -1,0 +1,35 @@
+{% extends 'water_survey/base.html' %}
+{% block title %}Surveys{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">Field records</p>
+        <h1>Property surveys</h1>
+    </div>
+    <a class="button button-primary" href="{% url 'water_survey:survey-create' %}">New survey</a>
+</div>
+
+{% if surveys %}
+<div class="survey-grid">
+    {% for survey in surveys %}
+    <a class="survey-card" href="{% url 'water_survey:survey-detail' survey.pk %}">
+        <span class="status status-{{ survey.status }}">{{ survey.get_status_display }}</span>
+        <h2>{{ survey.property_name|default:survey.address_line_1 }}</h2>
+        <p>{{ survey.address_line_1 }}{% if survey.town %}, {{ survey.town }}{% endif %}</p>
+        <dl class="card-metrics">
+            <div><dt>Postcode</dt><dd>{{ survey.postcode|upper }}</dd></div>
+            <div><dt>Roof</dt><dd>{{ survey.total_roof_area_m2|floatformat:1 }} m²</dd></div>
+        </dl>
+        <small>Updated {{ survey.updated_at|date:'j M Y, H:i' }}</small>
+    </a>
+    {% endfor %}
+</div>
+{% else %}
+<section class="empty-state">
+    <span class="empty-icon">⌁</span>
+    <h2>No surveys yet</h2>
+    <p>Create the first property record, then add each roof section that drains to the proposed system.</p>
+    <a class="button button-primary" href="{% url 'water_survey:survey-create' %}">Create first survey</a>
+</section>
+{% endif %}
+{% endblock %}
