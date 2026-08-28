@@ -20,6 +20,8 @@ from contact import views as contact_views
 
 urlpatterns = [
     path('', include('about.urls')),  # This line tells Django to use the 'about' app's URLs
+    path('accounts/', include('django.contrib.auth.urls')),
+    path('surveys/', include('water_survey.urls')),
     path('contact/', contact_views.contact_view, name='contact'),  # Contact page at '/contact/'
     path('blog/', include('blog.urls')),  # Include blog app URLs 
     path('gallery/', include('gallery.urls')),
