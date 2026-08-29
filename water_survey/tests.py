@@ -1,18 +1,25 @@
 import json
 from collections import OrderedDict
 from decimal import Decimal
+from pathlib import Path
+from tempfile import TemporaryDirectory
 
 from django.contrib.auth import get_user_model
+from django.core.management import call_command
 from django.test import override_settings
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
-from .models import RoofSection, Survey
+from .models import RainfallGridPoint, RoofSection, Survey
 from .services.calculations import (
     calculate_monthly_yields,
     calculate_yield_litres,
 )
 from .services.geometry import calculate_geojson_area_m2
+from .services.rainfall import (
+    apply_nearest_rainfall_to_survey,
+    find_nearest_rainfall_point,
+)
 
 
 TEST_ROOF_POLYGON = {
@@ -25,6 +32,36 @@ TEST_ROOF_POLYGON = {
         [-3.8340, 50.4260],
     ]],
 }
+TEST_MONTHLY_RAINFALL = {
+    'jan': '100.00',
+    'feb': '80.00',
+    'mar': '75.00',
+    'apr': '60.00',
+    'may': '55.00',
+    'jun': '50.00',
+    'jul': '45.00',
+    'aug': '55.00',
+    'sep': '70.00',
+    'oct': '90.00',
+    'nov': '105.00',
+    'dec': '115.00',
+}
+
+
+def create_rainfall_point(**overrides):
+    values = {
+        'grid_reference': 'test-grid-1',
+        'latitude': Decimal('50.426100'),
+        'longitude': Decimal('-3.834100'),
+        'monthly_rainfall_mm': TEST_MONTHLY_RAINFALL,
+        'annual_rainfall_mm': Decimal('900.00'),
+        'source_name': 'Met Office HadUK-Grid',
+        'source_version': 'v1.3.2.ceda',
+        'reference_period': '1991-2020',
+        'resolution_km': Decimal('1.00'),
+    }
+    values.update(overrides)
+    return RainfallGridPoint.objects.create(**values)
 
 
 class YieldCalculationTests(SimpleTestCase):
@@ -80,6 +117,126 @@ class GeometryCalculationTests(SimpleTestCase):
 
         with self.assertRaisesMessage(ValueError, 'three different points'):
             calculate_geojson_area_m2(polygon)
+
+
+class RainfallLookupTests(TestCase):
+    def setUp(self):
+        self.user = get_user_model().objects.create_user(
+            username='rainfall-surveyor', password='test-password'
+        )
+        self.survey = Survey.objects.create(
+            created_by=self.user,
+            address_line_1='1 Rain Lane',
+            postcode='TQ10 9AB',
+            latitude=Decimal('50.426000'),
+            longitude=Decimal('-3.834000'),
+            annual_rainfall_mm=Decimal('1100'),
+        )
+        RoofSection.objects.create(
+            survey=self.survey,
+            area_m2=Decimal('10'),
+            runoff_coefficient=Decimal('1'),
+            system_efficiency=Decimal('1'),
+        )
+
+    def test_nearest_grid_point_is_selected(self):
+        nearest = create_rainfall_point()
+        create_rainfall_point(
+            grid_reference='test-grid-2',
+            latitude=Decimal('50.500000'),
+            longitude=Decimal('-3.900000'),
+        )
+
+        result, distance = find_nearest_rainfall_point(
+            self.survey.latitude, self.survey.longitude
+        )
+
+        self.assertEqual(result, nearest)
+        self.assertLess(distance, Decimal('0.02'))
+
+    def test_grid_values_are_copied_to_survey(self):
+        point = create_rainfall_point()
+
+        result = apply_nearest_rainfall_to_survey(self.survey)
+
+        self.survey.refresh_from_db()
+        self.assertEqual(result, point)
+        self.assertEqual(self.survey.annual_rainfall_mm, Decimal('900.00'))
+        self.assertEqual(self.survey.monthly_rainfall_mm['jan'], '100.00')
+        self.assertEqual(self.survey.rainfall_reference_period, '1991-2020')
+        self.assertEqual(
+            self.survey.monthly_yield_rows[0]['yield_litres'],
+            Decimal('1000.00'),
+        )
+
+    def test_no_grid_point_preserves_manual_fallback(self):
+        result = apply_nearest_rainfall_to_survey(self.survey)
+
+        self.survey.refresh_from_db()
+        self.assertIsNone(result)
+        self.assertEqual(self.survey.annual_rainfall_mm, Decimal('1100.00'))
+        self.assertEqual(self.survey.monthly_rainfall_mm, {})
+
+    def test_refresh_endpoint_applies_rainfall(self):
+        create_rainfall_point()
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('water_survey:rainfall-refresh', args=[self.survey.pk]),
+            follow=True,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Local monthly rainfall has been updated.')
+        self.assertContains(response, 'January')
+        self.assertContains(response, '1,000 L')
+
+    def test_other_user_cannot_refresh_survey(self):
+        other_user = get_user_model().objects.create_user(
+            username='rainfall-other', password='test-password'
+        )
+        self.client.force_login(other_user)
+
+        response = self.client.post(
+            reverse('water_survey:rainfall-refresh', args=[self.survey.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+
+class RainfallImportCommandTests(TestCase):
+    def test_csv_import_creates_grid_point_and_calculates_annual_total(self):
+        headers = [
+            'grid_reference',
+            'latitude',
+            'longitude',
+            *TEST_MONTHLY_RAINFALL,
+            'source_name',
+            'source_version',
+            'reference_period',
+            'resolution_km',
+        ]
+        row = [
+            'sx-123-456',
+            '50.4261',
+            '-3.8341',
+            *TEST_MONTHLY_RAINFALL.values(),
+            'Met Office HadUK-Grid',
+            'v1.3.2.ceda',
+            '1991-2020',
+            '1',
+        ]
+        with TemporaryDirectory() as directory:
+            csv_path = Path(directory) / 'rainfall.csv'
+            csv_path.write_text(
+                ','.join(headers) + '\n' + ','.join(row) + '\n',
+                encoding='utf-8',
+            )
+            call_command('import_rainfall_grid', csv_path)
+
+        point = RainfallGridPoint.objects.get(grid_reference='sx-123-456')
+        self.assertEqual(point.annual_rainfall_mm, Decimal('900.00'))
+        self.assertEqual(point.monthly_rainfall_mm['dec'], '115.00')
 
 
 class SurveyAccessTests(TestCase):
@@ -151,6 +308,7 @@ class SurveyAccessTests(TestCase):
         self.assertContains(response, 'restricted-browser-key')
 
     def test_polygon_area_is_recalculated_on_server(self):
+        rainfall_point = create_rainfall_point()
         self.client.force_login(self.user)
 
         response = self.client.post(
@@ -176,3 +334,5 @@ class SurveyAccessTests(TestCase):
         self.survey.refresh_from_db()
         self.assertEqual(self.survey.latitude, Decimal('50.426000'))
         self.assertEqual(self.survey.longitude, Decimal('-3.834000'))
+        self.assertEqual(self.survey.rainfall_grid_point, rainfall_point)
+        self.assertEqual(self.survey.annual_rainfall_mm, Decimal('900.00'))

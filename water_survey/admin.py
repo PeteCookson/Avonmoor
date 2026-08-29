@@ -1,6 +1,19 @@
 from django.contrib import admin
 
-from .models import RoofSection, Survey
+from .models import RainfallGridPoint, RoofSection, Survey
+
+
+@admin.register(RainfallGridPoint)
+class RainfallGridPointAdmin(admin.ModelAdmin):
+    list_display = (
+        'grid_reference',
+        'reference_period',
+        'annual_rainfall_mm',
+        'resolution_km',
+    )
+    list_filter = ('reference_period', 'source_version', 'resolution_km')
+    search_fields = ('grid_reference',)
+    readonly_fields = ('imported_at',)
 
 
 class RoofSectionInline(admin.TabularInline):
@@ -14,10 +27,16 @@ class SurveyAdmin(admin.ModelAdmin):
         'address_line_1',
         'postcode',
         'status',
+        'annual_rainfall_mm',
         'created_by',
         'updated_at',
     )
     list_filter = ('status', 'updated_at')
     search_fields = ('property_name', 'address_line_1', 'postcode')
-    readonly_fields = ('reference', 'created_at', 'updated_at')
+    readonly_fields = (
+        'reference',
+        'rainfall_updated_at',
+        'created_at',
+        'updated_at',
+    )
     inlines = (RoofSectionInline,)

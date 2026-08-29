@@ -47,6 +47,10 @@ a { color: inherit; }
 .brand small { color: #b8cbc4; font-size: 11px; letter-spacing: .11em; text-transform: uppercase; }
 .text-button { border: 0; color: #d6e1dd; background: transparent; cursor: pointer; font: inherit; }
 .app-main { width: min(1040px, 100%); margin: 0 auto; padding: 28px clamp(16px, 4vw, 40px) 64px; }
+.message-list { display: grid; gap: 8px; margin-bottom: 18px; }
+.message { padding: 12px 15px; border-left: 4px solid var(--bronze); background: #f3e8dc; }
+.message-success { border-color: #477b5b; background: var(--mint); }
+.message-warning { border-color: var(--bronze); }
 h1, h2, h3, p { margin-top: 0; }
 h1, h2, h3 { font-family: Georgia, "Times New Roman", serif; font-weight: 500; line-height: 1.12; }
 h1 { margin-bottom: 9px; font-size: clamp(31px, 6vw, 48px); }
@@ -137,6 +141,15 @@ dd { margin: 2px 0 0; font-weight: 800; }
 .inline-empty { padding: 22px 0 4px; }
 .inline-empty p { margin-bottom: 6px; color: var(--ink-soft); }
 .inline-empty a { color: var(--bronze-dark); font-weight: 750; }
+.rainfall-summary { display: flex; align-items: center; justify-content: space-between; gap: 20px; padding: 18px 0; }
+.rainfall-summary p { margin-bottom: 0; color: var(--ink-soft); }
+.rainfall-summary strong { color: var(--ink); }
+.rainfall-table-wrap { overflow-x: auto; }
+.rainfall-table { width: 100%; border-collapse: collapse; font-variant-numeric: tabular-nums; }
+.rainfall-table th, .rainfall-table td { padding: 11px 10px; border-bottom: 1px solid var(--line); text-align: right; white-space: nowrap; }
+.rainfall-table th:first-child { text-align: left; }
+.rainfall-table thead th { color: var(--ink-soft); font-size: 11px; letter-spacing: .08em; text-transform: uppercase; }
+.rainfall-table tbody th { font-family: inherit; font-weight: 750; }
 .survey-auth { display: grid; place-items: center; padding: 20px; background: var(--ink); }
 .auth-card { width: min(460px, 100%); padding: clamp(28px, 8vw, 52px); border-top: 5px solid var(--bronze); }
 
@@ -149,6 +162,8 @@ dd { margin: 2px 0 0; font-weight: 800; }
     .detail-heading .button { width: 100%; }
     .roof-row { flex-direction: column; }
     .roof-row dl { justify-content: space-between; text-align: left; }
+    .rainfall-summary { align-items: stretch; flex-direction: column; }
+    .rainfall-summary .button { width: 100%; }
     .form-panel { padding-right: 16px; padding-left: 16px; }
     .roof-map { height: 52vh; min-height: 330px; }
 }
