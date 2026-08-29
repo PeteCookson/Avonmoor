@@ -5,11 +5,62 @@
 <section class="form-panel">
     <p class="eyebrow">Roof measurement</p>
     <h1>Add a roof section</h1>
-    <p class="lede">Use the horizontal plan area—not the sloping tile area. The map drawing tool will populate this automatically in the next stage.</p>
+    <p class="lede">Measure the horizontal roof footprint that drains to this downpipe—not the sloping tile area.</p>
     <form method="post" class="stacked-form">
         {% csrf_token %}
-        {{ form.as_div }}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+            {% if hidden.errors %}<div class="form-error">{{ hidden.errors }}</div>{% endif %}
+        {% endfor %}
+
+        {% if google_maps_api_key %}
+        <div class="map-field">
+            <div class="map-heading">
+                <div>
+                    <label>Roof outline</label>
+                    <small>Tap each corner. Drag a point to correct it.</small>
+                </div>
+                <output id="map-area" class="map-area" aria-live="polite">No outline</output>
+            </div>
+            <div
+                id="roof-map"
+                class="roof-map"
+                data-api-key="{{ google_maps_api_key }}"
+                data-address="{{ map_address }}"
+                data-latitude="{{ survey.latitude|default_if_none:'' }}"
+                data-longitude="{{ survey.longitude|default_if_none:'' }}"
+            ></div>
+            <div id="map-message" class="map-message">Finding the property…</div>
+            <div class="map-actions">
+                <button type="button" id="undo-map-point" class="button button-secondary" disabled>Undo point</button>
+                <button type="button" id="clear-map" class="button button-secondary" disabled>Clear outline</button>
+            </div>
+        </div>
+        {% else %}
+        <div class="map-unavailable">
+            <strong>Map measurement is not configured.</strong>
+            Enter the plan area manually for now.
+        </div>
+        {% endif %}
+
+        {% for field in form.visible_fields %}
+        <div class="form-field{% if field.name == 'area_m2' %} area-field{% endif %}">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+            {% if field.errors %}<div class="form-error">{{ field.errors }}</div>{% endif %}
+        </div>
+        {% endfor %}
         <button type="submit" class="button button-primary button-wide">Add roof section</button>
     </form>
 </section>
+{% endblock %}
+
+{% block scripts %}
+{% if google_maps_api_key %}
+{% load static %}
+<script src="{% static 'js/roof_measure.js' %}" defer></script>
+{% endif %}
 {% endblock %}
