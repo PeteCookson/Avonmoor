@@ -1,7 +1,9 @@
+import json
 from collections import OrderedDict
 from decimal import Decimal
 
 from django.contrib.auth import get_user_model
+from django.test import override_settings
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
@@ -10,6 +12,19 @@ from .services.calculations import (
     calculate_monthly_yields,
     calculate_yield_litres,
 )
+from .services.geometry import calculate_geojson_area_m2
+
+
+TEST_ROOF_POLYGON = {
+    'type': 'Polygon',
+    'coordinates': [[
+        [-3.8340, 50.4260],
+        [-3.8339, 50.4260],
+        [-3.8339, 50.4261],
+        [-3.8340, 50.4261],
+        [-3.8340, 50.4260],
+    ]],
+}
 
 
 class YieldCalculationTests(SimpleTestCase):
@@ -48,6 +63,23 @@ class YieldCalculationTests(SimpleTestCase):
 
         self.assertEqual(list(result), ['Jan', 'Feb'])
         self.assertEqual(result['Jan'], Decimal('1000.00'))
+
+
+class GeometryCalculationTests(SimpleTestCase):
+    def test_geojson_polygon_returns_horizontal_area(self):
+        area = calculate_geojson_area_m2(TEST_ROOF_POLYGON)
+
+        self.assertGreater(area, Decimal('77'))
+        self.assertLess(area, Decimal('81'))
+
+    def test_polygon_requires_three_different_points(self):
+        polygon = {
+            'type': 'Polygon',
+            'coordinates': [[[-3.8, 50.4], [-3.7, 50.5], [-3.8, 50.4]]],
+        }
+
+        with self.assertRaisesMessage(ValueError, 'three different points'):
+            calculate_geojson_area_m2(polygon)
 
 
 class SurveyAccessTests(TestCase):
@@ -106,3 +138,41 @@ class SurveyAccessTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 404)
+
+    @override_settings(GOOGLE_MAPS_API_KEY='restricted-browser-key')
+    def test_add_roof_page_includes_map_when_key_is_configured(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse('water_survey:roof-section-create', args=[self.survey.pk])
+        )
+
+        self.assertContains(response, 'id="roof-map"')
+        self.assertContains(response, 'restricted-browser-key')
+
+    def test_polygon_area_is_recalculated_on_server(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('water_survey:roof-section-create', args=[self.survey.pk]),
+            {
+                'name': 'Garage roof',
+                'downpipe_label': 'DP2',
+                'roof_material': RoofSection.RoofMaterial.SLATE_TILE,
+                'area_m2': '999.00',
+                'runoff_coefficient': '0.850',
+                'system_efficiency': '0.950',
+                'polygon': json.dumps(TEST_ROOF_POLYGON),
+                'map_latitude': '50.426000',
+                'map_longitude': '-3.834000',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        roof = RoofSection.objects.get(name='Garage roof')
+        self.assertNotEqual(roof.area_m2, Decimal('999.00'))
+        self.assertGreater(roof.area_m2, Decimal('77'))
+        self.assertLess(roof.area_m2, Decimal('81'))
+        self.survey.refresh_from_db()
+        self.assertEqual(self.survey.latitude, Decimal('50.426000'))
+        self.assertEqual(self.survey.longitude, Decimal('-3.834000'))
