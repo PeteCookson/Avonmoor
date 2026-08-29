@@ -1,3 +1,4 @@
+from django.conf import settings
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404
@@ -60,11 +61,29 @@ class RoofSectionCreateView(LoginRequiredMixin, CreateView):
 
     def form_valid(self, form):
         form.instance.survey = self.survey
+        latitude = form.cleaned_data.get('map_latitude')
+        longitude = form.cleaned_data.get('map_longitude')
+        if latitude is not None and longitude is not None:
+            self.survey.latitude = latitude
+            self.survey.longitude = longitude
+            self.survey.save(update_fields=['latitude', 'longitude', 'updated_at'])
         return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['survey'] = self.survey
+        context['google_maps_api_key'] = settings.GOOGLE_MAPS_API_KEY
+        context['map_address'] = ', '.join(
+            part
+            for part in (
+                self.survey.property_name,
+                self.survey.address_line_1,
+                self.survey.town,
+                self.survey.postcode,
+                'UK',
+            )
+            if part
+        )
         return context
 
     def get_success_url(self):
