@@ -64,7 +64,7 @@
     function initialisePolygon() {
         roofPolygon = new google.maps.Polygon({
             map: map,
-            paths: [],
+            paths: [[]],
             editable: true,
             clickable: false,
             strokeColor: '#b66d2b',
