@@ -75,10 +75,10 @@
         });
 
         const path = roofPolygon.getPath();
-        path.addListener('insert_at', syncMeasurement);
-        path.addListener('set_at', syncMeasurement);
-        path.addListener('remove_at', syncMeasurement);
-        map.addListener('click', addPoint);
+        google.maps.event.addListener(path, 'insert_at', syncMeasurement);
+        google.maps.event.addListener(path, 'set_at', syncMeasurement);
+        google.maps.event.addListener(path, 'remove_at', syncMeasurement);
+        google.maps.event.addListener(map, 'click', addPoint);
     }
 
     function restorePolygon() {
@@ -180,7 +180,7 @@
     script.src =
         'https://maps.googleapis.com/maps/api/js?key=' +
         encodeURIComponent(mapElement.dataset.apiKey) +
-        '&libraries=geometry&callback=initAvonmoorRoofMap&v=quarterly';
+        '&libraries=geometry&loading=async&callback=initAvonmoorRoofMap&v=quarterly';
     script.async = true;
     script.onerror = function () {
         setMessage('Google Maps failed to load. Enter the roof area manually.', true);
