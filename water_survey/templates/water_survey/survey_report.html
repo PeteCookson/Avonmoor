@@ -1,0 +1,127 @@
+{% extends 'water_survey/base.html' %}
+{% load static %}
+{% block title %}Survey report – {{ survey }}{% endblock %}
+{% block content %}
+<div class="report-toolbar">
+    <a class="back-link" href="{% url 'water_survey:survey-detail' survey.pk %}">← Back to survey</a>
+    <button type="button" class="button button-primary" onclick="window.print()">Print / Save PDF</button>
+</div>
+
+<article class="report-paper">
+    <header class="report-header">
+        <div class="report-brand">
+            <img src="{% static 'img/master-logo-black.png' %}" alt="Avonmoor">
+            <div>
+                <p class="eyebrow">Rainwater harvesting</p>
+                <h1>Roof yield survey</h1>
+            </div>
+        </div>
+        <dl class="report-meta">
+            <div><dt>Survey reference</dt><dd>{{ survey.reference }}</dd></div>
+            <div><dt>Survey updated</dt><dd>{{ survey.updated_at|date:'j F Y' }}</dd></div>
+            <div><dt>Prepared by</dt><dd>{{ survey.created_by.get_full_name|default:survey.created_by.username }}</dd></div>
+        </dl>
+    </header>
+
+    <section class="report-property">
+        <div>
+            <p class="eyebrow">Property</p>
+            <h2>{{ survey.property_name|default:survey.address_line_1 }}</h2>
+            <p>{{ survey.address_line_1 }}{% if survey.town %}, {{ survey.town }}{% endif %}<br>{{ survey.postcode|upper }}</p>
+        </div>
+        <span class="status status-{{ survey.status }}">{{ survey.get_status_display }}</span>
+    </section>
+
+    <section class="report-summary" aria-label="Survey summary">
+        <div class="report-primary-metric">
+            <span>Estimated annual yield</span>
+            {% if survey.estimated_annual_yield_litres is not None %}
+            <strong>{{ survey.estimated_annual_yield_litres|floatformat:'0g' }}</strong>
+            <small>litres/year</small>
+            {% else %}
+            <strong>Not available</strong>
+            <small>Rainfall data required</small>
+            {% endif %}
+        </div>
+        <div class="report-metric">
+            <span>Selected roof area</span>
+            <strong>{{ survey.total_roof_area_m2|floatformat:1 }} m²</strong>
+        </div>
+        <div class="report-metric">
+            <span>Annual rainfall</span>
+            <strong>{% if survey.annual_rainfall_mm is not None %}{{ survey.annual_rainfall_mm|floatformat:0 }} mm{% else %}Not available{% endif %}</strong>
+        </div>
+    </section>
+
+    <section class="report-section">
+        <div class="report-section-heading">
+            <div><p class="eyebrow">Catchment</p><h2>Roof sections</h2></div>
+            <span>{{ survey.roof_sections.count }} section{{ survey.roof_sections.count|pluralize }}</span>
+        </div>
+        {% if survey.roof_sections.count %}
+        <div class="report-table-wrap">
+            <table class="report-table">
+                <thead>
+                    <tr><th>Roof section</th><th>Area</th><th>Runoff</th><th>Efficiency</th><th>Annual yield</th></tr>
+                </thead>
+                <tbody>
+                    {% for roof in survey.roof_sections.all %}
+                    <tr>
+                        <th scope="row">{{ roof.name }}<small>{{ roof.get_roof_material_display }}{% if roof.downpipe_label %} · {{ roof.downpipe_label }}{% endif %}</small></th>
+                        <td>{{ roof.area_m2|floatformat:1 }} m²</td>
+                        <td>{{ roof.runoff_coefficient }}</td>
+                        <td>{{ roof.system_efficiency }}</td>
+                        <td>{% if roof.estimated_annual_yield_litres is not None %}{{ roof.estimated_annual_yield_litres|floatformat:'0g' }} L{% else %}—{% endif %}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <p>No roof sections have been recorded.</p>
+        {% endif %}
+    </section>
+
+    <section class="report-section">
+        <div class="report-section-heading">
+            <div><p class="eyebrow">Climate basis</p><h2>Local rainfall and yield</h2></div>
+            {% if survey.rainfall_reference_period %}<span>{{ survey.rainfall_reference_period }}</span>{% endif %}
+        </div>
+        {% if survey.monthly_yield_rows %}
+        <p class="report-source"><strong>{{ survey.rainfall_source }}</strong>{% if survey.rainfall_grid_point.resolution_km %} · {{ survey.rainfall_grid_point.resolution_km }} km grid{% endif %}{% if survey.rainfall_distance_km is not None %} · nearest point {{ survey.rainfall_distance_km }} km away{% endif %}</p>
+        <div class="report-table-wrap">
+            <table class="report-table report-monthly-table">
+                <thead><tr><th>Month</th><th>Rainfall</th><th>Estimated yield</th></tr></thead>
+                <tbody>
+                    {% for row in survey.monthly_yield_rows %}
+                    <tr><th scope="row">{{ row.month }}</th><td>{{ row.rainfall_mm|floatformat:1 }} mm</td><td>{{ row.yield_litres|floatformat:'0g' }} L</td></tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% elif survey.annual_rainfall_mm is not None %}
+        <p>This estimate uses a manual annual rainfall fallback of {{ survey.annual_rainfall_mm|floatformat:0 }} mm. Monthly results are unavailable.</p>
+        {% else %}
+        <p>No rainfall data has been assigned to this survey.</p>
+        {% endif %}
+    </section>
+
+    {% if survey.notes %}
+    <section class="report-section report-notes">
+        <p class="eyebrow">Site record</p>
+        <h2>Survey notes</h2>
+        <p>{{ survey.notes|linebreaksbr }}</p>
+    </section>
+    {% endif %}
+
+    <section class="report-disclaimer">
+        <h2>Assessment limitations</h2>
+        <p>This report is an indicative rainwater yield assessment, not a quotation or system design. Yield is based on the horizontal roof footprint, recorded runoff and system-efficiency factors, and the stated rainfall dataset. A final proposal must confirm roof dimensions, gutter and downpipe routing, intended water demand, storage location, access, ground conditions, drainage, excavation requirements and installation constraints.</p>
+    </section>
+
+    <footer class="report-footer">
+        <span>Generated {{ report_generated_at|date:'j F Y, H:i' }}</span>
+        <span>Avonmoor Water · avonmoor.co.uk · hello@avonmoor.co.uk</span>
+    </footer>
+</article>
+{% endblock %}

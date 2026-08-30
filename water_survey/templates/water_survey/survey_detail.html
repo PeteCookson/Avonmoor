@@ -9,6 +9,7 @@
         <p>{{ survey.address_line_1 }}{% if survey.town %}, {{ survey.town }}{% endif %} · {{ survey.postcode|upper }}</p>
     </div>
     <div class="detail-actions">
+        <a class="button button-secondary" href="{% url 'water_survey:survey-report' survey.pk %}">Print report</a>
         <a class="button button-secondary" href="{% url 'water_survey:survey-update' survey.pk %}">Edit survey</a>
         <a class="button button-primary" href="{% url 'water_survey:roof-section-create' survey.pk %}">Add roof</a>
     </div>
