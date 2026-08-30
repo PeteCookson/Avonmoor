@@ -296,6 +296,67 @@ class SurveyAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_survey_report_requires_login(self):
+        url = reverse('water_survey:survey-report', args=[self.survey.pk])
+
+        response = self.client.get(url)
+
+        self.assertRedirects(response, f"{reverse('login')}?next={url}")
+
+    def test_owner_can_view_printable_survey_report(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse('water_survey:survey-report', args=[self.survey.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Roof yield survey')
+        self.assertContains(response, '1 Test Lane')
+        self.assertContains(response, '75,240')
+        self.assertContains(response, 'Main roof')
+        self.assertContains(response, 'Print / Save PDF')
+        self.assertContains(response, 'Assessment limitations')
+
+    def test_survey_detail_links_to_printable_report(self):
+        self.client.force_login(self.user)
+        report_url = reverse(
+            'water_survey:survey-report', args=[self.survey.pk]
+        )
+
+        response = self.client.get(
+            reverse('water_survey:survey-detail', args=[self.survey.pk])
+        )
+
+        self.assertContains(response, f'href="{report_url}"')
+        self.assertContains(response, 'Print report')
+
+    def test_other_user_cannot_view_survey_report(self):
+        self.client.force_login(self.other_user)
+
+        response = self.client.get(
+            reverse('water_survey:survey-report', args=[self.survey.pk])
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_grid_backed_report_includes_monthly_source_and_yield(self):
+        create_rainfall_point()
+        self.survey.latitude = Decimal('50.426000')
+        self.survey.longitude = Decimal('-3.834000')
+        self.survey.save(update_fields=['latitude', 'longitude'])
+        apply_nearest_rainfall_to_survey(self.survey)
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse('water_survey:survey-report', args=[self.survey.pk])
+        )
+
+        self.assertContains(response, 'Met Office HadUK-Grid')
+        self.assertContains(response, '1991-2020')
+        self.assertContains(response, 'January')
+        self.assertContains(response, '6,840 L')
+
     def test_owner_can_edit_survey_and_status(self):
         self.client.force_login(self.user)
 

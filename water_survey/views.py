@@ -4,6 +4,7 @@ from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Prefetch
 from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse, reverse_lazy
+from django.utils import timezone
 from django.views import View
 from django.views.generic import (
     CreateView,
@@ -51,6 +52,17 @@ class SurveyDetailView(OwnedSurveyMixin, DetailView):
     model = Survey
     template_name = 'water_survey/survey_detail.html'
     context_object_name = 'survey'
+
+
+class SurveyReportView(OwnedSurveyMixin, DetailView):
+    model = Survey
+    template_name = 'water_survey/survey_report.html'
+    context_object_name = 'survey'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['report_generated_at'] = timezone.localtime()
+        return context
 
 
 class SurveyUpdateView(OwnedSurveyMixin, UpdateView):
