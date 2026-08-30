@@ -8,7 +8,10 @@
         <h1>{{ survey.property_name|default:survey.address_line_1 }}</h1>
         <p>{{ survey.address_line_1 }}{% if survey.town %}, {{ survey.town }}{% endif %} · {{ survey.postcode|upper }}</p>
     </div>
-    <a class="button button-secondary" href="{% url 'water_survey:roof-section-create' survey.pk %}">Add roof</a>
+    <div class="detail-actions">
+        <a class="button button-secondary" href="{% url 'water_survey:survey-update' survey.pk %}">Edit survey</a>
+        <a class="button button-primary" href="{% url 'water_survey:roof-section-create' survey.pk %}">Add roof</a>
+    </div>
 </div>
 
 <section class="result-panel">
@@ -71,12 +74,16 @@
     <div class="section-heading"><h2>Roof sections</h2><span>{{ survey.roof_sections.count }}</span></div>
     {% for roof in survey.roof_sections.all %}
     <article class="roof-row">
-        <div><h3>{{ roof.name }}</h3><p>{{ roof.get_roof_material_display }}{% if roof.downpipe_label %} · {{ roof.downpipe_label }}{% endif %}</p></div>
+        <div class="roof-main"><h3>{{ roof.name }}</h3><p>{{ roof.get_roof_material_display }}{% if roof.downpipe_label %} · {{ roof.downpipe_label }}{% endif %}</p></div>
         <dl>
             <div><dt>Area</dt><dd>{{ roof.area_m2|floatformat:1 }} m²</dd></div>
             {% if roof.estimated_annual_yield_litres is not None %}<div><dt>Yield</dt><dd>{{ roof.estimated_annual_yield_litres|floatformat:'0g' }} L</dd></div>{% endif %}
             <div><dt>Runoff</dt><dd>{{ roof.runoff_coefficient }}</dd></div>
         </dl>
+        <div class="roof-actions">
+            <a href="{% url 'water_survey:roof-section-update' survey.pk roof.pk %}">Edit</a>
+            <a class="danger-link" href="{% url 'water_survey:roof-section-delete' survey.pk roof.pk %}">Delete</a>
+        </div>
     </article>
     {% empty %}
     <div class="inline-empty"><p>No roof areas measured yet.</p><a href="{% url 'water_survey:roof-section-create' survey.pk %}">Add the first roof section →</a></div>
@@ -84,4 +91,9 @@
 </section>
 
 {% if survey.notes %}<section class="section-block"><h2>Survey notes</h2><p>{{ survey.notes|linebreaksbr }}</p></section>{% endif %}
+
+<section class="danger-zone">
+    <div><strong>Delete survey</strong><p>Permanently removes this survey and all of its roof sections.</p></div>
+    <a class="button button-danger" href="{% url 'water_survey:survey-delete' survey.pk %}">Delete survey</a>
+</section>
 {% endblock %}
