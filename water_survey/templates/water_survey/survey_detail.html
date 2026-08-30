@@ -23,6 +23,50 @@
     {% endif %}
 </section>
 
+<section class="section-block rainfall-block">
+    <div class="section-heading">
+        <h2>Local rainfall</h2>
+        {% if survey.rainfall_reference_period %}<span>{{ survey.rainfall_reference_period }}</span>{% endif %}
+    </div>
+    {% if survey.monthly_yield_rows %}
+        <div class="rainfall-summary">
+            <p><strong>{{ survey.rainfall_source }}</strong><br>
+            {{ survey.rainfall_grid_point.resolution_km|default:'Local' }}{% if survey.rainfall_grid_point.resolution_km %} km grid{% endif %}
+            {% if survey.rainfall_distance_km is not None %} · nearest point {{ survey.rainfall_distance_km }} km away{% endif %}</p>
+            {% if survey.latitude is not None %}
+            <form method="post" action="{% url 'water_survey:rainfall-refresh' survey.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="button button-secondary">Refresh rainfall</button>
+            </form>
+            {% endif %}
+        </div>
+        <div class="rainfall-table-wrap">
+            <table class="rainfall-table">
+                <thead><tr><th>Month</th><th>Rainfall</th><th>Estimated yield</th></tr></thead>
+                <tbody>
+                    {% for row in survey.monthly_yield_rows %}
+                    <tr>
+                        <th scope="row">{{ row.month }}</th>
+                        <td>{{ row.rainfall_mm|floatformat:1 }} mm</td>
+                        <td>{{ row.yield_litres|floatformat:'0g' }} L</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+    {% else %}
+        <div class="inline-empty">
+            <p>{% if survey.annual_rainfall_mm is not None %}The annual estimate is using the manual fallback. {% endif %}Import the rainfall grid, then refresh this survey to add monthly results.</p>
+            {% if survey.latitude is not None %}
+            <form method="post" action="{% url 'water_survey:rainfall-refresh' survey.pk %}">
+                {% csrf_token %}
+                <button type="submit" class="button button-secondary">Find local rainfall</button>
+            </form>
+            {% endif %}
+        </div>
+    {% endif %}
+</section>
+
 <section class="section-block">
     <div class="section-heading"><h2>Roof sections</h2><span>{{ survey.roof_sections.count }}</span></div>
     {% for roof in survey.roof_sections.all %}

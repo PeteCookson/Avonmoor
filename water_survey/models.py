@@ -6,6 +6,56 @@ from django.core.exceptions import ValidationError
 from django.db import models
 
 from .services.calculations import calculate_yield_litres
+from .services.rainfall import MONTHS, normalise_monthly_rainfall
+
+
+class RainfallGridPoint(models.Model):
+    """A locally cached long-term rainfall climatology grid point."""
+
+    grid_reference = models.CharField(max_length=80, unique=True)
+    latitude = models.DecimalField(max_digits=9, decimal_places=6, db_index=True)
+    longitude = models.DecimalField(max_digits=9, decimal_places=6, db_index=True)
+    monthly_rainfall_mm = models.JSONField()
+    annual_rainfall_mm = models.DecimalField(max_digits=7, decimal_places=2)
+    source_name = models.CharField(max_length=120, default='Met Office HadUK-Grid')
+    source_version = models.CharField(max_length=40, blank=True)
+    reference_period = models.CharField(max_length=20, default='1991-2020')
+    resolution_km = models.DecimalField(
+        max_digits=5, decimal_places=2, null=True, blank=True
+    )
+    imported_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['grid_reference']
+        indexes = [
+            models.Index(
+                fields=['latitude', 'longitude'],
+                name='rain_grid_lat_lon_idx',
+            )
+        ]
+
+    def __str__(self):
+        return f'{self.grid_reference} ({self.reference_period})'
+
+    def clean(self):
+        errors = {}
+        try:
+            monthly = normalise_monthly_rainfall(self.monthly_rainfall_mm)
+        except ValueError as error:
+            errors['monthly_rainfall_mm'] = str(error)
+        else:
+            expected_annual = sum(monthly.values(), Decimal('0'))
+            if (
+                self.annual_rainfall_mm is not None
+                and abs(expected_annual - self.annual_rainfall_mm)
+                > Decimal('0.12')
+            ):
+                errors['annual_rainfall_mm'] = (
+                    'Annual rainfall must equal the sum of the 12 monthly values.'
+                )
+
+        if errors:
+            raise ValidationError(errors)
 
 
 class Survey(models.Model):
@@ -35,8 +85,22 @@ class Survey(models.Model):
         decimal_places=2,
         null=True,
         blank=True,
-        help_text='Temporary manual value until the rainfall data import is connected.',
+        help_text='Optional manual fallback when local climate data is unavailable.',
     )
+    monthly_rainfall_mm = models.JSONField(default=dict, blank=True)
+    rainfall_grid_point = models.ForeignKey(
+        RainfallGridPoint,
+        on_delete=models.SET_NULL,
+        related_name='surveys',
+        null=True,
+        blank=True,
+    )
+    rainfall_source = models.CharField(max_length=180, blank=True)
+    rainfall_reference_period = models.CharField(max_length=20, blank=True)
+    rainfall_distance_km = models.DecimalField(
+        max_digits=6, decimal_places=2, null=True, blank=True
+    )
+    rainfall_updated_at = models.DateTimeField(null=True, blank=True)
     status = models.CharField(
         max_length=12, choices=Status.choices, default=Status.DRAFT
     )
@@ -69,6 +133,30 @@ class Survey(models.Model):
             ),
             Decimal('0'),
         )
+
+    @property
+    def monthly_yield_rows(self):
+        if not self.monthly_rainfall_mm:
+            return []
+
+        try:
+            rainfall = normalise_monthly_rainfall(self.monthly_rainfall_mm)
+        except ValueError:
+            return []
+
+        roofs = list(self.roof_sections.all())
+        return [
+            {
+                'key': key,
+                'month': label,
+                'rainfall_mm': rainfall[key],
+                'yield_litres': sum(
+                    (roof.calculate_yield(rainfall[key]) for roof in roofs),
+                    Decimal('0'),
+                ),
+            }
+            for key, label in MONTHS
+        ]
 
 
 class RoofSection(models.Model):

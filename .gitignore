@@ -18,6 +18,9 @@ staticfiles/
 .DS_Store
 venv/
 .venv/
+water_survey/data/*.csv
+!water_survey/data/rainfall_grid_example.csv
+water_survey/data/*.nc
 
 # VS Code-related
 .vscode/

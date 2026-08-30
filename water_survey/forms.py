@@ -19,7 +19,7 @@ class SurveyForm(forms.ModelForm):
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
         labels = {
-            'annual_rainfall_mm': 'Annual rainfall (mm)',
+            'annual_rainfall_mm': 'Manual annual rainfall fallback (mm)',
         }
 
 

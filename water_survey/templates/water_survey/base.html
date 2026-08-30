@@ -20,6 +20,13 @@
         </form>
     </header>
     <main class="app-main">
+        {% if messages %}
+        <div class="message-list" aria-live="polite">
+            {% for message in messages %}
+            <div class="message message-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
         {% block content %}{% endblock %}
     </main>
     {% block scripts %}{% endblock %}

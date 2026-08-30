@@ -1,12 +1,15 @@
 from django.conf import settings
+from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin
 from django.db.models import Prefetch
-from django.shortcuts import get_object_or_404
+from django.shortcuts import get_object_or_404, redirect
 from django.urls import reverse
+from django.views import View
 from django.views.generic import CreateView, DetailView, ListView
 
 from .forms import RoofSectionForm, SurveyForm
 from .models import RoofSection, Survey
+from .services.rainfall import apply_nearest_rainfall_to_survey
 
 
 class OwnedSurveyMixin(LoginRequiredMixin):
@@ -67,6 +70,7 @@ class RoofSectionCreateView(LoginRequiredMixin, CreateView):
             self.survey.latitude = latitude
             self.survey.longitude = longitude
             self.survey.save(update_fields=['latitude', 'longitude', 'updated_at'])
+            apply_nearest_rainfall_to_survey(self.survey)
         return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
@@ -88,3 +92,27 @@ class RoofSectionCreateView(LoginRequiredMixin, CreateView):
 
     def get_success_url(self):
         return reverse('water_survey:survey-detail', args=[self.survey.pk])
+
+
+class RainfallRefreshView(LoginRequiredMixin, View):
+    def post(self, request, *args, **kwargs):
+        queryset = Survey.objects.all()
+        if not request.user.is_superuser:
+            queryset = queryset.filter(created_by=request.user)
+        survey = get_object_or_404(queryset, pk=kwargs['pk'])
+
+        if survey.latitude is None or survey.longitude is None:
+            messages.warning(
+                request,
+                'Measure a roof on the map first so the property has a location.',
+            )
+        elif apply_nearest_rainfall_to_survey(survey) is None:
+            messages.warning(
+                request,
+                'No imported rainfall grid point was found near this property. '
+                'The manual annual rainfall value is unchanged.',
+            )
+        else:
+            messages.success(request, 'Local monthly rainfall has been updated.')
+
+        return redirect('water_survey:survey-detail', pk=survey.pk)
