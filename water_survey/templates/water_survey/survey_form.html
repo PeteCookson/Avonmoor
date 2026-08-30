@@ -1,15 +1,23 @@
 {% extends 'water_survey/base.html' %}
-{% block title %}New survey{% endblock %}
+{% block title %}{% if object %}Edit survey{% else %}New survey{% endif %}{% endblock %}
 {% block content %}
+{% if object %}
+<a class="back-link" href="{% url 'water_survey:survey-detail' object.pk %}">← Back to survey</a>
+{% else %}
 <a class="back-link" href="{% url 'water_survey:survey-list' %}">← All surveys</a>
+{% endif %}
 <section class="form-panel">
-    <p class="eyebrow">Step 1</p>
-    <h1>Property details</h1>
+    <p class="eyebrow">{% if object %}Survey record{% else %}Step 1{% endif %}</p>
+    <h1>{% if object %}Edit survey{% else %}Property details{% endif %}</h1>
+    {% if object %}
+    <p class="lede">Update the property details, survey status and notes. Grid-backed rainfall remains tied to the mapped location.</p>
+    {% else %}
     <p class="lede">Start with the site. You can enter annual rainfall as a fallback; local monthly climate data will be applied after the roof is located on the map.</p>
+    {% endif %}
     <form method="post" class="stacked-form">
         {% csrf_token %}
         {{ form.as_div }}
-        <button type="submit" class="button button-primary button-wide">Save and measure roof</button>
+        <button type="submit" class="button button-primary button-wide">{% if object %}Save changes{% else %}Save and measure roof{% endif %}</button>
     </form>
 </section>
 {% endblock %}

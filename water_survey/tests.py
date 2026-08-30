@@ -132,7 +132,7 @@ class RainfallLookupTests(TestCase):
             longitude=Decimal('-3.834000'),
             annual_rainfall_mm=Decimal('1100'),
         )
-        RoofSection.objects.create(
+        self.roof = RoofSection.objects.create(
             survey=self.survey,
             area_m2=Decimal('10'),
             runoff_coefficient=Decimal('1'),
@@ -253,7 +253,7 @@ class SurveyAccessTests(TestCase):
             postcode='TQ10 9AB',
             annual_rainfall_mm=Decimal('1100'),
         )
-        RoofSection.objects.create(
+        self.roof = RoofSection.objects.create(
             survey=self.survey,
             area_m2=Decimal('80'),
             runoff_coefficient=Decimal('0.9'),
@@ -296,6 +296,92 @@ class SurveyAccessTests(TestCase):
 
         self.assertEqual(response.status_code, 404)
 
+    def test_owner_can_edit_survey_and_status(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse('water_survey:survey-update', args=[self.survey.pk]),
+            {
+                'property_name': 'Test Cottage',
+                'address_line_1': '2 Updated Lane',
+                'town': 'South Brent',
+                'postcode': 'TQ10 9AB',
+                'annual_rainfall_mm': '1200',
+                'status': Survey.Status.SURVEYED,
+                'notes': 'Updated access note.',
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('water_survey:survey-detail', args=[self.survey.pk]),
+        )
+        self.survey.refresh_from_db()
+        self.assertEqual(self.survey.property_name, 'Test Cottage')
+        self.assertEqual(self.survey.status, Survey.Status.SURVEYED)
+        self.assertEqual(self.survey.annual_rainfall_mm, Decimal('1200.00'))
+
+    def test_grid_backed_survey_edit_hides_manual_rainfall(self):
+        point = create_rainfall_point()
+        self.survey.latitude = Decimal('50.426000')
+        self.survey.longitude = Decimal('-3.834000')
+        self.survey.save(update_fields=['latitude', 'longitude'])
+        apply_nearest_rainfall_to_survey(self.survey)
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse('water_survey:survey-update', args=[self.survey.pk])
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertNotContains(response, 'id="id_annual_rainfall_mm"')
+
+        response = self.client.post(
+            reverse('water_survey:survey-update', args=[self.survey.pk]),
+            {
+                'property_name': 'Grid Cottage',
+                'address_line_1': self.survey.address_line_1,
+                'town': '',
+                'postcode': self.survey.postcode,
+                'status': Survey.Status.SURVEYED,
+                'notes': '',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        self.survey.refresh_from_db()
+        self.assertEqual(self.survey.rainfall_grid_point, point)
+        self.assertEqual(self.survey.annual_rainfall_mm, Decimal('900.00'))
+
+    def test_other_user_cannot_edit_or_delete_survey(self):
+        self.client.force_login(self.other_user)
+
+        edit_response = self.client.get(
+            reverse('water_survey:survey-update', args=[self.survey.pk])
+        )
+        delete_response = self.client.post(
+            reverse('water_survey:survey-delete', args=[self.survey.pk])
+        )
+
+        self.assertEqual(edit_response.status_code, 404)
+        self.assertEqual(delete_response.status_code, 404)
+        self.assertTrue(Survey.objects.filter(pk=self.survey.pk).exists())
+
+    def test_survey_delete_requires_confirmation_post(self):
+        self.client.force_login(self.user)
+        url = reverse('water_survey:survey-delete', args=[self.survey.pk])
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Delete this survey?')
+        self.assertTrue(Survey.objects.filter(pk=self.survey.pk).exists())
+
+        response = self.client.post(url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'was deleted')
+        self.assertFalse(Survey.objects.filter(pk=self.survey.pk).exists())
+        self.assertFalse(RoofSection.objects.filter(pk=self.roof.pk).exists())
+
     @override_settings(GOOGLE_MAPS_API_KEY='restricted-browser-key')
     def test_add_roof_page_includes_map_when_key_is_configured(self):
         self.client.force_login(self.user)
@@ -306,6 +392,85 @@ class SurveyAccessTests(TestCase):
 
         self.assertContains(response, 'id="roof-map"')
         self.assertContains(response, 'restricted-browser-key')
+
+    @override_settings(GOOGLE_MAPS_API_KEY='restricted-browser-key')
+    def test_edit_roof_page_restores_existing_polygon(self):
+        self.roof.polygon = TEST_ROOF_POLYGON
+        self.roof.save(update_fields=['polygon'])
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse(
+                'water_survey:roof-section-update',
+                args=[self.survey.pk, self.roof.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Edit roof section')
+        self.assertEqual(response.context['form'].initial['polygon'], TEST_ROOF_POLYGON)
+
+    def test_owner_can_edit_roof_and_area_is_recalculated(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse(
+                'water_survey:roof-section-update',
+                args=[self.survey.pk, self.roof.pk],
+            ),
+            {
+                'name': 'Updated main roof',
+                'downpipe_label': 'DP1',
+                'roof_material': RoofSection.RoofMaterial.METAL,
+                'area_m2': '999.00',
+                'runoff_coefficient': '0.920',
+                'system_efficiency': '0.950',
+                'polygon': json.dumps(TEST_ROOF_POLYGON),
+                'map_latitude': '50.426000',
+                'map_longitude': '-3.834000',
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        self.roof.refresh_from_db()
+        self.assertEqual(self.roof.name, 'Updated main roof')
+        self.assertEqual(self.roof.roof_material, RoofSection.RoofMaterial.METAL)
+        self.assertGreater(self.roof.area_m2, Decimal('77'))
+        self.assertLess(self.roof.area_m2, Decimal('81'))
+
+    def test_other_user_cannot_edit_or_delete_roof(self):
+        self.client.force_login(self.other_user)
+        edit_url = reverse(
+            'water_survey:roof-section-update',
+            args=[self.survey.pk, self.roof.pk],
+        )
+        delete_url = reverse(
+            'water_survey:roof-section-delete',
+            args=[self.survey.pk, self.roof.pk],
+        )
+
+        self.assertEqual(self.client.get(edit_url).status_code, 404)
+        self.assertEqual(self.client.post(delete_url).status_code, 404)
+        self.assertTrue(RoofSection.objects.filter(pk=self.roof.pk).exists())
+
+    def test_roof_delete_requires_confirmation_post(self):
+        self.client.force_login(self.user)
+        url = reverse(
+            'water_survey:roof-section-delete',
+            args=[self.survey.pk, self.roof.pk],
+        )
+
+        response = self.client.get(url)
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Delete this roof section?')
+        self.assertTrue(RoofSection.objects.filter(pk=self.roof.pk).exists())
+
+        response = self.client.post(url, follow=True)
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'was deleted')
+        self.assertFalse(RoofSection.objects.filter(pk=self.roof.pk).exists())
+        self.assertTrue(Survey.objects.filter(pk=self.survey.pk).exists())
 
     def test_polygon_area_is_recalculated_on_server(self):
         rainfall_point = create_rainfall_point()

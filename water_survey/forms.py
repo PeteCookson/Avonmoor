@@ -5,6 +5,11 @@ from .services.geometry import calculate_geojson_area_m2
 
 
 class SurveyForm(forms.ModelForm):
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        if self.instance.pk and self.instance.monthly_rainfall_mm:
+            self.fields.pop('annual_rainfall_mm', None)
+
     class Meta:
         model = Survey
         fields = [
@@ -21,6 +26,19 @@ class SurveyForm(forms.ModelForm):
         labels = {
             'annual_rainfall_mm': 'Manual annual rainfall fallback (mm)',
         }
+
+
+class SurveyUpdateForm(SurveyForm):
+    class Meta(SurveyForm.Meta):
+        fields = [
+            'property_name',
+            'address_line_1',
+            'town',
+            'postcode',
+            'annual_rainfall_mm',
+            'status',
+            'notes',
+        ]
 
 
 class RoofSectionForm(forms.ModelForm):

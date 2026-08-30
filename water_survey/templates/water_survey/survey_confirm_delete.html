@@ -1,0 +1,16 @@
+{% extends 'water_survey/base.html' %}
+{% block title %}Delete survey{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'water_survey:survey-detail' object.pk %}">← Back to survey</a>
+<section class="form-panel confirmation-panel">
+    <p class="eyebrow eyebrow-danger">Permanent action</p>
+    <h1>Delete this survey?</h1>
+    <p class="lede"><strong>{{ object }}</strong> and all {{ object.roof_sections.count }} roof section{{ object.roof_sections.count|pluralize }} will be permanently deleted.</p>
+    <p>This cannot be undone.</p>
+    <form method="post" class="confirmation-actions">
+        {% csrf_token %}
+        <a class="button button-secondary" href="{% url 'water_survey:survey-detail' object.pk %}">Cancel</a>
+        <button type="submit" class="button button-danger">Yes, delete survey</button>
+    </form>
+</section>
+{% endblock %}
