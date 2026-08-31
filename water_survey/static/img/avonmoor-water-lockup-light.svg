@@ -90,5 +90,5 @@
 <use xlink:href="#glyph-0-2" x="167.206428" y="180.5078"/>
 <use xlink:href="#glyph-0-5" x="196.29366" y="180.5078"/>
 </g>
-<text x="115" y="195.5" text-anchor="middle" textLength="217.4" lengthAdjust="spacingAndGlyphs" fill="#878583" font-family="Helvetica Neue, Arial, Helvetica, sans-serif" font-size="7.1" font-weight="300" letter-spacing="1.1">RAINWATER HARVESTING</text>
+<text x="115" y="195.5" text-anchor="middle" textLength="217.4" lengthAdjust="spacing" fill="#878583" font-family="Helvetica Neue, Arial, Helvetica, sans-serif" font-size="7.1" font-weight="300">RAINWATER HARVESTING</text>
 </svg>

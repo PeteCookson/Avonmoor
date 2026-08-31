@@ -275,6 +275,14 @@ class SurveyAccessTests(TestCase):
         self.assertContains(response, 'Avonmoor Rainwater Harvesting')
         self.assertContains(response, 'avonmoor-water-lockup-light.svg')
 
+    def test_survey_workspace_header_uses_full_avonmoor_lockup(self):
+        self.client.force_login(self.user)
+
+        response = self.client.get(reverse('water_survey:survey-list'))
+
+        self.assertContains(response, 'avonmoor-water-lockup-dark.svg')
+        self.assertContains(response, 'Survey workspace')
+
     def test_add_roof_requires_login(self):
         url = reverse(
             'water_survey:roof-section-create', args=[self.survey.pk]
