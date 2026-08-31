@@ -1,0 +1,55 @@
+{% extends 'water_calculator/base.html' %}
+{% load static %}
+{% block title %}Measure your roof{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'water_calculator:start' %}">← Change property</a>
+<section class="calculator-panel calculator-step-panel calculator-wide-panel">
+    <div class="step-label"><span>2</span><div><strong>Roof catchment</strong><small>Step 2 of 3</small></div></div>
+    <h1>Outline the roof you could collect from</h1>
+    <p class="lede">Tap each roof corner on the aerial image. Use the horizontal footprint—not the sloping tile area.</p>
+    <p class="property-chip">{{ property.address_line_1 }}{% if property.town %}, {{ property.town }}{% endif %} · {{ property.postcode }}</p>
+
+    <form method="post" class="stacked-form calculator-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+        {% for hidden in form.hidden_fields %}
+            {{ hidden }}
+            {% if hidden.errors %}<div class="form-error">{{ hidden.errors }}</div>{% endif %}
+        {% endfor %}
+
+        {% if google_maps_api_key %}
+        <div class="map-field">
+            <div class="map-heading">
+                <div><label>Roof outline</label><small>Tap corners in order. Drag any point to refine it.</small></div>
+                <output id="map-area" class="map-area" aria-live="polite">No outline</output>
+            </div>
+            <div id="roof-map" class="roof-map" data-api-key="{{ google_maps_api_key }}" data-address="{{ map_address }}" data-latitude="" data-longitude="" data-requires-location="true"></div>
+            <div id="map-message" class="map-message">Finding the property…</div>
+            <div class="map-actions">
+                <button type="button" id="undo-map-point" class="button button-secondary" disabled>Undo point</button>
+                <button type="button" id="clear-map" class="button button-secondary" disabled>Clear outline</button>
+            </div>
+        </div>
+        {% else %}
+        <div class="map-unavailable"><strong>Map measurement is unavailable.</strong> Please try again later or contact Avonmoor for an assessment.</div>
+        {% endif %}
+
+        {% for field in form.visible_fields %}
+        <div class="form-field{% if field.name == 'area_m2' %} area-field{% endif %}{% if field.name == 'intended_use' or field.name == 'has_existing_collection' %} choice-field{% endif %}">
+            {{ field.label_tag }}
+            {{ field }}
+            {% if field.help_text %}<span class="helptext">{{ field.help_text }}</span>{% endif %}
+            {% if field.errors %}<div class="form-error">{{ field.errors }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        {% if google_maps_api_key %}
+        <button type="submit" class="button button-primary button-wide">Calculate my rainwater potential</button>
+        {% else %}
+        <a class="button button-secondary button-wide" href="mailto:hello@avonmoor.co.uk">Contact Avonmoor</a>
+        {% endif %}
+    </form>
+</section>
+{% endblock %}
+{% block scripts %}
+{% if google_maps_api_key %}<script src="{% static 'js/roof_measure.js' %}" defer></script>{% endif %}
+{% endblock %}

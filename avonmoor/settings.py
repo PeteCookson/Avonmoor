@@ -41,6 +41,7 @@ INSTALLED_APPS = [
     'django.contrib.staticfiles',
     'contact',
     'water_survey',
+    'water_calculator',
 ]
 
 MIDDLEWARE = [

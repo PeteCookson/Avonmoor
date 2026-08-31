@@ -1,0 +1,11 @@
+{% extends 'water_calculator/base.html' %}
+{% block title %}Survey request received{% endblock %}
+{% block content %}
+<section class="calculator-panel thanks-panel">
+    <span class="thanks-mark">✓</span>
+    <p class="eyebrow">Request received</p>
+    <h1>Thank you. We will review the estimate before getting in touch.</h1>
+    <p class="lede">Your reference is <strong>{{ reference }}</strong>. A site survey is still required before any tank size, system design or price can be confirmed.</p>
+    <a class="button button-secondary" href="{% url 'water_calculator:start' %}">Calculate another property</a>
+</section>
+{% endblock %}
