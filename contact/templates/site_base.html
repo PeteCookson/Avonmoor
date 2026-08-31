@@ -21,10 +21,7 @@
     <header class="site-header">
         <div class="site-header-inner">
             <a class="master-brand" href="{% url 'home' %}" aria-label="Avonmoor home">
-                <img class="master-brand-mark" src="{% static 'img/avonmoor-icon.svg' %}" alt="">
-                <span class="master-wordmark-crop" aria-hidden="true">
-                    <img class="master-wordmark" src="{% static 'img/avonmoor-water-lockup-light.svg' %}" alt="">
-                </span>
+                <img class="master-brand-logo" src="{% static 'img/avonmoor-master-horizontal-light.svg' %}" alt="Avonmoor">
             </a>
             <nav class="desktop-nav" aria-label="Main navigation">
                 <a href="{% url 'garden_property' %}">Garden &amp; property</a>
@@ -45,17 +42,23 @@
     <footer class="site-footer">
         <div class="site-footer-inner">
             <div>
-                <a class="footer-brand" href="{% url 'home' %}">AVONMOOR</a>
+                <a class="footer-brand" href="{% url 'home' %}" aria-label="Avonmoor home">
+                    <img class="footer-brand-logo" src="{% static 'img/avonmoor-master-horizontal-dark.svg' %}" alt="Avonmoor">
+                </a>
                 <p>Garden &amp; property maintenance<br>Rainwater harvesting</p>
             </div>
             <div class="footer-contact">
-                <p>South Brent · South Devon</p>
+                <p>Serving homes and properties across South Devon</p>
                 <a href="mailto:hello@avonmoor.co.uk">hello@avonmoor.co.uk</a>
             </div>
             <div class="footer-links">
-                <a href="https://www.facebook.com/profile.php?id=61559721330836&amp;sk=about" target="_blank" rel="noreferrer">Facebook</a>
-                <a href="https://www.instagram.com/avon_moor/" target="_blank" rel="noreferrer">Instagram</a>
-                <span>© {% now "Y" %} Avonmoor</span>
+                <nav class="footer-socials" aria-label="Social media">
+                    <a href="https://www.facebook.com/profile.php?id=61559721330836&amp;sk=about" target="_blank" rel="noreferrer">Facebook</a>
+                    <a href="https://www.instagram.com/avon_moor/" target="_blank" rel="noreferrer">Instagram</a>
+                    <a href="https://www.youtube.com/@Avonmoor" target="_blank" rel="noreferrer">YouTube</a>
+                    <a href="https://www.tiktok.com/@avonmoor?_t=8myTGdBGY3F&amp;_r=1" target="_blank" rel="noreferrer">TikTok</a>
+                </nav>
+                <span>© AVONMOOR MMXXVI</span>
             </div>
         </div>
     </footer>

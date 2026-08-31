@@ -34,7 +34,8 @@ def contact_view(request):
             return HttpResponseRedirect(reverse('contact') + '?success=1')
     else:
         initial_subjects = {
-            'garden-property': 'Garden & Property Maintenance',
+            'garden': 'Garden',
+            'property': 'Property',
             'rainwater': 'Rainwater Harvesting',
         }
         form = ContactForm(

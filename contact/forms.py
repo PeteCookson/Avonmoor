@@ -27,7 +27,8 @@ class ContactForm(forms.ModelForm):
             'postcode': forms.TextInput(attrs={'placeholder': 'Postcode', 'class': 'form-control postcode-field'}),
             'subject': forms.Select(attrs={'class': 'form-control subject-field'}, choices=[
                 ('', 'Enquiry Subject'),
-                ('Garden & Property Maintenance', 'Garden & Property Maintenance'),
+                ('Garden', 'Garden'),
+                ('Property', 'Property'),
                 ('Rainwater Harvesting', 'Rainwater Harvesting'),
                 ('Other', 'Other')
             ]),
