@@ -1,0 +1,28 @@
+{% extends 'water_calculator/base.html' %}
+{% block title %}Estimate your rainwater potential{% endblock %}
+{% block content %}
+<section class="calculator-hero">
+    <div>
+        <p class="eyebrow">Free roof estimate</p>
+        <h1>How much rainwater is your roof losing?</h1>
+        <p class="lede">Measure your roof and use long-term local rainfall data to estimate the water that could be stored instead of running to drains or ground.</p>
+    </div>
+    <dl class="calculator-proof">
+        <div><dt>Rainfall source</dt><dd>Met Office HadUK-Grid</dd></div>
+        <div><dt>Local resolution</dt><dd>1 km climate grid</dd></div>
+        <div><dt>Time required</dt><dd>About 2 minutes</dd></div>
+    </dl>
+</section>
+
+<section class="calculator-panel calculator-step-panel">
+    <div class="step-label"><span>1</span><div><strong>Property</strong><small>Step 1 of 3</small></div></div>
+    <h2>Start with the property address</h2>
+    <p class="lede">We use the address temporarily to find the roof and its nearest long-term rainfall grid point. It is not added to our customer records unless you later request a survey.</p>
+    <form method="post" class="stacked-form calculator-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+        {{ form.as_div }}
+        <button type="submit" class="button button-primary button-wide">Find my roof</button>
+    </form>
+</section>
+{% endblock %}

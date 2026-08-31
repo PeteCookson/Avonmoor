@@ -46,10 +46,17 @@
         const area = google.maps.geometry.spherical.computeArea(
             roofPolygon.getPath()
         );
+        const roofBounds = new google.maps.LatLngBounds();
+        roofPolygon.getPath().forEach(function (point) {
+            roofBounds.extend(point);
+        });
+        const roofCentre = roofBounds.getCenter();
         polygonInput.value = JSON.stringify({
             type: 'Polygon',
             coordinates: [closedCoordinates],
         });
+        latitudeInput.value = roofCentre.lat().toFixed(6);
+        longitudeInput.value = roofCentre.lng().toFixed(6);
         areaInput.value = area.toFixed(2);
         areaInput.readOnly = true;
         areaOutput.textContent = area.toFixed(1) + ' m²';
@@ -183,7 +190,12 @@
         '&libraries=geometry&loading=async&callback=initAvonmoorRoofMap&v=quarterly';
     script.async = true;
     script.onerror = function () {
-        setMessage('Google Maps failed to load. Enter the roof area manually.', true);
+        setMessage(
+            mapElement.dataset.requiresLocation === 'true'
+                ? 'Google Maps failed to load. Please reload the page or contact Avonmoor.'
+                : 'Google Maps failed to load. Enter the roof area manually.',
+            true
+        );
     };
     document.head.appendChild(script);
 })();

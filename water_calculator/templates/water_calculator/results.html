@@ -1,0 +1,67 @@
+{% extends 'water_calculator/base.html' %}
+{% block title %}Your rainwater estimate{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'water_calculator:measure' %}">← Adjust roof measurement</a>
+<section class="calculator-results-hero">
+    <div>
+        <p class="eyebrow">Your indicative result</p>
+        <h1>{{ estimate.annual_harvest_litres|floatformat:'0g' }} <span>litres/year</span></h1>
+        <p>Potential harvest from {{ estimate.roof_area_m2|floatformat:1 }} m² of {{ estimate.roof_material_label|lower }} roof using {{ estimate.annual_rainfall_mm|floatformat:0 }} mm long-term annual rainfall.</p>
+    </div>
+    {% if estimate.uncaptured_litres %}
+    <div class="lost-water-callout"><span>Potential currently uncaptured</span><strong>{{ estimate.uncaptured_litres|floatformat:'0g' }}</strong><b>L/year</b><small>Assuming this roof currently has no collection system.</small></div>
+    {% endif %}
+</section>
+
+<section class="calculator-metrics" aria-label="Estimate summary">
+    <div><span>Rain landing on roof</span><strong>{{ estimate.gross_rainfall_litres|floatformat:'0g' }} L</strong><small>Before runoff and filter losses</small></div>
+    <div><span>Indicative storage</span><strong>{{ estimate.storage_low_litres|floatformat:'0g' }}{% if estimate.storage_high_litres %}–{{ estimate.storage_high_litres|floatformat:'0g' }}{% else %}+{% endif %} L</strong><small>Planning range, not a final specification</small></div>
+    <div><span>Nearest climate point</span><strong>{{ estimate.rainfall_distance_km }} km</strong><small>{{ estimate.rainfall_reference_period }} average</small></div>
+</section>
+
+<section class="calculator-panel monthly-panel">
+    <div class="section-heading"><h2>How collection changes through the year</h2><span>{{ estimate.rainfall_reference_period }}</span></div>
+    <p class="lede">Winter rainfall is abundant, but useful storage is determined by demand and the dry periods between rainfall—not the annual total alone.</p>
+    <div class="monthly-bars">
+        {% for row in estimate.monthly_rows %}
+        <div class="monthly-bar-row">
+            <span>{{ row.month|slice:':3' }}</span>
+            <div class="monthly-bar-track"><i style="--bar-width: {{ row.percentage }}%"></i></div>
+            <strong>{{ row.yield_litres|floatformat:'0g' }} L</strong>
+        </div>
+        {% endfor %}
+    </div>
+    <p class="data-source">Source: {{ estimate.rainfall_source }}, {{ estimate.rainfall_reference_period }} · nearest 1 km grid point {{ estimate.rainfall_distance_km }} km away.</p>
+</section>
+
+<section class="calculator-panel recommendation-panel">
+    <p class="eyebrow">What this means</p>
+    <h2>A physical survey turns potential into a dependable system</h2>
+    <p>The indicative storage range uses 5% of estimated annual harvest. Final sizing must test actual water demand, gutter routing, dry-period performance, overflow, access, excavation and ground conditions.</p>
+    <ul class="recommendation-list">
+        <li>Confirm which roof sections reach each downpipe</li>
+        <li>Compare tank sizes against realistic water use</li>
+        <li>Specify filtration, overflow and pumping</li>
+    </ul>
+</section>
+
+<section class="calculator-panel lead-panel" id="request-survey">
+    <div class="step-label"><span>3</span><div><strong>Request a survey</strong><small>Optional</small></div></div>
+    <h2>Would you like Avonmoor to assess the property?</h2>
+    <p class="lede">Send this estimate with your contact details. We will review it before discussing a site survey—there is no automatic quote or obligation.</p>
+    <form method="post" action="{% url 'water_calculator:request-survey' %}" class="stacked-form calculator-form">
+        {% csrf_token %}
+        {% if lead_form.non_field_errors %}<div class="form-error">{{ lead_form.non_field_errors }}</div>{% endif %}
+        {% for field in lead_form %}
+        <div class="form-field{% if field.name == 'website' %} honeypot{% endif %}{% if field.name == 'consent' %} consent-field{% endif %}">
+            {% if field.name != 'consent' %}{{ field.label_tag }}{% endif %}
+            {{ field }}
+            {% if field.name == 'consent' %}{{ field.label_tag }}{% endif %}
+            {% if field.errors %}<div class="form-error">{{ field.errors }}</div>{% endif %}
+        </div>
+        {% endfor %}
+        <button type="submit" class="button button-primary button-wide">Send my survey request</button>
+        <small class="privacy-note">Your details are used only to respond to this enquiry. Anonymous calculator entries are not added to our customer database.</small>
+    </form>
+</section>
+{% endblock %}

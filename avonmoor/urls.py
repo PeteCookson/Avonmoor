@@ -23,6 +23,7 @@ from django.conf.urls.static import static
 urlpatterns = [
     path('', contact_views.contact_view, name='contact'),
     path('accounts/', include('django.contrib.auth.urls')),
+    path('rainwater-calculator/', include('water_calculator.urls')),
     path('surveys/', include('water_survey.urls')),
     path('admin/', admin.site.urls),
 ]
