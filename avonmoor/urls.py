@@ -21,7 +21,18 @@ from django.conf import settings
 from django.conf.urls.static import static
 
 urlpatterns = [
-    path('', contact_views.contact_view, name='contact'),
+    path('', contact_views.home_view, name='home'),
+    path(
+        'garden-property-maintenance/',
+        contact_views.garden_property_view,
+        name='garden_property',
+    ),
+    path(
+        'rainwater-harvesting/',
+        contact_views.rainwater_harvesting_view,
+        name='rainwater_harvesting',
+    ),
+    path('contact/', contact_views.contact_view, name='contact'),
     path('accounts/', include('django.contrib.auth.urls')),
     path('rainwater-calculator/', include('water_calculator.urls')),
     path('surveys/', include('water_survey.urls')),

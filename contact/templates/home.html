@@ -1,0 +1,49 @@
+{% extends 'site_base.html' %}
+{% block title %}Avonmoor | Garden, property and rainwater harvesting{% endblock %}
+{% block body_class %}home-page{% endblock %}
+{% block content %}
+<section class="home-intro">
+    <div class="page-shell home-intro-grid">
+        <div>
+            <p class="eyebrow">South Devon</p>
+            <h1>Care for your property.<br>Make better use of your water.</h1>
+        </div>
+        <p class="home-lede">Avonmoor brings practical, dependable help to homes and estates across South Devon. Choose the service you need to get started.</p>
+    </div>
+</section>
+<section class="service-gateway" aria-labelledby="choose-service-heading">
+    <div class="page-shell">
+        <h2 class="visually-hidden" id="choose-service-heading">Choose an Avonmoor service</h2>
+        <div class="gateway-grid">
+            <a class="gateway-card gateway-garden" href="{% url 'garden_property' %}">
+                <span class="gateway-number">01</span>
+                <div class="gateway-card-copy">
+                    <p class="gateway-label">Established service</p>
+                    <h2>Garden &amp; Property Maintenance</h2>
+                    <p>Reliable hands-on care for gardens, grounds and the jobs that keep a property looking right.</p>
+                    <span class="gateway-link">Explore garden &amp; property <span aria-hidden="true">→</span></span>
+                </div>
+            </a>
+            <a class="gateway-card gateway-water" href="{% url 'rainwater_harvesting' %}">
+                <span class="gateway-number">02</span>
+                <div class="gateway-card-copy">
+                    <p class="gateway-label">Water resilience</p>
+                    <h2>Rainwater Harvesting</h2>
+                    <p>Practical systems that capture roof water for use around your garden and grounds.</p>
+                    <span class="gateway-link">Explore rainwater harvesting <span aria-hidden="true">→</span></span>
+                </div>
+            </a>
+        </div>
+    </div>
+</section>
+<section class="home-principles">
+    <div class="page-shell principles-grid">
+        <p class="eyebrow">One local name</p>
+        <h2>Built around the property you actually have.</h2>
+        <div>
+            <p>No generic packages or hard sell. We look at the site, understand what you need and recommend a practical way forward.</p>
+            <a class="text-link" href="{% url 'contact' %}">Talk to Avonmoor <span aria-hidden="true">→</span></a>
+        </div>
+    </div>
+</section>
+{% endblock %}

@@ -1,0 +1,51 @@
+{% extends 'site_base.html' %}
+{% block title %}Rainwater Harvesting | Avonmoor{% endblock %}
+{% block meta_description %}Rainwater harvesting surveys, system design and installation across South Devon. Calculate how much water your roof could collect.{% endblock %}
+{% block og_title %}Rainwater Harvesting | Avonmoor{% endblock %}
+{% block og_description %}Survey, design and installation of practical rainwater harvesting systems across South Devon.{% endblock %}
+{% block body_class %}service-page water-service-page{% endblock %}
+{% block content %}
+<section class="service-hero water-hero">
+    <div class="page-shell service-hero-grid">
+        <div class="service-hero-copy">
+            <p class="eyebrow">Rainwater Harvesting</p>
+            <h1>Turn your roof into a water resource.</h1>
+            <p class="service-lede">Capture the rain that already falls on your property and store it for your garden, grounds and other suitable non-potable uses.</p>
+            <div class="button-row">
+                <a class="button button-copper" href="{% url 'water_calculator:start' %}">Calculate your rainwater</a>
+                <a class="button button-outline-light" href="{% url 'contact' %}?service=rainwater">Discuss a system</a>
+            </div>
+        </div>
+        <dl class="calculator-summary">
+            <div><dt>Cost</dt><dd>Free</dd></div>
+            <div><dt>Time</dt><dd>About 2 minutes</dd></div>
+            <div><dt>Rainfall data</dt><dd>Met Office 1 km grid</dd></div>
+        </dl>
+    </div>
+</section>
+<section class="calculator-callout">
+    <div class="page-shell calculator-callout-grid">
+        <div><p class="eyebrow">Start with the numbers</p><h2>How much rainwater is your roof losing?</h2></div>
+        <div>
+            <p>Measure your roof on the map and combine it with long-term local rainfall data. You will get an estimate of annual collection potential and an indicative storage range.</p>
+            <a class="text-link" href="{% url 'water_calculator:start' %}">Open the rainwater calculator <span aria-hidden="true">→</span></a>
+        </div>
+    </div>
+</section>
+<section class="service-content water-service-content">
+    <div class="page-shell">
+        <div class="section-heading"><p class="eyebrow">From roof to garden</p><h2>A system designed around your property.</h2></div>
+        <div class="process-grid">
+            <article><span>01</span><h3>Survey</h3><p>Measure roof area, rainfall, access, ground conditions and where the water will be used.</p></article>
+            <article><span>02</span><h3>Design</h3><p>Size the storage, filtration, pump and distribution around real collection and demand.</p></article>
+            <article><span>03</span><h3>Install</h3><p>Fit a practical system, from a simple above-ground tank to larger pumped storage.</p></article>
+        </div>
+    </div>
+</section>
+<section class="service-cta water-cta">
+    <div class="page-shell service-cta-inner">
+        <div><p class="eyebrow">Ready to start?</p><h2>Measure your roof first.</h2></div>
+        <a class="button button-copper" href="{% url 'water_calculator:start' %}">Use the free calculator</a>
+    </div>
+</section>
+{% endblock %}

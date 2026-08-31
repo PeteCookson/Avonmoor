@@ -27,9 +27,8 @@ class ContactForm(forms.ModelForm):
             'postcode': forms.TextInput(attrs={'placeholder': 'Postcode', 'class': 'form-control postcode-field'}),
             'subject': forms.Select(attrs={'class': 'form-control subject-field'}, choices=[
                 ('', 'Enquiry Subject'),
-                ('Garden', 'Garden'),
-                ('Property', 'Property'),
-                ('Garden & Property', 'Garden & Property'),
+                ('Garden & Property Maintenance', 'Garden & Property Maintenance'),
+                ('Rainwater Harvesting', 'Rainwater Harvesting'),
                 ('Other', 'Other')
             ]),
             'message': forms.Textarea(attrs={'placeholder': 'Message', 'class': 'form-control message-field'}),
