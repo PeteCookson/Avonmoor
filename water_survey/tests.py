@@ -268,6 +268,13 @@ class SurveyAccessTests(TestCase):
             f"{reverse('login')}?next={reverse('water_survey:survey-list')}",
         )
 
+    def test_login_uses_rainwater_harvesting_brand(self):
+        response = self.client.get(reverse('login'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Avonmoor Rainwater Harvesting')
+        self.assertContains(response, 'avonmoor-water-lockup-light.svg')
+
     def test_add_roof_requires_login(self):
         url = reverse(
             'water_survey:roof-section-create', args=[self.survey.pk]
@@ -311,7 +318,9 @@ class SurveyAccessTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Roof yield survey')
+        self.assertContains(response, 'Roof yield assessment')
+        self.assertContains(response, 'Estimated annual harvest')
+        self.assertContains(response, 'avonmoor-water-lockup-light.svg')
         self.assertContains(response, '1 Test Lane')
         self.assertContains(response, '75,240')
         self.assertContains(response, 'Main roof')

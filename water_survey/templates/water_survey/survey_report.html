@@ -10,11 +10,11 @@
 <article class="report-paper">
     <header class="report-header">
         <div class="report-brand">
-            <img src="{% static 'img/master-logo-black.png' %}" alt="Avonmoor">
-            <div>
-                <p class="eyebrow">Rainwater harvesting</p>
-                <h1>Roof yield survey</h1>
-            </div>
+            <img src="{% static 'img/avonmoor-water-lockup-light.svg' %}" alt="Avonmoor Rainwater Harvesting">
+        </div>
+        <div class="report-title">
+            <p class="eyebrow">Survey report</p>
+            <h1>Roof yield assessment</h1>
         </div>
         <dl class="report-meta">
             <div><dt>Survey reference</dt><dd>{{ survey.reference }}</dd></div>
@@ -34,7 +34,7 @@
 
     <section class="report-summary" aria-label="Survey summary">
         <div class="report-primary-metric">
-            <span>Estimated annual yield</span>
+            <span>Estimated annual harvest</span>
             {% if survey.estimated_annual_yield_litres is not None %}
             <strong>{{ survey.estimated_annual_yield_litres|floatformat:'0g' }}</strong>
             <small>litres/year</small>
@@ -62,7 +62,7 @@
         <div class="report-table-wrap">
             <table class="report-table">
                 <thead>
-                    <tr><th>Roof section</th><th>Area</th><th>Runoff</th><th>Efficiency</th><th>Annual yield</th></tr>
+                    <tr><th>Roof section</th><th>Area</th><th>Runoff</th><th>Efficiency</th><th>Estimated harvest</th></tr>
                 </thead>
                 <tbody>
                     {% for roof in survey.roof_sections.all %}
@@ -121,7 +121,7 @@
 
     <footer class="report-footer">
         <span>Generated {{ report_generated_at|date:'j F Y, H:i' }}</span>
-        <span>Avonmoor Water · avonmoor.co.uk · hello@avonmoor.co.uk</span>
+        <span>Avonmoor · Rainwater Harvesting · avonmoor.co.uk · hello@avonmoor.co.uk</span>
     </footer>
 </article>
 {% endblock %}

@@ -67,10 +67,10 @@
             paths: [[]],
             editable: true,
             clickable: false,
-            strokeColor: '#b66d2b',
+            strokeColor: '#30569A',
             strokeOpacity: 1,
             strokeWeight: 3,
-            fillColor: '#d7904f',
+            fillColor: '#51A4CF',
             fillOpacity: 0.32,
         });
 

@@ -16,11 +16,11 @@
 </div>
 
 <section class="result-panel">
-    <p class="eyebrow">Current estimate</p>
+    <p class="eyebrow">Estimated annual harvest</p>
     {% if survey.estimated_annual_yield_litres is not None %}
         <strong class="yield-number">{{ survey.estimated_annual_yield_litres|floatformat:'0g' }}</strong>
         <span class="yield-unit">litres/year</span>
-        <p>From {{ survey.total_roof_area_m2|floatformat:1 }} m² of selected roof using {{ survey.annual_rainfall_mm|floatformat:0 }} mm annual rainfall.</p>
+        <p>Based on {{ survey.total_roof_area_m2|floatformat:1 }} m² of selected roof, {{ survey.annual_rainfall_mm|floatformat:0 }} mm annual rainfall and the recorded runoff and system-efficiency factors.</p>
     {% else %}
         <h2>Rainfall required</h2>
         <p>Add an annual rainfall figure to calculate the estimated yield.</p>
