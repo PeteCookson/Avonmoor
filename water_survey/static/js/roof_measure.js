@@ -131,7 +131,6 @@
                 }
             }
 
-            if (roofPolygon) roofPolygon.getPath().clear();
             latitudeInput.value = latitude.toFixed(6);
             longitudeInput.value = longitude.toFixed(6);
             setLocationMethod('postcode');
@@ -142,6 +141,7 @@
             );
             if (areaInput) areaInput.focus();
         } catch (error) {
+            console.error('Avonmoor postcode fallback failed:', error);
             setFallbackStatus(
                 'The postcode lookup is unavailable. Check the postcode or try again shortly.',
                 true
