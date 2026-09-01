@@ -37,8 +37,8 @@ h3 { margin-bottom: 10px; font-size: 22px; font-weight: 500; line-height: 1.2; }
 
 .site-header { position: relative; z-index: 20; border-bottom: 1px solid rgba(26, 48, 61, .12); background: rgba(247, 245, 240, .96); }
 .site-header-inner { width: min(var(--shell), calc(100% - 48px)); min-height: 92px; display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-inline: auto; }
-.master-brand { display: block; text-decoration: none; }
-.master-brand-logo { width: clamp(190px, 22vw, 240px); height: auto; display: block; }
+.master-brand { min-width: 0; flex: 0 1 240px; display: block; text-decoration: none; }
+.master-brand-logo { width: 100%; max-width: 240px; height: auto; display: block; }
 .desktop-nav { display: flex; align-items: center; gap: clamp(20px, 3vw, 42px); }
 .desktop-nav a { min-height: 44px; display: inline-flex; align-items: center; color: var(--ink); font-size: 14px; font-weight: 600; text-decoration: none; }
 .desktop-nav a:hover { color: var(--copper-dark); }
@@ -175,8 +175,8 @@ h3 { margin-bottom: 10px; font-size: 22px; font-weight: 500; line-height: 1.2; }
 
 @media (max-width: 680px) {
     .page-shell, .site-header-inner, .site-footer-inner { width: min(100% - 32px, var(--shell)); }
-    .site-header-inner { min-height: 76px; }
-    .master-brand-logo { width: 180px; }
+    .site-header-inner { min-height: 76px; gap: 16px; }
+    .master-brand { flex-basis: 180px; }
     .home-intro { padding-top: 58px; }
     .gateway-grid, .service-columns, .calculator-callout-grid, .process-grid, .form-grid, .site-footer-inner { grid-template-columns: 1fr; }
     .gateway-card { min-height: 450px; }

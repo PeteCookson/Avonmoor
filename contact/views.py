@@ -1,8 +1,13 @@
+import logging
+
 from django.core.mail import send_mail
 from django.shortcuts import render, redirect
 from django.http import HttpResponseRedirect
 from django.urls import reverse
 from .forms import ContactForm
+
+
+logger = logging.getLogger(__name__)
 
 
 def home_view(request):
@@ -32,7 +37,13 @@ def contact_view(request):
             message = f'Name: {form.cleaned_data["name"]}\nEmail: {form.cleaned_data["email"]}\nPhone Number: {form.cleaned_data["phone_number"]}\nPostcode: {form.cleaned_data["postcode"]}\nSubject: {form.cleaned_data["subject"]}\nMessage: {form.cleaned_data["message"]}'
             from_email = 'hello@avonmoor.co.uk'
             recipient_list = ['hello@avonmoor.co.uk']
-            send_mail(subject, message, from_email, recipient_list)
+            try:
+                send_mail(subject, message, from_email, recipient_list)
+            except Exception:
+                # The enquiry is already safely stored in the database. An
+                # email-provider outage must not lose it or expose a 500 page
+                # to the customer; retain the traceback in the server log.
+                logger.exception('Contact notification email could not be sent')
 
             # Redirect to the same page with success parameter
             return HttpResponseRedirect(reverse('contact') + '?success=1')

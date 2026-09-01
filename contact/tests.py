@@ -1,6 +1,9 @@
+from unittest.mock import patch
+
 from django.test import TestCase
 
 from .forms import ContactForm
+from .models import Contact
 
 
 class ContactPageTests(TestCase):
@@ -41,6 +44,24 @@ class ContactPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Tell us what you need.')
         self.assertNotContains(response, 'South Brent')
+        self.assertContains(response, 'css/contact.css?v=20260901-2')
+
+    @patch('contact.views.send_mail', side_effect=OSError('SMTP unavailable'))
+    def test_contact_submission_survives_email_outage(self, _send_mail):
+        response = self.client.post('/contact/', data={
+            'name': 'Test Customer',
+            'email': 'customer@example.com',
+            'phone_number': '07123 456 789',
+            'postcode': 'TQ10 9AB',
+            'subject': 'Rainwater Harvesting',
+            'message': 'Please contact me about a rainwater system.',
+        })
+
+        self.assertRedirects(response, '/contact/?success=1')
+        self.assertEqual(Contact.objects.count(), 1)
+
+        success_response = self.client.get(response.url)
+        self.assertContains(success_response, 'your enquiry has been received')
 
     def test_contact_subjects_are_separate_and_include_rainwater(self):
         form = ContactForm()
