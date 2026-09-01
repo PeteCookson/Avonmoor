@@ -8,12 +8,13 @@ from urllib.request import Request, urlopen
 from django.conf import settings
 from django.contrib import messages
 from django.core.cache import cache
-from django.core.mail import send_mail
 from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.views import View
+
+from avonmoor.email_notifications import send_branded_notification
 
 from .forms import PropertyForm, RoofEstimateForm, SurveyRequestForm
 from .models import CustomerSurveyLead
@@ -25,6 +26,15 @@ ESTIMATE_SESSION_KEY = 'water_calculator_estimate'
 REPORT_UNLOCKED_SESSION_KEY = 'water_calculator_report_unlocked'
 LEAD_REFERENCE_SESSION_KEY = 'water_calculator_lead_reference'
 POSTCODE_PATTERN = re.compile(r'^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$')
+
+
+def format_storage_range(lead):
+    if lead.indicative_storage_high_litres is None:
+        return f'{lead.indicative_storage_low_litres:,} litres'
+    return (
+        f'{lead.indicative_storage_low_litres:,}–'
+        f'{lead.indicative_storage_high_litres:,} litres'
+    )
 
 
 class PostcodeLocationView(View):
@@ -233,21 +243,51 @@ class SurveyRequestView(View):
         lead.consented_at = timezone.now()
         lead.save()
 
-        subject = f'Full rainwater estimate accessed - {lead.postcode}'
-        body = (
-            f'New calculator estimate access\n\n'
-            f'Name: {lead.name}\nEmail: {lead.email}\nPhone: {lead.phone}\n'
-            f'Address: {lead.address_line_1}, {lead.town}, {lead.postcode}\n'
-            f'Location method: {estimate.get("location_method", "map")}\n'
-            f'Roof area: {lead.roof_area_m2} m2\n'
-            f'Estimated harvest: {lead.estimated_annual_harvest_litres} L/year\n'
-            f'Reference: {lead.reference}\n'
-        )
-        send_mail(
-            subject,
-            body,
-            settings.EMAIL_HOST_USER,
-            [settings.EMAIL_HOST_USER],
+        send_branded_notification(
+            subject=(
+                f'RAINWATER LEAD — Detailed estimate accessed — '
+                f'{lead.postcode} — {lead.name}'
+            ),
+            heading='Detailed Estimate Accessed',
+            notification_type='rainwater',
+            message=(
+                'The customer unlocked the detailed calculator results. '
+                'They have not yet requested a site survey.'
+            ),
+            message_label='Calculator Activity',
+            fields=[
+                ('Name', lead.name),
+                ('Email', lead.email),
+                ('Phone', lead.phone),
+                (
+                    'Property',
+                    ', '.join(
+                        part for part in (
+                            lead.address_line_1,
+                            lead.town,
+                            lead.postcode,
+                        ) if part
+                    ),
+                ),
+                ('Location', lead.get_location_method_display()),
+                ('Roof area', f'{lead.roof_area_m2} m²'),
+                ('Roof material', lead.get_roof_material_display()),
+                ('Intended use', lead.get_intended_use_display()),
+                (
+                    'Existing collection',
+                    'Yes' if lead.has_existing_collection else 'No',
+                ),
+                (
+                    'Estimated annual harvest',
+                    f'{lead.estimated_annual_harvest_litres:,.0f} litres/year',
+                ),
+                (
+                    'Indicative storage',
+                    format_storage_range(lead),
+                ),
+                ('Reference', lead.reference),
+            ],
+            reply_to=lead.email,
             fail_silently=True,
         )
         request.session[LEAD_REFERENCE_SESSION_KEY] = str(lead.reference)
@@ -278,20 +318,46 @@ class SiteSurveyRequestView(View):
                 update_fields.append('status')
             lead.save(update_fields=update_fields)
 
-            subject = f'Site survey requested - {lead.postcode}'
-            body = (
-                f'Rainwater site survey request\n\n'
-                f'Name: {lead.name}\nEmail: {lead.email}\nPhone: {lead.phone}\n'
-                f'Address: {lead.address_line_1}, {lead.town}, {lead.postcode}\n'
-                f'Estimated harvest: '
-                f'{lead.estimated_annual_harvest_litres} L/year\n'
-                f'Reference: {lead.reference}\n'
-            )
-            send_mail(
-                subject,
-                body,
-                settings.EMAIL_HOST_USER,
-                [settings.EMAIL_HOST_USER],
+            send_branded_notification(
+                subject=(
+                    f'RAINWATER SURVEY REQUESTED — {lead.postcode} — '
+                    f'{lead.name}'
+                ),
+                heading='Site Survey Requested',
+                notification_type='rainwater',
+                message=(
+                    'The customer has asked Avonmoor to contact them and '
+                    'arrange the next step for a rainwater site survey.'
+                ),
+                message_label='Action Required',
+                fields=[
+                    ('Name', lead.name),
+                    ('Email', lead.email),
+                    ('Phone', lead.phone),
+                    (
+                        'Property',
+                        ', '.join(
+                            part for part in (
+                                lead.address_line_1,
+                                lead.town,
+                                lead.postcode,
+                            ) if part
+                        ),
+                    ),
+                    ('Intended use', lead.get_intended_use_display()),
+                    ('Roof area', f'{lead.roof_area_m2} m²'),
+                    (
+                        'Estimated annual harvest',
+                        f'{lead.estimated_annual_harvest_litres:,.0f} '
+                        'litres/year',
+                    ),
+                    (
+                        'Indicative storage',
+                        format_storage_range(lead),
+                    ),
+                    ('Reference', lead.reference),
+                ],
+                reply_to=lead.email,
                 fail_silently=True,
             )
 

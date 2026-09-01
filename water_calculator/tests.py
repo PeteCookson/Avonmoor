@@ -311,6 +311,10 @@ class PublicCalculatorJourneyTests(TestCase):
         self.assertEqual(len(lead.monthly_estimate), 12)
         self.assertIsNotNone(lead.consented_at)
         self.assertEqual(len(mail.outbox), 1)
+        self.assertIn('RAINWATER LEAD', mail.outbox[0].subject)
+        self.assertEqual(mail.outbox[0].reply_to, ['alex@example.com'])
+        self.assertIn('#30569A', mail.outbox[0].alternatives[0][0])
+        self.assertIn('Detailed Estimate Accessed', mail.outbox[0].body)
 
         unlocked_response = self.client.get(reverse('water_calculator:results'))
         self.assertContains(unlocked_response, 'Planning range, not a final specification')
@@ -361,6 +365,10 @@ class PublicCalculatorJourneyTests(TestCase):
         )
         self.assertIsNotNone(lead.survey_requested_at)
         self.assertEqual(len(mail.outbox), 2)
+        survey_email = mail.outbox[1]
+        self.assertIn('RAINWATER SURVEY REQUESTED', survey_email.subject)
+        self.assertIn('Site Survey Requested', survey_email.body)
+        self.assertIn('79,800 litres/year', survey_email.body)
 
         result = self.client.get(reverse('water_calculator:results'))
         self.assertContains(result, 'Survey Request Received')

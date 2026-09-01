@@ -1,9 +1,11 @@
 import logging
 
-from django.core.mail import send_mail
 from django.shortcuts import render, redirect
 from django.http import HttpResponseRedirect
 from django.urls import reverse
+
+from avonmoor.email_notifications import send_branded_notification
+
 from .forms import ContactForm
 
 
@@ -30,15 +32,41 @@ def contact_view(request):
     if request.method == 'POST':
         form = ContactForm(request.POST)
         if form.is_valid():
-            form.save()
+            enquiry = form.save()
+            service = form.cleaned_data['subject']
+            if service == 'Rainwater Harvesting':
+                notification_type = 'rainwater'
+                subject_label = 'RAINWATER'
+            elif service in {'Garden', 'Property'}:
+                notification_type = 'garden'
+                subject_label = 'GARDEN & PROPERTY'
+            else:
+                notification_type = 'other'
+                subject_label = 'GENERAL'
 
-            # Send email (example, replace with your own logic)
-            subject = 'New Contact Form Submission'
-            message = f'Name: {form.cleaned_data["name"]}\nEmail: {form.cleaned_data["email"]}\nPhone Number: {form.cleaned_data["phone_number"]}\nPostcode: {form.cleaned_data["postcode"]}\nSubject: {form.cleaned_data["subject"]}\nMessage: {form.cleaned_data["message"]}'
+            subject = (
+                f'{subject_label} ENQUIRY — {service} — '
+                f'{enquiry.postcode} — {enquiry.name}'
+            )
             from_email = 'hello@avonmoor.co.uk'
             recipient_list = ['hello@avonmoor.co.uk']
             try:
-                send_mail(subject, message, from_email, recipient_list)
+                send_branded_notification(
+                    subject=subject,
+                    heading=f'New {service} Enquiry',
+                    notification_type=notification_type,
+                    message=enquiry.message,
+                    fields=[
+                        ('Name', enquiry.name),
+                        ('Email', enquiry.email),
+                        ('Phone', enquiry.phone_number),
+                        ('Postcode', enquiry.postcode),
+                        ('Service requested', service),
+                    ],
+                    reply_to=enquiry.email,
+                    from_email=from_email,
+                    recipient_list=recipient_list,
+                )
             except Exception:
                 # The enquiry is already safely stored in the database. An
                 # email-provider outage must not lose it or expose a 500 page

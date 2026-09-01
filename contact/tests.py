@@ -1,5 +1,6 @@
 from unittest.mock import patch
 
+from django.core import mail
 from django.test import TestCase
 
 from .forms import ContactForm
@@ -50,8 +51,11 @@ class ContactPageTests(TestCase):
             'Garden, Property and Other enquiries: TQ10, TQ11 and PL21.',
         )
 
-    @patch('contact.views.send_mail', side_effect=OSError('SMTP unavailable'))
-    def test_contact_submission_survives_email_outage(self, _send_mail):
+    @patch(
+        'contact.views.send_branded_notification',
+        side_effect=OSError('SMTP unavailable'),
+    )
+    def test_contact_submission_survives_email_outage(self, _notification):
         response = self.client.post('/contact/', data={
             'name': 'Test Customer',
             'email': 'customer@example.com',
@@ -66,6 +70,49 @@ class ContactPageTests(TestCase):
 
         success_response = self.client.get(response.url)
         self.assertContains(success_response, 'your enquiry has been received')
+
+    def test_rainwater_enquiry_email_is_clear_and_blue(self):
+        self.client.post('/contact/', data={
+            'name': 'Test Customer',
+            'email': 'customer@example.com',
+            'phone_number': '07123 456 789',
+            'postcode': 'TQ10 9AB',
+            'subject': 'Rainwater Harvesting',
+            'message': 'Please assess the house for a rainwater system.',
+        })
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertEqual(
+            email.subject,
+            'RAINWATER ENQUIRY — Rainwater Harvesting — TQ109AB — '
+            'Test Customer',
+        )
+        self.assertEqual(email.reply_to, ['customer@example.com'])
+        self.assertIn('CUSTOMER MESSAGE', email.body)
+        self.assertIn(
+            'Please assess the house for a rainwater system.', email.body
+        )
+        html = email.alternatives[0][0]
+        self.assertIn('#30569A', html)
+        self.assertIn('Rainwater Harvesting', html)
+        self.assertIn('07123 456 789', html)
+
+    def test_garden_enquiry_email_uses_garden_green(self):
+        self.client.post('/contact/', data={
+            'name': 'Garden Customer',
+            'email': 'garden@example.com',
+            'phone_number': '',
+            'postcode': 'TQ10 9AB',
+            'subject': 'Garden',
+            'message': 'Please quote for regular garden maintenance.',
+        })
+
+        self.assertEqual(len(mail.outbox), 1)
+        email = mail.outbox[0]
+        self.assertIn('GARDEN & PROPERTY ENQUIRY', email.subject)
+        self.assertIn('#344C3F', email.alternatives[0][0])
+        self.assertIn('Not supplied', email.body)
 
     def test_postcode_is_required_and_phone_is_optional(self):
         form = ContactForm(data={

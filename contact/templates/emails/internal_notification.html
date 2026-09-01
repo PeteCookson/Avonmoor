@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>{{ heading }}</title>
+</head>
+<body style="margin:0;padding:0;background:#F7F5F0;color:#1A303D;font-family:'Helvetica Neue',Arial,Helvetica,sans-serif;">
+    <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:#F7F5F0;">
+        <tr>
+            <td align="center" style="padding:24px 12px;">
+                <table role="presentation" width="640" cellspacing="0" cellpadding="0" border="0" style="width:100%;max-width:640px;background:#FFFFFF;border-collapse:collapse;border-top:8px solid {{ accent }};">
+                    <tr>
+                        <td style="padding:28px 30px 24px;">
+                            <p style="margin:0 0 8px;color:{{ accent }};font-size:12px;font-weight:700;letter-spacing:1.2px;text-transform:uppercase;">{{ category }}</p>
+                            <h1 style="margin:0;color:#1A303D;font-size:28px;line-height:1.2;font-weight:600;">{{ heading }}</h1>
+                            <p style="margin:10px 0 0;color:#526873;font-size:14px;line-height:1.5;">Received {{ received_at|date:'j F Y, H:i' }}</p>
+                        </td>
+                    </tr>
+                    {% if message %}
+                    <tr>
+                        <td style="padding:0 30px 26px;">
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;background:{{ accent_soft }};border-left:5px solid {{ accent }};border-collapse:collapse;">
+                                <tr>
+                                    <td style="padding:20px 22px;">
+                                        <p style="margin:0 0 8px;color:{{ accent }};font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">{{ message_label }}</p>
+                                        <p style="margin:0;color:#1A303D;font-size:18px;line-height:1.55;white-space:pre-line;">{{ message }}</p>
+                                    </td>
+                                </tr>
+                            </table>
+                        </td>
+                    </tr>
+                    {% endif %}
+                    <tr>
+                        <td style="padding:0 30px 30px;">
+                            <p style="margin:0 0 10px;color:#526873;font-size:12px;font-weight:700;letter-spacing:1px;text-transform:uppercase;">Important Details</p>
+                            <table role="presentation" width="100%" cellspacing="0" cellpadding="0" border="0" style="width:100%;border-collapse:collapse;border-top:1px solid #D7DEE1;">
+                                {% for label, value in fields %}
+                                <tr>
+                                    <th align="left" valign="top" style="width:34%;padding:11px 10px 11px 0;border-bottom:1px solid #D7DEE1;color:#526873;font-size:13px;line-height:1.4;font-weight:600;">{{ label }}</th>
+                                    <td valign="top" style="padding:11px 0 11px 10px;border-bottom:1px solid #D7DEE1;color:#1A303D;font-size:15px;line-height:1.4;font-weight:600;overflow-wrap:anywhere;">{{ value }}</td>
+                                </tr>
+                                {% endfor %}
+                            </table>
+                        </td>
+                    </tr>
+                    <tr>
+                        <td style="padding:17px 30px;background:#1A303D;color:#D7E5EA;font-size:12px;line-height:1.5;">
+                            Avonmoor website notification. Replying to this email will reply to the customer when an address was supplied.
+                        </td>
+                    </tr>
+                </table>
+            </td>
+        </tr>
+    </table>
+</body>
+</html>
