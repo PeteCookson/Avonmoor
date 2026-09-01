@@ -5,6 +5,7 @@ from .views import (
     PostcodeLocationView,
     ResultsView,
     RoofMeasureStepView,
+    SiteSurveyRequestView,
     SurveyRequestView,
     ThanksView,
 )
@@ -22,5 +23,10 @@ urlpatterns = [
     ),
     path('results/', ResultsView.as_view(), name='results'),
     path('unlock-results/', SurveyRequestView.as_view(), name='unlock-results'),
+    path(
+        'request-site-survey/',
+        SiteSurveyRequestView.as_view(),
+        name='request-site-survey',
+    ),
     path('thanks/', ThanksView.as_view(), name='thanks'),
 ]

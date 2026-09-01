@@ -6,7 +6,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#1A303D">
     <title>{% block title %}Survey tool{% endblock %} | Avonmoor Rainwater Harvesting</title>
-    <link rel="stylesheet" href="{% static 'css/water_survey.css' %}">
+    <link rel="stylesheet" href="{% static 'css/water_survey.css' %}?v=20260902-1">
 </head>
 <body class="survey-app">
     <header class="app-header">
@@ -16,10 +16,13 @@
             </span>
             <strong class="brand-workspace">Survey Workspace</strong>
         </a>
-        <form method="post" action="{% url 'logout' %}">
-            {% csrf_token %}
-            <button type="submit" class="text-button">Sign out</button>
-        </form>
+        <div class="header-actions">
+            {% if request.user.is_staff %}<a class="text-button" href="{% url 'admin:water_calculator_customersurveylead_changelist' %}">Calculator Leads</a>{% endif %}
+            <form method="post" action="{% url 'logout' %}">
+                {% csrf_token %}
+                <button type="submit" class="text-button">Sign out</button>
+            </form>
+        </div>
     </header>
     <main class="app-main">
         {% if messages %}

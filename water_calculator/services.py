@@ -104,6 +104,8 @@ def build_public_estimate(property_data, roof_data):
         'roof_material_label': dict(RoofSection.RoofMaterial.choices)[
             roof_data['roof_material']
         ],
+        'runoff_coefficient': str(runoff),
+        'system_efficiency': str(SYSTEM_EFFICIENCY),
         'intended_use': roof_data['intended_use'],
         'intended_use_label': dict(INTENDED_USE_CHOICES)[
             roof_data['intended_use']

@@ -16,12 +16,14 @@ from django.utils import timezone
 from django.views import View
 
 from .forms import PropertyForm, RoofEstimateForm, SurveyRequestForm
+from .models import CustomerSurveyLead
 from .services import RainfallUnavailable, build_public_estimate
 
 
 PROPERTY_SESSION_KEY = 'water_calculator_property'
 ESTIMATE_SESSION_KEY = 'water_calculator_estimate'
 REPORT_UNLOCKED_SESSION_KEY = 'water_calculator_report_unlocked'
+LEAD_REFERENCE_SESSION_KEY = 'water_calculator_lead_reference'
 POSTCODE_PATTERN = re.compile(r'^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$')
 
 
@@ -91,6 +93,7 @@ class PropertyStepView(View):
             request.session[PROPERTY_SESSION_KEY] = form.cleaned_data
             request.session.pop(ESTIMATE_SESSION_KEY, None)
             request.session.pop(REPORT_UNLOCKED_SESSION_KEY, None)
+            request.session.pop(LEAD_REFERENCE_SESSION_KEY, None)
             return redirect('water_calculator:measure')
         return render(request, self.template_name, {'form': form})
 
@@ -141,6 +144,7 @@ class RoofMeasureStepView(View):
             else:
                 request.session[ESTIMATE_SESSION_KEY] = estimate
                 request.session.pop(REPORT_UNLOCKED_SESSION_KEY, None)
+                request.session.pop(LEAD_REFERENCE_SESSION_KEY, None)
                 return redirect('water_calculator:results')
         return render(request, self.template_name, self.get_context(form))
 
@@ -152,13 +156,20 @@ class ResultsView(View):
         estimate = request.session.get(ESTIMATE_SESSION_KEY)
         if not estimate:
             return redirect('water_calculator:start')
+        lead = None
+        lead_reference = request.session.get(LEAD_REFERENCE_SESSION_KEY)
+        if lead_reference:
+            lead = CustomerSurveyLead.objects.filter(
+                reference=lead_reference
+            ).first()
         return render(
             request,
             self.template_name,
             {
                 'estimate': estimate,
                 'lead_form': SurveyRequestForm(),
-                'full_report_unlocked': request.session.get(
+                'lead': lead,
+                'full_report_unlocked': bool(lead) or request.session.get(
                     REPORT_UNLOCKED_SESSION_KEY, False
                 ),
             },
@@ -170,6 +181,13 @@ class SurveyRequestView(View):
         estimate = request.session.get(ESTIMATE_SESSION_KEY)
         if not estimate:
             return redirect('water_calculator:start')
+
+        lead_reference = request.session.get(LEAD_REFERENCE_SESSION_KEY)
+        if lead_reference and CustomerSurveyLead.objects.filter(
+            reference=lead_reference
+        ).exists():
+            request.session[REPORT_UNLOCKED_SESSION_KEY] = True
+            return redirect(reverse('water_calculator:results'))
 
         form = SurveyRequestForm(request.POST)
         if not form.is_valid():
@@ -192,16 +210,26 @@ class SurveyRequestView(View):
         lead.roof_area_m2 = Decimal(estimate['roof_area_m2'])
         lead.roof_polygon = estimate['roof_polygon']
         lead.roof_material = estimate['roof_material']
+        lead.runoff_coefficient = Decimal(estimate['runoff_coefficient'])
+        lead.system_efficiency = Decimal(estimate['system_efficiency'])
         lead.intended_use = estimate['intended_use']
         lead.has_existing_collection = estimate['has_existing_collection']
+        lead.location_method = estimate.get('location_method', 'map')
         lead.annual_rainfall_mm = Decimal(estimate['annual_rainfall_mm'])
+        lead.gross_rainfall_litres = Decimal(
+            estimate['gross_rainfall_litres']
+        )
         lead.estimated_annual_harvest_litres = Decimal(
             estimate['annual_harvest_litres']
         )
+        if estimate['uncaptured_litres'] is not None:
+            lead.uncaptured_litres = Decimal(estimate['uncaptured_litres'])
         lead.indicative_storage_low_litres = estimate['storage_low_litres']
         lead.indicative_storage_high_litres = estimate['storage_high_litres']
         lead.rainfall_source = estimate['rainfall_source']
         lead.rainfall_reference_period = estimate['rainfall_reference_period']
+        lead.rainfall_distance_km = Decimal(estimate['rainfall_distance_km'])
+        lead.monthly_estimate = estimate['monthly_rows']
         lead.consented_at = timezone.now()
         lead.save()
 
@@ -222,8 +250,56 @@ class SurveyRequestView(View):
             [settings.EMAIL_HOST_USER],
             fail_silently=True,
         )
+        request.session[LEAD_REFERENCE_SESSION_KEY] = str(lead.reference)
         request.session[REPORT_UNLOCKED_SESSION_KEY] = True
         messages.success(request, 'Your full rainwater estimate is now available.')
+        return redirect(reverse('water_calculator:results'))
+
+
+class SiteSurveyRequestView(View):
+    def post(self, request):
+        estimate = request.session.get(ESTIMATE_SESSION_KEY)
+        lead_reference = request.session.get(LEAD_REFERENCE_SESSION_KEY)
+        if not estimate or not lead_reference:
+            return redirect('water_calculator:start')
+
+        lead = CustomerSurveyLead.objects.filter(
+            reference=lead_reference
+        ).first()
+        if lead is None:
+            request.session.pop(LEAD_REFERENCE_SESSION_KEY, None)
+            return redirect('water_calculator:start')
+
+        if lead.survey_requested_at is None:
+            lead.survey_requested_at = timezone.now()
+            update_fields = ['survey_requested_at', 'updated_at']
+            if lead.status == CustomerSurveyLead.Status.NEW:
+                lead.status = CustomerSurveyLead.Status.SURVEY_REQUESTED
+                update_fields.append('status')
+            lead.save(update_fields=update_fields)
+
+            subject = f'Site survey requested - {lead.postcode}'
+            body = (
+                f'Rainwater site survey request\n\n'
+                f'Name: {lead.name}\nEmail: {lead.email}\nPhone: {lead.phone}\n'
+                f'Address: {lead.address_line_1}, {lead.town}, {lead.postcode}\n'
+                f'Estimated harvest: '
+                f'{lead.estimated_annual_harvest_litres} L/year\n'
+                f'Reference: {lead.reference}\n'
+            )
+            send_mail(
+                subject,
+                body,
+                settings.EMAIL_HOST_USER,
+                [settings.EMAIL_HOST_USER],
+                fail_silently=True,
+            )
+
+        messages.success(
+            request,
+            'Your site survey request has been received. We will contact you '
+            'to discuss the property and arrange the next step.',
+        )
         return redirect(reverse('water_calculator:results'))
 
 
@@ -231,9 +307,7 @@ class ThanksView(View):
     template_name = 'water_calculator/thanks.html'
 
     def get(self, request):
-        reference = request.session.pop(
-            'water_calculator_lead_reference', None
-        )
+        reference = request.session.get(LEAD_REFERENCE_SESSION_KEY)
         if not reference:
             messages.info(request, 'Start a new estimate when you are ready.')
             return redirect('water_calculator:start')

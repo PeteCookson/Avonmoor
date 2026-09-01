@@ -65,6 +65,8 @@ button, input, select, textarea { font-family: inherit; }
 
 .text-button {
     min-height: 44px;
+    display: inline-flex;
+    align-items: center;
     padding: 8px 10px;
     border: 1px solid transparent;
     border-radius: 6px;
@@ -72,8 +74,11 @@ button, input, select, textarea { font-family: inherit; }
     background: transparent;
     cursor: pointer;
     font-size: 14px;
+    text-decoration: none;
 }
 .text-button:hover { border-color: rgba(255, 255, 255, .45); }
+.header-actions { display: flex; align-items: center; gap: 8px; }
+.header-actions form { margin: 0; }
 
 .app-main { width: min(1080px, 100%); margin: 0 auto; padding: 32px clamp(16px, 4vw, 40px) 64px; }
 .message-list { display: grid; gap: 8px; margin-bottom: 24px; }
@@ -258,6 +263,17 @@ dd { margin: 3px 0 0; color: var(--ink); font-weight: 700; font-variant-numeric:
 
 .section-block { margin-top: 20px; padding: clamp(20px, 4vw, 32px); }
 .section-heading { border-bottom: 1px solid var(--line); }
+.customer-lead-block { border-top: 4px solid var(--av-copper); }
+.customer-lead-grid {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 18px 28px;
+    padding-top: 22px;
+}
+.customer-lead-grid > div { display: grid; gap: 3px; min-width: 0; }
+.customer-lead-grid span { color: var(--ink-soft); font-size: 12px; font-weight: 700; }
+.customer-lead-grid strong, .customer-lead-grid a { overflow-wrap: anywhere; }
+.customer-lead-block > p { margin: 22px 0 0; color: var(--ink-soft); }
 .section-heading h2 { margin-bottom: 15px; }
 .section-heading span { min-width: 28px; padding: 4px 8px; border-radius: 999px; color: var(--water-navy); text-align: center; background: #DCEEF6; }
 .roof-row { display: grid; grid-template-columns: minmax(150px, 1fr) auto auto; align-items: center; gap: 24px; padding: 20px 0; border-bottom: 1px solid var(--line); }
@@ -353,6 +369,7 @@ dd { margin: 3px 0 0; color: var(--ink); font-weight: 700; font-variant-numeric:
     .detail-heading { align-items: flex-start; flex-direction: column; }
     .detail-actions { width: 100%; flex-direction: column; }
     .detail-heading .button { width: 100%; }
+    .customer-lead-grid { grid-template-columns: 1fr; }
     .roof-row { grid-template-columns: 1fr; gap: 12px; }
     .roof-row dl { justify-content: space-between; text-align: left; }
     .roof-actions { display: flex; justify-content: flex-end; gap: 18px; }

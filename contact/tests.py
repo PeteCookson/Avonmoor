@@ -215,6 +215,7 @@ class ContactPageTests(TestCase):
         self.assertContains(response, 'Avonmoor Ltd, company number 04655485, is the data controller')
         self.assertContains(response, 'held in an essential website session for up to one hour')
         self.assertContains(response, 'Postcodes.io')
+        self.assertContains(response, 'linked to the resulting survey')
         self.assertContains(response, 'No automated mailing list')
 
     def test_site_footer_links_to_privacy_notice(self):

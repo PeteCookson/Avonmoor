@@ -48,11 +48,24 @@
 
 <section class="calculator-panel lead-panel unlocked-next-step">
     <div>
+        {% if lead.survey_requested_at %}
+        <p class="eyebrow">Survey Request Received</p>
+        <h2>We will contact you about the property</h2>
+        <p class="lede">Your calculation and property details are attached to the request, so you will not need to enter them again.</p>
+        {% else %}
         <p class="eyebrow">Next Step</p>
         <h2>Turn the estimate into a system that fits the property</h2>
         <p class="lede">A site survey confirms demand, drainage routes, tank location, access and ground conditions before anything is specified.</p>
+        {% endif %}
     </div>
+    {% if lead and not lead.survey_requested_at %}
+    <form method="post" action="{% url 'water_calculator:request-site-survey' %}">
+        {% csrf_token %}
+        <button class="button button-primary" type="submit">Request a Site Survey</button>
+    </form>
+    {% elif not lead %}
     <a class="button button-primary" href="{% url 'contact' %}?service=rainwater">Discuss a Site Survey</a>
+    {% endif %}
 </section>
 {% else %}
 <section class="calculator-panel locked-results-panel" id="unlock-results">

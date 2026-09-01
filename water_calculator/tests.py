@@ -2,11 +2,12 @@ import json
 from decimal import Decimal
 from unittest.mock import patch
 
+from django.contrib.auth import get_user_model
 from django.core import mail
 from django.test import TestCase, override_settings
 from django.urls import reverse
 
-from water_survey.models import RainfallGridPoint
+from water_survey.models import RainfallGridPoint, RoofSection, Survey
 
 from .models import CustomerSurveyLead
 from .services import build_public_estimate
@@ -302,6 +303,12 @@ class PublicCalculatorJourneyTests(TestCase):
         self.assertEqual(
             lead.estimated_annual_harvest_litres, Decimal('79800.00')
         )
+        self.assertEqual(lead.gross_rainfall_litres, Decimal('96000.00'))
+        self.assertEqual(lead.runoff_coefficient, Decimal('0.875'))
+        self.assertEqual(lead.system_efficiency, Decimal('0.950'))
+        self.assertEqual(lead.location_method, 'map')
+        self.assertEqual(lead.rainfall_distance_km, Decimal('0.00'))
+        self.assertEqual(len(lead.monthly_estimate), 12)
         self.assertIsNotNone(lead.consented_at)
         self.assertEqual(len(mail.outbox), 1)
 
@@ -310,6 +317,106 @@ class PublicCalculatorJourneyTests(TestCase):
         self.assertContains(unlocked_response, 'Met Office HadUK-Grid')
         self.assertContains(unlocked_response, 'Potential Currently Uncaptured')
         self.assertNotContains(unlocked_response, 'Unlock the Detailed Results')
+
+    def test_repeated_unlock_submission_does_not_duplicate_lead(self):
+        self._complete_estimate()
+        data = {
+            'name': 'Alex Customer',
+            'email': 'alex@example.com',
+            'phone': '',
+            'website': '',
+            'consent': 'on',
+        }
+
+        self.client.post(reverse('water_calculator:unlock-results'), data)
+        response = self.client.post(
+            reverse('water_calculator:unlock-results'), data
+        )
+
+        self.assertRedirects(response, reverse('water_calculator:results'))
+        self.assertEqual(CustomerSurveyLead.objects.count(), 1)
+        self.assertEqual(len(mail.outbox), 1)
+
+    def test_customer_can_request_site_survey_without_second_contact_form(self):
+        self._complete_estimate()
+        self.client.post(
+            reverse('water_calculator:unlock-results'),
+            {
+                'name': 'Alex Customer',
+                'email': 'alex@example.com',
+                'phone': '',
+                'website': '',
+                'consent': 'on',
+            },
+        )
+
+        response = self.client.post(
+            reverse('water_calculator:request-site-survey')
+        )
+
+        lead = CustomerSurveyLead.objects.get()
+        self.assertRedirects(response, reverse('water_calculator:results'))
+        self.assertEqual(
+            lead.status, CustomerSurveyLead.Status.SURVEY_REQUESTED
+        )
+        self.assertIsNotNone(lead.survey_requested_at)
+        self.assertEqual(len(mail.outbox), 2)
+
+        result = self.client.get(reverse('water_calculator:results'))
+        self.assertContains(result, 'Survey Request Received')
+        self.assertContains(result, 'you will not need to enter them again')
+        self.assertNotContains(result, 'Request a Site Survey')
+
+        self.client.post(reverse('water_calculator:request-site-survey'))
+        self.assertEqual(len(mail.outbox), 2)
+
+    def test_admin_can_create_survey_from_calculator_lead(self):
+        self._complete_estimate()
+        self.client.post(
+            reverse('water_calculator:unlock-results'),
+            {
+                'name': 'Alex Customer',
+                'email': 'alex@example.com',
+                'phone': '07123 456 789',
+                'website': '',
+                'consent': 'on',
+            },
+        )
+        lead = CustomerSurveyLead.objects.get()
+        user = get_user_model().objects.create_superuser(
+            username='lead-admin',
+            email='admin@example.com',
+            password='test-password',
+        )
+        self.client.force_login(user)
+
+        response = self.client.post(
+            reverse('admin:water_calculator_customersurveylead_changelist'),
+            {
+                'action': 'create_survey_records',
+                '_selected_action': [str(lead.pk)],
+            },
+        )
+
+        self.assertEqual(response.status_code, 302)
+        lead.refresh_from_db()
+        self.assertIsNotNone(lead.survey_id)
+        survey = Survey.objects.get(pk=lead.survey_id)
+        self.assertEqual(survey.created_by, user)
+        self.assertEqual(survey.postcode, 'TQ10 9AB')
+        self.assertEqual(survey.monthly_rainfall_mm['jan'], '100.00')
+        roof = RoofSection.objects.get(survey=survey)
+        self.assertEqual(roof.area_m2, Decimal('80.00'))
+        self.assertEqual(roof.roof_material, 'slate_tile')
+        self.assertEqual(roof.runoff_coefficient, Decimal('0.875'))
+
+        detail = self.client.get(
+            reverse('water_survey:survey-detail', args=[survey.pk])
+        )
+        self.assertContains(detail, 'Customer and Calculator Lead')
+        self.assertContains(detail, 'Alex Customer')
+        self.assertContains(detail, 'alex@example.com')
+        self.assertContains(detail, 'Calculator Leads')
 
     def test_honeypot_rejects_automated_submission(self):
         self._complete_estimate()

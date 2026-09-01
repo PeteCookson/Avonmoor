@@ -15,6 +15,24 @@
     </div>
 </div>
 
+{% with lead=survey.calculator_lead %}
+{% if lead %}
+<section class="section-block customer-lead-block">
+    <div class="section-heading">
+        <h2>Customer and Calculator Lead</h2>
+        <span class="status status-{{ lead.status }}">{{ lead.get_status_display }}</span>
+    </div>
+    <div class="customer-lead-grid">
+        <div><span>Name</span><strong>{{ lead.name }}</strong></div>
+        <div><span>Email</span><a href="mailto:{{ lead.email }}">{{ lead.email }}</a></div>
+        <div><span>Phone</span>{% if lead.phone %}<a href="tel:{{ lead.phone }}">{{ lead.phone }}</a>{% else %}<strong>Not supplied</strong>{% endif %}</div>
+        <div><span>Calculator reference</span><strong>{{ lead.reference }}</strong></div>
+    </div>
+    {% if lead.survey_requested_at %}<p>Site survey requested {{ lead.survey_requested_at|date:'j F Y, H:i' }}.</p>{% endif %}
+</section>
+{% endif %}
+{% endwith %}
+
 <section class="result-panel">
     <p class="eyebrow">Estimated Annual Harvest</p>
     {% if survey.estimated_annual_yield_litres is not None %}
