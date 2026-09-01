@@ -44,7 +44,7 @@ class ContactPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Tell us what you need.')
         self.assertNotContains(response, 'South Brent')
-        self.assertContains(response, 'css/contact.css?v=20260901-3')
+        self.assertContains(response, 'css/contact.css?v=20260901-4')
         self.assertContains(
             response,
             'Garden, Property and Other enquiries: TQ10, TQ11 and PL21.',
@@ -137,16 +137,44 @@ class ContactPageTests(TestCase):
                 self.assertIn('postcode', form.errors)
 
     def test_rainwater_enquiry_retains_broad_postcode_coverage(self):
+        for postcode in ('TQ1 1AG', 'TQ2 7JH'):
+            with self.subTest(postcode=postcode):
+                form = ContactForm(data={
+                    'name': 'Test Customer',
+                    'email': 'customer@example.com',
+                    'phone_number': '',
+                    'postcode': postcode,
+                    'subject': 'Rainwater Harvesting',
+                    'message': 'Please contact me about a rainwater system.',
+                })
+
+                self.assertTrue(form.is_valid(), form.errors)
+
+    def test_rainwater_enquiry_rejects_postcodes_outside_broad_area(self):
         form = ContactForm(data={
             'name': 'Test Customer',
             'email': 'customer@example.com',
             'phone_number': '',
-            'postcode': 'TQ2 7JH',
+            'postcode': 'EX1 1AA',
             'subject': 'Rainwater Harvesting',
             'message': 'Please contact me about a rainwater system.',
         })
 
-        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.is_valid())
+        self.assertIn('postcode', form.errors)
+
+    def test_torquay_postcode_is_still_rejected_for_garden_work(self):
+        form = ContactForm(data={
+            'name': 'Test Customer',
+            'email': 'customer@example.com',
+            'phone_number': '',
+            'postcode': 'TQ1 1AG',
+            'subject': 'Garden',
+            'message': 'Please contact me about some garden work.',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('postcode', form.errors)
 
     def test_contact_subjects_are_separate_and_include_rainwater(self):
         form = ContactForm()

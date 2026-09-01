@@ -36,7 +36,7 @@ h3 { margin-bottom: 10px; font-size: 22px; font-weight: 500; line-height: 1.2; }
 .text-link:hover { text-decoration: underline; }
 
 .site-header { position: relative; z-index: 20; border-bottom: 1px solid rgba(26, 48, 61, .12); background: rgba(247, 245, 240, .96); }
-.site-header-inner { width: min(var(--shell), calc(100% - 48px)); min-height: 92px; display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-inline: auto; }
+.site-header-inner { width: min(var(--shell), calc(100% - 48px)); min-height: 92px; display: flex; align-items: center; justify-content: space-between; gap: 32px; margin-inline: auto; padding-block: 12px; }
 .master-brand { min-width: 0; flex: 0 1 240px; display: block; text-decoration: none; }
 .master-brand-logo { width: 100%; max-width: 240px; height: auto; display: block; }
 .desktop-nav { display: flex; align-items: center; gap: clamp(20px, 3vw, 42px); }

@@ -2,21 +2,23 @@ import re
 from django import forms
 from django.core.validators import EmailValidator, MinLengthValidator
 from django.core.exceptions import ValidationError
-from .constants import VALID_POSTCODES
 from .models import Contact
 
 POSTCODE_REGEX = re.compile(r'^[A-Z]{2}\d{2,}[A-Z]{2}$')
 UK_PHONE_REGEX = re.compile(r'^(\+44\s?7\d{3}|\(?07\d{3}\)?)\s?\d{3}\s?\d{3}$|^(\+44\s?1\d{3}|\(?01\d{3}\)?)\s?\d{3}\s?\d{3}$|^(\+44\s?2\d{3}|\(?02\d{3}\)?)\s?\d{3}\s?\d{3}$')
 LOCAL_SERVICE_OUTCODES = frozenset({'PL21', 'TQ10', 'TQ11'})
 LOCAL_SERVICE_SUBJECTS = frozenset({'Garden', 'Property', 'Other'})
+BROAD_SERVICE_OUTCODES = frozenset({
+    'PL3', 'PL4', 'PL6', 'PL7', 'PL8', 'PL9', 'PL20', 'PL21',
+    'TQ1', 'TQ2', 'TQ3', 'TQ4', 'TQ5', 'TQ6', 'TQ7', 'TQ9',
+    'TQ10', 'TQ11', 'TQ12', 'TQ13',
+})
 
 
 def validate_postcode(value):
     normalized_value = value.replace(" ", "").upper()  # Remove spaces and convert to uppercase
     if not POSTCODE_REGEX.match(normalized_value):  # Check if the postcode matches the pattern
         raise ValidationError('Please enter a valid postcode')
-    if normalized_value not in VALID_POSTCODES:  # Check if the postcode is not covered
-        raise ValidationError('Sorry, we do not currently cover this postcode.')
 
 class ContactForm(forms.ModelForm):
     class Meta:
@@ -85,16 +87,27 @@ class ContactForm(forms.ModelForm):
         cleaned_data = super().clean()
         postcode = cleaned_data.get('postcode')
         subject = cleaned_data.get('subject')
+        outcode = postcode[:-3] if postcode else None
 
         if (
             postcode
             and subject in LOCAL_SERVICE_SUBJECTS
-            and postcode[:-3] not in LOCAL_SERVICE_OUTCODES
+            and outcode not in LOCAL_SERVICE_OUTCODES
         ):
             self.add_error(
                 'postcode',
                 'For this enquiry type, Avonmoor currently covers TQ10, '
                 'TQ11 and PL21.',
+            )
+        elif (
+            postcode
+            and subject == 'Rainwater Harvesting'
+            and outcode not in BROAD_SERVICE_OUTCODES
+        ):
+            self.add_error(
+                'postcode',
+                'Rainwater Harvesting enquiries are currently limited to '
+                'the wider South Devon and Plymouth area.',
             )
 
         return cleaned_data
