@@ -150,6 +150,7 @@ class SurveyRequestView(View):
             f'New calculator estimate access\n\n'
             f'Name: {lead.name}\nEmail: {lead.email}\nPhone: {lead.phone}\n'
             f'Address: {lead.address_line_1}, {lead.town}, {lead.postcode}\n'
+            f'Location method: {estimate.get("location_method", "map")}\n'
             f'Roof area: {lead.roof_area_m2} m2\n'
             f'Estimated harvest: {lead.estimated_annual_harvest_litres} L/year\n'
             f'Reference: {lead.reference}\n'

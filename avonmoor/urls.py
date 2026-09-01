@@ -33,6 +33,7 @@ urlpatterns = [
         name='rainwater_harvesting',
     ),
     path('contact/', contact_views.contact_view, name='contact'),
+    path('privacy/', contact_views.privacy_view, name='privacy'),
     path('accounts/', include('django.contrib.auth.urls')),
     path('rainwater-calculator/', include('water_calculator.urls')),
     path('surveys/', include('water_survey.urls')),

@@ -70,3 +70,20 @@ class ContactPageTests(TestCase):
             response.context['form']['subject'].value(),
             'Rainwater Harvesting',
         )
+
+    def test_privacy_notice_explains_calculator_and_postcode_fallback(self):
+        response = self.client.get('/privacy/')
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Company Information &amp; Privacy')
+        self.assertContains(response, 'Company number 04655485')
+        self.assertContains(response, 'Victoria Cottage')
+        self.assertContains(response, 'Avonmoor Ltd, company number 04655485, is the data controller')
+        self.assertContains(response, 'held in an essential website session for up to one hour')
+        self.assertContains(response, 'Postcodes.io')
+        self.assertContains(response, 'No automated mailing list')
+
+    def test_site_footer_links_to_privacy_notice(self):
+        response = self.client.get('/')
+
+        self.assertContains(response, 'href="/privacy/"')

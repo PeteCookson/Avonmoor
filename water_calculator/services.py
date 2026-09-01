@@ -97,6 +97,7 @@ def build_public_estimate(property_data, roof_data):
         **property_data,
         'latitude': str(roof_data['map_latitude']),
         'longitude': str(roof_data['map_longitude']),
+        'location_method': roof_data.get('location_method') or 'map',
         'roof_area_m2': str(area),
         'roof_polygon': roof_data.get('polygon') or {},
         'roof_material': roof_data['roof_material'],

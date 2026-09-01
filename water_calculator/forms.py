@@ -31,6 +31,12 @@ class PropertyForm(forms.Form):
 
 class RoofEstimateForm(forms.Form):
     polygon = forms.JSONField(required=False, widget=forms.HiddenInput())
+    location_method = forms.ChoiceField(
+        choices=(('map', 'Map'), ('postcode', 'Postcode centre')),
+        required=False,
+        initial='map',
+        widget=forms.HiddenInput(),
+    )
     map_latitude = forms.DecimalField(
         min_value=-90,
         max_value=90,
@@ -70,6 +76,9 @@ class RoofEstimateForm(forms.Form):
 
     def clean(self):
         cleaned_data = super().clean()
+        cleaned_data['location_method'] = (
+            cleaned_data.get('location_method') or 'map'
+        )
         polygon = cleaned_data.get('polygon')
         if not polygon:
             return cleaned_data

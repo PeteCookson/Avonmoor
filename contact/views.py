@@ -17,6 +17,10 @@ def rainwater_harvesting_view(request):
     return render(request, 'rainwater_harvesting.html')
 
 
+def privacy_view(request):
+    return render(request, 'privacy.html')
+
+
 def contact_view(request):
     if request.method == 'POST':
         form = ContactForm(request.POST)
