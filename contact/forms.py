@@ -36,7 +36,9 @@ class ContactForm(forms.ModelForm):
         }
 
     def clean_postcode(self):
-        postcode = self.cleaned_data['postcode']
+        postcode = self.cleaned_data.get('postcode')
+        if not postcode:
+            return postcode
         normalized_postcode = postcode.replace(" ", "").upper()
         validate_postcode(normalized_postcode)  # Validate normalized postcode
         return normalized_postcode
@@ -48,8 +50,8 @@ class ContactForm(forms.ModelForm):
         return email
 
     def clean_phone_number(self):
-        phone_number = self.cleaned_data['phone_number']
-        if not UK_PHONE_REGEX.match(phone_number):
+        phone_number = self.cleaned_data.get('phone_number')
+        if phone_number and not UK_PHONE_REGEX.match(phone_number):
             raise ValidationError('Please enter a valid UK phone number')
         return phone_number
 

@@ -51,8 +51,8 @@ class ContactPageTests(TestCase):
         response = self.client.post('/contact/', data={
             'name': 'Test Customer',
             'email': 'customer@example.com',
-            'phone_number': '07123 456 789',
-            'postcode': 'TQ10 9AB',
+            'phone_number': '',
+            'postcode': '',
             'subject': 'Rainwater Harvesting',
             'message': 'Please contact me about a rainwater system.',
         })
@@ -62,6 +62,18 @@ class ContactPageTests(TestCase):
 
         success_response = self.client.get(response.url)
         self.assertContains(success_response, 'your enquiry has been received')
+
+    def test_optional_phone_and_postcode_can_be_blank(self):
+        form = ContactForm(data={
+            'name': 'Test Customer',
+            'email': 'customer@example.com',
+            'phone_number': '',
+            'postcode': '',
+            'subject': 'Garden',
+            'message': 'Please contact me about some garden work.',
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
 
     def test_contact_subjects_are_separate_and_include_rainwater(self):
         form = ContactForm()
