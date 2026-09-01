@@ -44,7 +44,11 @@ class ContactPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Tell us what you need.')
         self.assertNotContains(response, 'South Brent')
-        self.assertContains(response, 'css/contact.css?v=20260901-2')
+        self.assertContains(response, 'css/contact.css?v=20260901-3')
+        self.assertContains(
+            response,
+            'Garden, Property and Other enquiries: TQ10, TQ11 and PL21.',
+        )
 
     @patch('contact.views.send_mail', side_effect=OSError('SMTP unavailable'))
     def test_contact_submission_survives_email_outage(self, _send_mail):
@@ -102,6 +106,47 @@ class ContactPageTests(TestCase):
 
         self.assertFalse(form.is_valid())
         self.assertIn('phone_number', form.errors)
+
+    def test_local_services_accept_only_local_postcode_districts(self):
+        for postcode in ('TQ10 9AB', 'TQ11 0NA', 'PL21 0PF'):
+            with self.subTest(postcode=postcode):
+                form = ContactForm(data={
+                    'name': 'Test Customer',
+                    'email': 'customer@example.com',
+                    'phone_number': '',
+                    'postcode': postcode,
+                    'subject': 'Garden',
+                    'message': 'Please contact me about some garden work.',
+                })
+
+                self.assertTrue(form.is_valid(), form.errors)
+
+    def test_broad_postcode_is_rejected_for_local_services(self):
+        for subject in ('Garden', 'Property', 'Other'):
+            with self.subTest(subject=subject):
+                form = ContactForm(data={
+                    'name': 'Test Customer',
+                    'email': 'customer@example.com',
+                    'phone_number': '',
+                    'postcode': 'TQ2 7JH',
+                    'subject': subject,
+                    'message': 'Please contact me about this service enquiry.',
+                })
+
+                self.assertFalse(form.is_valid())
+                self.assertIn('postcode', form.errors)
+
+    def test_rainwater_enquiry_retains_broad_postcode_coverage(self):
+        form = ContactForm(data={
+            'name': 'Test Customer',
+            'email': 'customer@example.com',
+            'phone_number': '',
+            'postcode': 'TQ2 7JH',
+            'subject': 'Rainwater Harvesting',
+            'message': 'Please contact me about a rainwater system.',
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
 
     def test_contact_subjects_are_separate_and_include_rainwater(self):
         form = ContactForm()

@@ -130,6 +130,7 @@ h3 { margin-bottom: 10px; font-size: 22px; font-weight: 500; line-height: 1.2; }
 .field-group input, .field-group select, .field-group textarea { width: 100%; min-height: 50px; padding: 12px 13px; border: 1px solid #9EB0B8; border-radius: 4px; color: var(--ink); background: var(--white); }
 .field-group textarea { min-height: 160px; resize: vertical; }
 .field-group input:focus, .field-group select:focus, .field-group textarea:focus { border-color: var(--blue); outline: 3px solid rgba(81, 164, 207, .25); }
+.field-help { color: var(--ink-soft); font-size: 13px; }
 .field-errors, .form-errors { color: #812E2A; font-size: 13px; font-weight: 700; }
 .field-errors ul, .form-errors ul { margin: 0; padding: 0; list-style: none; }
 .form-success { display: grid; gap: 3px; margin-bottom: 24px; padding: 16px 18px; border-left: 4px solid #2C7439; background: #EAF4EC; }

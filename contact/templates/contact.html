@@ -31,6 +31,7 @@
                     <div class="field-group {% if field.name == 'message' %}field-wide{% endif %}">
                         <label for="{{ field.id_for_label }}">{{ field.label }}</label>
                         {{ field }}
+                        {% if field.help_text %}<div class="field-help">{{ field.help_text }}</div>{% endif %}
                         {% if field.errors %}<div class="field-errors" role="alert">{{ field.errors }}</div>{% endif %}
                     </div>
                     {% endfor %}
