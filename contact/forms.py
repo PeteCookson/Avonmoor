@@ -35,10 +35,18 @@ class ContactForm(forms.ModelForm):
             'message': forms.Textarea(attrs={'placeholder': 'Message', 'class': 'form-control message-field'}),
         }
 
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        # Postcode is required to enforce Avonmoor's service area. Email is
+        # already required, so phone can remain optional without losing a
+        # reliable reply route.
+        self.fields['postcode'].required = True
+        self.fields['phone_number'].required = False
+
     def clean_postcode(self):
         postcode = self.cleaned_data.get('postcode')
         if not postcode:
-            return postcode
+            raise ValidationError('Please enter your postcode.')
         normalized_postcode = postcode.replace(" ", "").upper()
         validate_postcode(normalized_postcode)  # Validate normalized postcode
         return normalized_postcode

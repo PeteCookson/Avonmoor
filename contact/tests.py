@@ -52,7 +52,7 @@ class ContactPageTests(TestCase):
             'name': 'Test Customer',
             'email': 'customer@example.com',
             'phone_number': '',
-            'postcode': '',
+            'postcode': 'TQ10 9AB',
             'subject': 'Rainwater Harvesting',
             'message': 'Please contact me about a rainwater system.',
         })
@@ -63,7 +63,21 @@ class ContactPageTests(TestCase):
         success_response = self.client.get(response.url)
         self.assertContains(success_response, 'your enquiry has been received')
 
-    def test_optional_phone_and_postcode_can_be_blank(self):
+    def test_postcode_is_required_and_phone_is_optional(self):
+        form = ContactForm(data={
+            'name': 'Test Customer',
+            'email': 'customer@example.com',
+            'phone_number': '',
+            'postcode': 'TQ10 9AB',
+            'subject': 'Garden',
+            'message': 'Please contact me about some garden work.',
+        })
+
+        self.assertTrue(form.is_valid(), form.errors)
+        self.assertTrue(form.fields['postcode'].required)
+        self.assertFalse(form.fields['phone_number'].required)
+
+    def test_blank_postcode_is_rejected_without_server_error(self):
         form = ContactForm(data={
             'name': 'Test Customer',
             'email': 'customer@example.com',
@@ -73,7 +87,21 @@ class ContactPageTests(TestCase):
             'message': 'Please contact me about some garden work.',
         })
 
-        self.assertTrue(form.is_valid(), form.errors)
+        self.assertFalse(form.is_valid())
+        self.assertIn('postcode', form.errors)
+
+    def test_invalid_phone_is_rejected_when_supplied(self):
+        form = ContactForm(data={
+            'name': 'Test Customer',
+            'email': 'customer@example.com',
+            'phone_number': '12345',
+            'postcode': 'TQ10 9AB',
+            'subject': 'Garden',
+            'message': 'Please contact me about some garden work.',
+        })
+
+        self.assertFalse(form.is_valid())
+        self.assertIn('phone_number', form.errors)
 
     def test_contact_subjects_are_separate_and_include_rainwater(self):
         form = ContactForm()
