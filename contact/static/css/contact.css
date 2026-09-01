@@ -124,7 +124,7 @@ h3 { margin-bottom: 10px; font-size: 22px; font-weight: 500; line-height: 1.2; }
 .contact-form-panel { max-width: 760px; }
 .contact-form { display: grid; gap: 26px; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-.field-group { display: grid; gap: 7px; }
+.field-group { display: grid; align-content: start; gap: 7px; }
 .field-wide { grid-column: 1 / -1; }
 .field-group label { color: var(--navy); font-size: 13px; font-weight: 700; }
 .field-group input, .field-group select, .field-group textarea { width: 100%; min-height: 50px; padding: 12px 13px; border: 1px solid #9EB0B8; border-radius: 4px; color: var(--ink); background: var(--white); }

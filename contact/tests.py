@@ -44,7 +44,7 @@ class ContactPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Tell us what you need.')
         self.assertNotContains(response, 'South Brent')
-        self.assertContains(response, 'css/contact.css?v=20260901-4')
+        self.assertContains(response, 'css/contact.css?v=20260901-5')
         self.assertContains(
             response,
             'Garden, Property and Other enquiries: TQ10, TQ11 and PL21.',
