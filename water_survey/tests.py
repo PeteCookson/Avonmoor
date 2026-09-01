@@ -280,8 +280,8 @@ class SurveyAccessTests(TestCase):
 
         response = self.client.get(reverse('water_survey:survey-list'))
 
-        self.assertContains(response, 'avonmoor-water-lockup-dark.svg')
-        self.assertContains(response, 'Survey workspace')
+        self.assertContains(response, 'avonmoor-master-horizontal-dark.svg')
+        self.assertContains(response, 'Survey Workspace')
 
     def test_add_roof_requires_login(self):
         url = reverse(

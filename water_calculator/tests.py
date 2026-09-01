@@ -163,40 +163,38 @@ class PublicCalculatorJourneyTests(TestCase):
         estimate = self.client.session['water_calculator_estimate']
         self.assertEqual(estimate['annual_harvest_litres'], '79800.00')
 
-    def test_results_explain_yield_source_and_limitations(self):
+    def test_public_results_show_value_without_revealing_full_report(self):
         self._complete_estimate()
 
         response = self.client.get(reverse('water_calculator:results'))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '79,800')
-        self.assertContains(response, 'Potential currently uncaptured')
-        self.assertContains(response, 'Planning range, not a final specification')
-        self.assertContains(response, 'Met Office HadUK-Grid')
+        self.assertContains(response, 'Unlock the Detailed Results')
+        self.assertNotContains(response, 'Planning range, not a final specification')
+        self.assertNotContains(response, 'Met Office HadUK-Grid')
 
     def test_results_require_a_completed_estimate(self):
         response = self.client.get(reverse('water_calculator:results'))
 
         self.assertRedirects(response, reverse('water_calculator:start'))
 
-    def test_explicit_survey_request_creates_lead_and_email(self):
+    def test_contact_details_unlock_full_report_and_create_lead(self):
         self._complete_estimate()
 
         response = self.client.post(
-            reverse('water_calculator:request-survey'),
+            reverse('water_calculator:unlock-results'),
             {
                 'name': 'Alex Customer',
                 'email': 'alex@example.com',
                 'phone': '',
-                'preferred_contact': 'email',
-                'customer_message': 'Interested in underground storage.',
                 'website': '',
                 'consent': 'on',
             },
         )
 
         lead = CustomerSurveyLead.objects.get()
-        self.assertRedirects(response, reverse('water_calculator:thanks'))
+        self.assertRedirects(response, reverse('water_calculator:results'))
         self.assertEqual(lead.postcode, 'TQ10 9AB')
         self.assertEqual(lead.roof_area_m2, Decimal('80.00'))
         self.assertEqual(
@@ -205,15 +203,20 @@ class PublicCalculatorJourneyTests(TestCase):
         self.assertIsNotNone(lead.consented_at)
         self.assertEqual(len(mail.outbox), 1)
 
+        unlocked_response = self.client.get(reverse('water_calculator:results'))
+        self.assertContains(unlocked_response, 'Planning range, not a final specification')
+        self.assertContains(unlocked_response, 'Met Office HadUK-Grid')
+        self.assertContains(unlocked_response, 'Potential Currently Uncaptured')
+        self.assertNotContains(unlocked_response, 'Unlock the Detailed Results')
+
     def test_honeypot_rejects_automated_submission(self):
         self._complete_estimate()
 
         response = self.client.post(
-            reverse('water_calculator:request-survey'),
+            reverse('water_calculator:unlock-results'),
             {
                 'name': 'Spam Bot',
                 'email': 'spam@example.com',
-                'preferred_contact': 'email',
                 'website': 'https://spam.example',
                 'consent': 'on',
             },

@@ -13,7 +13,7 @@
             <img src="{% static 'img/avonmoor-water-lockup-light.svg' %}" alt="Avonmoor Rainwater Harvesting">
         </div>
         <div class="report-title">
-            <p class="eyebrow">Survey report</p>
+            <p class="eyebrow">Survey Report</p>
             <h1>Roof yield assessment</h1>
         </div>
         <dl class="report-meta">
@@ -84,7 +84,7 @@
 
     <section class="report-section">
         <div class="report-section-heading">
-            <div><p class="eyebrow">Climate basis</p><h2>Local rainfall and yield</h2></div>
+            <div><p class="eyebrow">Climate Basis</p><h2>Local rainfall and yield</h2></div>
             {% if survey.rainfall_reference_period %}<span>{{ survey.rainfall_reference_period }}</span>{% endif %}
         </div>
         {% if survey.monthly_yield_rows %}
@@ -108,7 +108,7 @@
 
     {% if survey.notes %}
     <section class="report-section report-notes">
-        <p class="eyebrow">Site record</p>
+        <p class="eyebrow">Site Record</p>
         <h2>Survey notes</h2>
         <p>{{ survey.notes|linebreaksbr }}</p>
     </section>

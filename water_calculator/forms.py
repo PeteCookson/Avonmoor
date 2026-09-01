@@ -89,8 +89,8 @@ class SurveyRequestForm(forms.ModelForm):
     )
     consent = forms.BooleanField(
         label=(
-            'I agree that Avonmoor may use these details to respond to my '
-            'survey request.'
+            'I agree that Avonmoor may use these details to provide the full '
+            'estimate and contact me about rainwater harvesting.'
         )
     )
 
@@ -100,16 +100,13 @@ class SurveyRequestForm(forms.ModelForm):
             'name',
             'email',
             'phone',
-            'preferred_contact',
-            'customer_message',
         ]
         widgets = {
             'email': forms.EmailInput(attrs={'autocomplete': 'email'}),
             'phone': forms.TextInput(attrs={'autocomplete': 'tel'}),
-            'customer_message': forms.Textarea(attrs={'rows': 3}),
         }
         labels = {
-            'customer_message': 'Anything we should know? (optional)',
+            'phone': 'Phone (optional)',
         }
 
     def clean_website(self):
@@ -117,13 +114,3 @@ class SurveyRequestForm(forms.ModelForm):
         if value:
             raise forms.ValidationError('Unable to submit this request.')
         return value
-
-    def clean(self):
-        cleaned_data = super().clean()
-        if (
-            cleaned_data.get('preferred_contact')
-            == CustomerSurveyLead.PreferredContact.PHONE
-            and not cleaned_data.get('phone')
-        ):
-            self.add_error('phone', 'Enter a phone number for a phone response.')
-        return cleaned_data
