@@ -1,4 +1,6 @@
+import json
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core import mail
 from django.test import TestCase, override_settings
@@ -177,7 +179,57 @@ class PublicCalculatorJourneyTests(TestCase):
         self.assertContains(response, 'data-requires-location="true"')
         self.assertContains(response, 'data-postcode="TQ10 9AB"')
         self.assertContains(response, 'Use the Postcode Fallback')
+        self.assertContains(response, 'data-lookup-url="/rainwater-calculator/postcode-location/"')
         self.assertContains(response, 'js/roof_measure.js')
+
+    @patch('water_calculator.views.urlopen')
+    def test_postcode_location_uses_same_origin_server_lookup(self, mock_urlopen):
+        self.client.post(
+            reverse('water_calculator:start'),
+            {
+                'address_line_1': '1 Test Lane',
+                'town': 'South Brent',
+                'postcode': 'TQ10 9AB',
+            },
+        )
+        api_response = mock_urlopen.return_value.__enter__.return_value
+        api_response.read.return_value = json.dumps({
+            'status': 200,
+            'result': {'latitude': 50.426723, 'longitude': -3.835181},
+        }).encode('utf-8')
+
+        response = self.client.get(
+            reverse('water_calculator:postcode-location'),
+            {'postcode': 'TQ109AB'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            'latitude': 50.426723,
+            'longitude': -3.835181,
+        })
+        mock_urlopen.assert_called_once()
+
+    @patch('water_calculator.views.urlopen')
+    def test_postcode_location_rejects_postcode_outside_session(
+        self, mock_urlopen
+    ):
+        self.client.post(
+            reverse('water_calculator:start'),
+            {
+                'address_line_1': '1 Test Lane',
+                'town': 'South Brent',
+                'postcode': 'TQ10 9AB',
+            },
+        )
+
+        response = self.client.get(
+            reverse('water_calculator:postcode-location'),
+            {'postcode': 'PL1 1AA'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        mock_urlopen.assert_not_called()
 
     @override_settings(GOOGLE_MAPS_API_KEY='')
     def test_measure_page_can_continue_when_google_maps_is_unavailable(self):

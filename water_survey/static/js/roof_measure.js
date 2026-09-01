@@ -94,17 +94,41 @@
         fallbackButton.disabled = true;
         setFallbackStatus('Finding the approximate postcode location…', false);
         try {
-            const response = await fetch(
-                'https://api.postcodes.io/postcodes/' +
-                encodeURIComponent(postcode.replace(/\s+/g, '')),
-                { headers: { Accept: 'application/json' } }
-            );
-            const payload = await response.json();
-            const result = payload && payload.result;
-            const latitude = Number(result && result.latitude);
-            const longitude = Number(result && result.longitude);
-            if (!response.ok || !Number.isFinite(latitude) || !Number.isFinite(longitude)) {
-                throw new Error('Postcode not found');
+            const normalizedPostcode = postcode.replace(/\s+/g, '');
+            let latitude;
+            let longitude;
+            try {
+                const localResponse = await fetch(
+                    fallbackPanel.dataset.lookupUrl +
+                    '?postcode=' + encodeURIComponent(normalizedPostcode),
+                    { headers: { Accept: 'application/json' } }
+                );
+                const localPayload = await localResponse.json();
+                latitude = Number(localPayload && localPayload.latitude);
+                longitude = Number(localPayload && localPayload.longitude);
+                if (
+                    !localResponse.ok ||
+                    !Number.isFinite(latitude) ||
+                    !Number.isFinite(longitude)
+                ) {
+                    throw new Error('Local postcode lookup failed');
+                }
+            } catch (localError) {
+                const directResponse = await fetch(
+                    'https://api.postcodes.io/postcodes/' +
+                    encodeURIComponent(normalizedPostcode)
+                );
+                const directPayload = await directResponse.json();
+                const directResult = directPayload && directPayload.result;
+                latitude = Number(directResult && directResult.latitude);
+                longitude = Number(directResult && directResult.longitude);
+                if (
+                    !directResponse.ok ||
+                    !Number.isFinite(latitude) ||
+                    !Number.isFinite(longitude)
+                ) {
+                    throw new Error('Direct postcode lookup failed');
+                }
             }
 
             if (roofPolygon) roofPolygon.getPath().clear();

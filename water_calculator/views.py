@@ -1,8 +1,15 @@
+import json
+import re
 from decimal import Decimal
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.mail import send_mail
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -15,6 +22,59 @@ from .services import RainfallUnavailable, build_public_estimate
 PROPERTY_SESSION_KEY = 'water_calculator_property'
 ESTIMATE_SESSION_KEY = 'water_calculator_estimate'
 REPORT_UNLOCKED_SESSION_KEY = 'water_calculator_report_unlocked'
+POSTCODE_PATTERN = re.compile(r'^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$')
+
+
+class PostcodeLocationView(View):
+    def get(self, request):
+        postcode = ''.join(request.GET.get('postcode', '').upper().split())
+        property_data = request.session.get(PROPERTY_SESSION_KEY) or {}
+        session_postcode = ''.join(
+            property_data.get('postcode', '').upper().split()
+        )
+        if (
+            not POSTCODE_PATTERN.fullmatch(postcode)
+            or postcode != session_postcode
+        ):
+            return JsonResponse({'error': 'Invalid postcode.'}, status=400)
+
+        cache_key = f'water-calculator-postcode:{postcode}'
+        cached_location = cache.get(cache_key)
+        if cached_location:
+            return JsonResponse(cached_location)
+
+        api_url = f'https://api.postcodes.io/postcodes/{quote(postcode)}'
+        api_request = Request(
+            api_url,
+            headers={
+                'Accept': 'application/json',
+                'User-Agent': 'Avonmoor-Rainwater-Calculator/1.0',
+            },
+        )
+        try:
+            with urlopen(api_request, timeout=5) as response:
+                payload = json.loads(response.read().decode('utf-8'))
+            result = payload['result']
+            location = {
+                'latitude': float(result['latitude']),
+                'longitude': float(result['longitude']),
+            }
+        except (
+            HTTPError,
+            URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
+            return JsonResponse(
+                {'error': 'Postcode lookup is currently unavailable.'},
+                status=502,
+            )
+
+        cache.set(cache_key, location, timeout=86400)
+        return JsonResponse(location)
 
 
 class PropertyStepView(View):

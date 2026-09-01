@@ -33,7 +33,7 @@
             <div class="map-unavailable"><strong>The aerial map is unavailable.</strong> You can still calculate using your postcode and a manual roof area.</div>
             {% endif %}
 
-            <div id="manual-location-fallback" class="manual-location-fallback" data-postcode="{{ property.postcode }}"{% if google_maps_api_key %} hidden{% endif %}>
+            <div id="manual-location-fallback" class="manual-location-fallback" data-postcode="{{ property.postcode }}" data-lookup-url="{% url 'water_calculator:postcode-location' %}"{% if google_maps_api_key %} hidden{% endif %}>
                 <h2>Use the Postcode Fallback</h2>
                 <p>We will use the centre of {{ property.postcode }} as an approximate location for rainfall matching. Enter the horizontal roof area below; a site survey would confirm both.</p>
                 <button type="button" id="use-postcode-location" class="button button-secondary">Use Postcode Location</button>
