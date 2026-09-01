@@ -4,6 +4,23 @@ from django.http import HttpResponseRedirect
 from django.urls import reverse
 from .forms import ContactForm
 
+
+def home_view(request):
+    return render(request, 'home.html')
+
+
+def garden_property_view(request):
+    return render(request, 'garden_property.html')
+
+
+def rainwater_harvesting_view(request):
+    return render(request, 'rainwater_harvesting.html')
+
+
+def privacy_view(request):
+    return render(request, 'privacy.html')
+
+
 def contact_view(request):
     if request.method == 'POST':
         form = ContactForm(request.POST)
@@ -20,7 +37,14 @@ def contact_view(request):
             # Redirect to the same page with success parameter
             return HttpResponseRedirect(reverse('contact') + '?success=1')
     else:
-        form = ContactForm()
+        initial_subjects = {
+            'garden': 'Garden',
+            'property': 'Property',
+            'rainwater': 'Rainwater Harvesting',
+        }
+        form = ContactForm(
+            initial={'subject': initial_subjects.get(request.GET.get('service'))}
+        )
 
     success = request.GET.get('success', False)
 

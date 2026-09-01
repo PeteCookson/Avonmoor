@@ -1,8 +1,15 @@
+import json
+import re
 from decimal import Decimal
+from urllib.error import HTTPError, URLError
+from urllib.parse import quote
+from urllib.request import Request, urlopen
 
 from django.conf import settings
 from django.contrib import messages
+from django.core.cache import cache
 from django.core.mail import send_mail
+from django.http import JsonResponse
 from django.shortcuts import redirect, render
 from django.urls import reverse
 from django.utils import timezone
@@ -14,6 +21,60 @@ from .services import RainfallUnavailable, build_public_estimate
 
 PROPERTY_SESSION_KEY = 'water_calculator_property'
 ESTIMATE_SESSION_KEY = 'water_calculator_estimate'
+REPORT_UNLOCKED_SESSION_KEY = 'water_calculator_report_unlocked'
+POSTCODE_PATTERN = re.compile(r'^[A-Z]{1,2}\d[A-Z\d]?\d[A-Z]{2}$')
+
+
+class PostcodeLocationView(View):
+    def get(self, request):
+        postcode = ''.join(request.GET.get('postcode', '').upper().split())
+        property_data = request.session.get(PROPERTY_SESSION_KEY) or {}
+        session_postcode = ''.join(
+            property_data.get('postcode', '').upper().split()
+        )
+        if (
+            not POSTCODE_PATTERN.fullmatch(postcode)
+            or postcode != session_postcode
+        ):
+            return JsonResponse({'error': 'Invalid postcode.'}, status=400)
+
+        cache_key = f'water-calculator-postcode:{postcode}'
+        cached_location = cache.get(cache_key)
+        if cached_location:
+            return JsonResponse(cached_location)
+
+        api_url = f'https://api.postcodes.io/postcodes/{quote(postcode)}'
+        api_request = Request(
+            api_url,
+            headers={
+                'Accept': 'application/json',
+                'User-Agent': 'Avonmoor-Rainwater-Calculator/1.0',
+            },
+        )
+        try:
+            with urlopen(api_request, timeout=5) as response:
+                payload = json.loads(response.read().decode('utf-8'))
+            result = payload['result']
+            location = {
+                'latitude': float(result['latitude']),
+                'longitude': float(result['longitude']),
+            }
+        except (
+            HTTPError,
+            URLError,
+            TimeoutError,
+            json.JSONDecodeError,
+            KeyError,
+            TypeError,
+            ValueError,
+        ):
+            return JsonResponse(
+                {'error': 'Postcode lookup is currently unavailable.'},
+                status=502,
+            )
+
+        cache.set(cache_key, location, timeout=86400)
+        return JsonResponse(location)
 
 
 class PropertyStepView(View):
@@ -29,6 +90,7 @@ class PropertyStepView(View):
             request.session.set_expiry(3600)
             request.session[PROPERTY_SESSION_KEY] = form.cleaned_data
             request.session.pop(ESTIMATE_SESSION_KEY, None)
+            request.session.pop(REPORT_UNLOCKED_SESSION_KEY, None)
             return redirect('water_calculator:measure')
         return render(request, self.template_name, {'form': form})
 
@@ -78,6 +140,7 @@ class RoofMeasureStepView(View):
                 form.add_error(None, str(error))
             else:
                 request.session[ESTIMATE_SESSION_KEY] = estimate
+                request.session.pop(REPORT_UNLOCKED_SESSION_KEY, None)
                 return redirect('water_calculator:results')
         return render(request, self.template_name, self.get_context(form))
 
@@ -92,7 +155,13 @@ class ResultsView(View):
         return render(
             request,
             self.template_name,
-            {'estimate': estimate, 'lead_form': SurveyRequestForm()},
+            {
+                'estimate': estimate,
+                'lead_form': SurveyRequestForm(),
+                'full_report_unlocked': request.session.get(
+                    REPORT_UNLOCKED_SESSION_KEY, False
+                ),
+            },
         )
 
 
@@ -107,7 +176,11 @@ class SurveyRequestView(View):
             return render(
                 request,
                 'water_calculator/results.html',
-                {'estimate': estimate, 'lead_form': form},
+                {
+                    'estimate': estimate,
+                    'lead_form': form,
+                    'full_report_unlocked': False,
+                },
             )
 
         lead = form.save(commit=False)
@@ -132,14 +205,14 @@ class SurveyRequestView(View):
         lead.consented_at = timezone.now()
         lead.save()
 
-        subject = f'Rainwater survey request - {lead.postcode}'
+        subject = f'Full rainwater estimate accessed - {lead.postcode}'
         body = (
-            f'New calculator survey request\n\n'
+            f'New calculator estimate access\n\n'
             f'Name: {lead.name}\nEmail: {lead.email}\nPhone: {lead.phone}\n'
             f'Address: {lead.address_line_1}, {lead.town}, {lead.postcode}\n'
+            f'Location method: {estimate.get("location_method", "map")}\n'
             f'Roof area: {lead.roof_area_m2} m2\n'
             f'Estimated harvest: {lead.estimated_annual_harvest_litres} L/year\n'
-            f'Customer message: {lead.customer_message or "None"}\n'
             f'Reference: {lead.reference}\n'
         )
         send_mail(
@@ -149,10 +222,9 @@ class SurveyRequestView(View):
             [settings.EMAIL_HOST_USER],
             fail_silently=True,
         )
-        request.session.pop(PROPERTY_SESSION_KEY, None)
-        request.session.pop(ESTIMATE_SESSION_KEY, None)
-        request.session['water_calculator_lead_reference'] = str(lead.reference)
-        return redirect(reverse('water_calculator:thanks'))
+        request.session[REPORT_UNLOCKED_SESSION_KEY] = True
+        messages.success(request, 'Your full rainwater estimate is now available.')
+        return redirect(reverse('water_calculator:results'))
 
 
 class ThanksView(View):

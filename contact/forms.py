@@ -29,7 +29,7 @@ class ContactForm(forms.ModelForm):
                 ('', 'Enquiry Subject'),
                 ('Garden', 'Garden'),
                 ('Property', 'Property'),
-                ('Garden & Property', 'Garden & Property'),
+                ('Rainwater Harvesting', 'Rainwater Harvesting'),
                 ('Other', 'Other')
             ]),
             'message': forms.Textarea(attrs={'placeholder': 'Message', 'class': 'form-control message-field'}),

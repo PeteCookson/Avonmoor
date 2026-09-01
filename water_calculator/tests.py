@@ -1,7 +1,9 @@
+import json
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.core import mail
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 
 from water_survey.models import RainfallGridPoint
@@ -73,6 +75,26 @@ class PublicEstimateServiceTests(TestCase):
 
         self.assertIsNone(estimate['uncaptured_litres'])
 
+    def test_estimate_records_approximate_postcode_location_method(self):
+        estimate = build_public_estimate(
+            {
+                'address_line_1': '1 Test Lane',
+                'town': 'South Brent',
+                'postcode': 'TQ10 9AB',
+            },
+            {
+                'map_latitude': Decimal('50.426000'),
+                'map_longitude': Decimal('-3.834000'),
+                'location_method': 'postcode',
+                'area_m2': Decimal('80.00'),
+                'roof_material': 'slate_tile',
+                'intended_use': 'garden',
+                'has_existing_collection': False,
+            },
+        )
+
+        self.assertEqual(estimate['location_method'], 'postcode')
+
 
 class PublicCalculatorJourneyTests(TestCase):
     def setUp(self):
@@ -94,7 +116,7 @@ class PublicCalculatorJourneyTests(TestCase):
             resolution_km=Decimal('1.00'),
         )
 
-    def _complete_estimate(self):
+    def _complete_estimate(self, location_method='map'):
         self.client.post(
             reverse('water_calculator:start'),
             {
@@ -108,6 +130,7 @@ class PublicCalculatorJourneyTests(TestCase):
             {
                 'map_latitude': '50.426000',
                 'map_longitude': '-3.834000',
+                'location_method': location_method,
                 'area_m2': '80.00',
                 'roof_material': 'slate_tile',
                 'intended_use': 'garden',
@@ -139,6 +162,7 @@ class PublicCalculatorJourneyTests(TestCase):
             'TQ10 9AB',
         )
 
+    @override_settings(GOOGLE_MAPS_API_KEY='test-browser-key')
     def test_measure_page_uses_public_location_aware_roof_map(self):
         self.client.post(
             reverse('water_calculator:start'),
@@ -153,6 +177,77 @@ class PublicCalculatorJourneyTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'data-requires-location="true"')
+        self.assertContains(response, 'data-postcode="TQ10 9AB"')
+        self.assertContains(response, 'Use the Postcode Fallback')
+        self.assertContains(response, 'data-lookup-url="/rainwater-calculator/postcode-location/"')
+        self.assertContains(response, 'js/roof_measure.js')
+
+    @patch('water_calculator.views.urlopen')
+    def test_postcode_location_uses_same_origin_server_lookup(self, mock_urlopen):
+        self.client.post(
+            reverse('water_calculator:start'),
+            {
+                'address_line_1': '1 Test Lane',
+                'town': 'South Brent',
+                'postcode': 'TQ10 9AB',
+            },
+        )
+        api_response = mock_urlopen.return_value.__enter__.return_value
+        api_response.read.return_value = json.dumps({
+            'status': 200,
+            'result': {'latitude': 50.426723, 'longitude': -3.835181},
+        }).encode('utf-8')
+
+        response = self.client.get(
+            reverse('water_calculator:postcode-location'),
+            {'postcode': 'TQ109AB'},
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.json(), {
+            'latitude': 50.426723,
+            'longitude': -3.835181,
+        })
+        mock_urlopen.assert_called_once()
+
+    @patch('water_calculator.views.urlopen')
+    def test_postcode_location_rejects_postcode_outside_session(
+        self, mock_urlopen
+    ):
+        self.client.post(
+            reverse('water_calculator:start'),
+            {
+                'address_line_1': '1 Test Lane',
+                'town': 'South Brent',
+                'postcode': 'TQ10 9AB',
+            },
+        )
+
+        response = self.client.get(
+            reverse('water_calculator:postcode-location'),
+            {'postcode': 'PL1 1AA'},
+        )
+
+        self.assertEqual(response.status_code, 400)
+        mock_urlopen.assert_not_called()
+
+    @override_settings(GOOGLE_MAPS_API_KEY='')
+    def test_measure_page_can_continue_when_google_maps_is_unavailable(self):
+        self.client.post(
+            reverse('water_calculator:start'),
+            {
+                'address_line_1': '1 Test Lane',
+                'town': 'South Brent',
+                'postcode': 'TQ10 9AB',
+            },
+        )
+
+        response = self.client.get(reverse('water_calculator:measure'))
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'You can still calculate')
+        self.assertContains(response, 'Use Postcode Location')
+        self.assertContains(response, 'Calculate My Rainwater Potential')
         self.assertContains(response, 'js/roof_measure.js')
 
     def test_measurement_creates_session_result_not_database_lead(self):
@@ -163,40 +258,45 @@ class PublicCalculatorJourneyTests(TestCase):
         estimate = self.client.session['water_calculator_estimate']
         self.assertEqual(estimate['annual_harvest_litres'], '79800.00')
 
-    def test_results_explain_yield_source_and_limitations(self):
+    def test_public_results_show_value_without_revealing_full_report(self):
         self._complete_estimate()
 
         response = self.client.get(reverse('water_calculator:results'))
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '79,800')
-        self.assertContains(response, 'Potential currently uncaptured')
-        self.assertContains(response, 'Planning range, not a final specification')
-        self.assertContains(response, 'Met Office HadUK-Grid')
+        self.assertContains(response, 'Unlock the Detailed Results')
+        self.assertNotContains(response, 'Planning range, not a final specification')
+        self.assertNotContains(response, 'Met Office HadUK-Grid')
+
+    def test_postcode_fallback_result_discloses_approximate_location(self):
+        self._complete_estimate(location_method='postcode')
+
+        response = self.client.get(reverse('water_calculator:results'))
+
+        self.assertContains(response, 'an approximate postcode-centre location')
 
     def test_results_require_a_completed_estimate(self):
         response = self.client.get(reverse('water_calculator:results'))
 
         self.assertRedirects(response, reverse('water_calculator:start'))
 
-    def test_explicit_survey_request_creates_lead_and_email(self):
+    def test_contact_details_unlock_full_report_and_create_lead(self):
         self._complete_estimate()
 
         response = self.client.post(
-            reverse('water_calculator:request-survey'),
+            reverse('water_calculator:unlock-results'),
             {
                 'name': 'Alex Customer',
                 'email': 'alex@example.com',
                 'phone': '',
-                'preferred_contact': 'email',
-                'customer_message': 'Interested in underground storage.',
                 'website': '',
                 'consent': 'on',
             },
         )
 
         lead = CustomerSurveyLead.objects.get()
-        self.assertRedirects(response, reverse('water_calculator:thanks'))
+        self.assertRedirects(response, reverse('water_calculator:results'))
         self.assertEqual(lead.postcode, 'TQ10 9AB')
         self.assertEqual(lead.roof_area_m2, Decimal('80.00'))
         self.assertEqual(
@@ -205,15 +305,20 @@ class PublicCalculatorJourneyTests(TestCase):
         self.assertIsNotNone(lead.consented_at)
         self.assertEqual(len(mail.outbox), 1)
 
+        unlocked_response = self.client.get(reverse('water_calculator:results'))
+        self.assertContains(unlocked_response, 'Planning range, not a final specification')
+        self.assertContains(unlocked_response, 'Met Office HadUK-Grid')
+        self.assertContains(unlocked_response, 'Potential Currently Uncaptured')
+        self.assertNotContains(unlocked_response, 'Unlock the Detailed Results')
+
     def test_honeypot_rejects_automated_submission(self):
         self._complete_estimate()
 
         response = self.client.post(
-            reverse('water_calculator:request-survey'),
+            reverse('water_calculator:unlock-results'),
             {
                 'name': 'Spam Bot',
                 'email': 'spam@example.com',
-                'preferred_contact': 'email',
                 'website': 'https://spam.example',
                 'consent': 'on',
             },

@@ -12,12 +12,9 @@
     <header class="app-header">
         <a href="{% url 'water_survey:survey-list' %}" class="brand" aria-label="Avonmoor Rainwater Harvesting survey workspace">
             <span class="brand-logo" aria-hidden="true">
-                <img class="brand-mark" src="{% static 'img/avonmoor-icon.svg' %}" alt="">
-                <span class="brand-lockup-crop">
-                    <img class="brand-lockup" src="{% static 'img/avonmoor-water-lockup-dark.svg' %}" alt="">
-                </span>
+                <img class="brand-master" src="{% static 'img/avonmoor-master-horizontal-dark.svg' %}" alt="">
             </span>
-            <strong class="brand-workspace">Survey workspace</strong>
+            <strong class="brand-workspace">Survey Workspace</strong>
         </a>
         <form method="post" action="{% url 'logout' %}">
             {% csrf_token %}

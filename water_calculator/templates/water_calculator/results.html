@@ -1,18 +1,19 @@
 {% extends 'water_calculator/base.html' %}
-{% block title %}Your rainwater estimate{% endblock %}
+{% block title %}Your Rainwater Estimate{% endblock %}
 {% block content %}
 <a class="back-link" href="{% url 'water_calculator:measure' %}">← Adjust roof measurement</a>
 <section class="calculator-results-hero">
     <div>
-        <p class="eyebrow">Your indicative result</p>
+        <p class="eyebrow">Your Indicative Result</p>
         <h1>{{ estimate.annual_harvest_litres|floatformat:'0g' }} <span>litres/year</span></h1>
-        <p>Potential harvest from {{ estimate.roof_area_m2|floatformat:1 }} m² of {{ estimate.roof_material_label|lower }} roof using {{ estimate.annual_rainfall_mm|floatformat:0 }} mm long-term annual rainfall.</p>
+        <p>Potential harvest from {{ estimate.roof_area_m2|floatformat:1 }} m² of {{ estimate.roof_material_label|lower }} roof using {% if estimate.location_method == 'postcode' %}an approximate postcode-centre location and {% endif %}long-term local rainfall data.</p>
     </div>
-    {% if estimate.uncaptured_litres %}
-    <div class="lost-water-callout"><span>Potential currently uncaptured</span><strong>{{ estimate.uncaptured_litres|floatformat:'0g' }}</strong><b>L/year</b><small>Assuming this roof currently has no collection system.</small></div>
+    {% if full_report_unlocked and estimate.uncaptured_litres %}
+    <div class="lost-water-callout"><span>Potential Currently Uncaptured</span><strong>{{ estimate.uncaptured_litres|floatformat:'0g' }}</strong><b>L/year</b><small>Assuming this roof currently has no collection system.</small></div>
     {% endif %}
 </section>
 
+{% if full_report_unlocked %}
 <section class="calculator-metrics" aria-label="Estimate summary">
     <div><span>Rain landing on roof</span><strong>{{ estimate.gross_rainfall_litres|floatformat:'0g' }} L</strong><small>Before runoff and filter losses</small></div>
     <div><span>Indicative storage</span><strong>{{ estimate.storage_low_litres|floatformat:'0g' }}{% if estimate.storage_high_litres %}–{{ estimate.storage_high_litres|floatformat:'0g' }}{% else %}+{% endif %} L</strong><small>Planning range, not a final specification</small></div>
@@ -31,11 +32,11 @@
         </div>
         {% endfor %}
     </div>
-    <p class="data-source">Source: {{ estimate.rainfall_source }}, {{ estimate.rainfall_reference_period }} · nearest 1 km grid point {{ estimate.rainfall_distance_km }} km away.</p>
+    <p class="data-source">Source: {{ estimate.rainfall_source }}, {{ estimate.rainfall_reference_period }} · nearest 1 km grid point {{ estimate.rainfall_distance_km }} km away.{% if estimate.location_method == 'postcode' %} Location based on the approximate centre of the property postcode.{% endif %}</p>
 </section>
 
 <section class="calculator-panel recommendation-panel">
-    <p class="eyebrow">What this means</p>
+    <p class="eyebrow">What This Means</p>
     <h2>A physical survey turns potential into a dependable system</h2>
     <p>The indicative storage range uses 5% of estimated annual harvest. Final sizing must test actual water demand, gutter routing, dry-period performance, overflow, access, excavation and ground conditions.</p>
     <ul class="recommendation-list">
@@ -45,23 +46,44 @@
     </ul>
 </section>
 
-<section class="calculator-panel lead-panel" id="request-survey">
-    <div class="step-label"><span>3</span><div><strong>Request a survey</strong><small>Optional</small></div></div>
-    <h2>Would you like Avonmoor to assess the property?</h2>
-    <p class="lede">Send this estimate with your contact details. We will review it before discussing a site survey—there is no automatic quote or obligation.</p>
-    <form method="post" action="{% url 'water_calculator:request-survey' %}" class="stacked-form calculator-form">
-        {% csrf_token %}
-        {% if lead_form.non_field_errors %}<div class="form-error">{{ lead_form.non_field_errors }}</div>{% endif %}
-        {% for field in lead_form %}
-        <div class="form-field{% if field.name == 'website' %} honeypot{% endif %}{% if field.name == 'consent' %} consent-field{% endif %}">
-            {% if field.name != 'consent' %}{{ field.label_tag }}{% endif %}
-            {{ field }}
-            {% if field.name == 'consent' %}{{ field.label_tag }}{% endif %}
-            {% if field.errors %}<div class="form-error">{{ field.errors }}</div>{% endif %}
-        </div>
-        {% endfor %}
-        <button type="submit" class="button button-primary button-wide">Send my survey request</button>
-        <small class="privacy-note">Your details are used only to respond to this enquiry. Anonymous calculator entries are not added to our customer database.</small>
-    </form>
+<section class="calculator-panel lead-panel unlocked-next-step">
+    <div>
+        <p class="eyebrow">Next Step</p>
+        <h2>Turn the estimate into a system that fits the property</h2>
+        <p class="lede">A site survey confirms demand, drainage routes, tank location, access and ground conditions before anything is specified.</p>
+    </div>
+    <a class="button button-primary" href="{% url 'contact' %}?service=rainwater">Discuss a Site Survey</a>
 </section>
+{% else %}
+<section class="calculator-panel locked-results-panel" id="unlock-results">
+    <div class="locked-results-grid">
+        <div>
+            <p class="eyebrow">Full Rainwater Estimate</p>
+            <h2>Unlock the Detailed Results</h2>
+            <p class="lede">Your headline harvest is free. Add your name and email to see the design information that makes the number useful.</p>
+            <ul class="locked-results-list">
+                <li><span aria-hidden="true">01</span><strong>Indicative storage range</strong></li>
+                <li><span aria-hidden="true">02</span><strong>Month-by-month collection</strong></li>
+                <li><span aria-hidden="true">03</span><strong>Rainfall source and assumptions</strong></li>
+            </ul>
+        </div>
+        <form method="post" action="{% url 'water_calculator:unlock-results' %}" class="stacked-form calculator-form unlock-form">
+            {% csrf_token %}
+            <h2>View My Full Estimate</h2>
+            <p>Phone is optional. There is no automatic quote or obligation.</p>
+            {% if lead_form.non_field_errors %}<div class="form-error">{{ lead_form.non_field_errors }}</div>{% endif %}
+            {% for field in lead_form %}
+            <div class="form-field{% if field.name == 'website' %} honeypot{% endif %}{% if field.name == 'consent' %} consent-field{% endif %}">
+                {% if field.name != 'consent' %}{{ field.label_tag }}{% endif %}
+                {{ field }}
+                {% if field.name == 'consent' %}{{ field.label_tag }}{% endif %}
+                {% if field.errors %}<div class="form-error">{{ field.errors }}</div>{% endif %}
+            </div>
+            {% endfor %}
+            <button type="submit" class="button button-primary button-wide">Unlock My Full Estimate</button>
+            <small class="privacy-note">Your details are used for this estimate and a relevant follow-up only. You will not be added to an automated mailing list. Read our <a href="{% url 'privacy' %}" target="_blank">privacy notice</a>.</small>
+        </form>
+    </div>
+</section>
+{% endif %}
 {% endblock %}

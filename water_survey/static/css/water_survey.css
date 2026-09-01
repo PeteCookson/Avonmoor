@@ -53,10 +53,8 @@ button, input, select, textarea { font-family: inherit; }
 }
 
 .brand { display: flex; align-items: center; gap: 12px; color: #FFFFFF; text-decoration: none; }
-.brand-logo { display: flex; align-items: center; gap: 7px; }
-.brand-mark { width: 34px; height: 48px; display: block; object-fit: contain; }
-.brand-lockup-crop { width: 142px; height: 34px; display: block; overflow: hidden; }
-.brand-lockup { width: 142px; height: 142px; display: block; transform: translateY(-89.6px); }
+.brand-logo { display: block; flex: 0 0 auto; }
+.brand-master { width: clamp(165px, 22vw, 205px); height: auto; display: block; }
 .brand-workspace {
     padding-left: 12px;
     border-left: 1px solid rgba(255, 255, 255, .42);
@@ -92,17 +90,16 @@ button, input, select, textarea { font-family: inherit; }
 
 h1, h2, h3, p { margin-top: 0; }
 h1, h2, h3 { color: var(--water-navy); line-height: 1.16; }
-h1 { margin-bottom: 10px; font-size: clamp(30px, 6vw, 46px); font-weight: 400; letter-spacing: -.025em; }
-h2 { font-size: 25px; font-weight: 400; letter-spacing: -.015em; }
+h1 { margin-bottom: 10px; font-family: var(--font-display); font-size: clamp(30px, 6vw, 46px); font-weight: 400; letter-spacing: -.025em; }
+h2 { font-family: var(--font-ui); font-size: 25px; font-weight: 400; letter-spacing: -.015em; }
 h3 { font-size: 20px; font-weight: 500; }
 
 .eyebrow {
     margin-bottom: 7px;
     color: var(--water-blue);
-    font-size: 11px;
+    font-size: 13px;
     font-weight: 700;
-    letter-spacing: .15em;
-    text-transform: uppercase;
+    letter-spacing: .02em;
 }
 
 .lede { max-width: 660px; color: var(--ink-soft); }
@@ -127,7 +124,7 @@ h3 { font-size: 20px; font-weight: 500; }
     cursor: pointer;
     transition: background-color .15s ease, border-color .15s ease, color .15s ease;
 }
-.button-primary { border-color: var(--av-copper); color: #FFFFFF; background: var(--av-copper); }
+.button-primary { min-height: 52px; padding: 13px 20px; border-color: var(--av-copper); color: #FFFFFF; background: var(--av-copper); font-size: 19px; font-weight: 700; }
 .button-primary:hover { border-color: var(--av-copper-dark); color: #FFFFFF; background: var(--av-copper-dark); }
 .button-secondary { border-color: var(--water-blue); color: var(--water-blue); background: #FFFFFF; }
 .button-secondary:hover { color: #FFFFFF; background: var(--water-blue); }

@@ -14,12 +14,9 @@
     <header class="app-header calculator-header">
         <a href="{% url 'water_calculator:start' %}" class="brand" aria-label="Avonmoor Rainwater Harvesting calculator">
             <span class="brand-logo" aria-hidden="true">
-                <img class="brand-mark" src="{% static 'img/avonmoor-icon.svg' %}" alt="">
-                <span class="brand-lockup-crop">
-                    <img class="brand-lockup" src="{% static 'img/avonmoor-water-lockup-dark.svg' %}" alt="">
-                </span>
+                <img class="brand-master" src="{% static 'img/avonmoor-master-horizontal-dark.svg' %}" alt="">
             </span>
-            <strong class="brand-workspace">Rainwater calculator</strong>
+            <strong class="brand-workspace">Rainwater Calculator</strong>
         </a>
         <a class="calculator-header-link" href="mailto:hello@avonmoor.co.uk">Need help?</a>
     </header>
@@ -33,7 +30,7 @@
     </main>
     <footer class="calculator-footer">
         <span>Avonmoor Rainwater Harvesting</span>
-        <span>South Devon · hello@avonmoor.co.uk</span>
+        <span>South Devon · <a href="mailto:hello@avonmoor.co.uk">hello@avonmoor.co.uk</a> · <a href="{% url 'privacy' %}">Company Information &amp; Privacy</a></span>
     </footer>
     {% block scripts %}{% endblock %}
 </body>

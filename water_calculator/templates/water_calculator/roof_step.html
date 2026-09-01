@@ -17,22 +17,30 @@
             {% if hidden.errors %}<div class="form-error">{{ hidden.errors }}</div>{% endif %}
         {% endfor %}
 
-        {% if google_maps_api_key %}
         <div class="map-field">
             <div class="map-heading">
-                <div><label>Roof outline</label><small>Tap corners in order. Drag any point to refine it.</small></div>
+                <div><label>Roof area</label><small>Outline it on the map, or enter the area manually if the map is unavailable.</small></div>
                 <output id="map-area" class="map-area" aria-live="polite">No outline</output>
             </div>
-            <div id="roof-map" class="roof-map" data-api-key="{{ google_maps_api_key }}" data-address="{{ map_address }}" data-latitude="" data-longitude="" data-requires-location="true"></div>
+            {% if google_maps_api_key %}
+            <div id="roof-map" class="roof-map" data-api-key="{{ google_maps_api_key }}" data-address="{{ map_address }}" data-postcode="{{ property.postcode }}" data-latitude="{{ form.map_latitude.value|default:'' }}" data-longitude="{{ form.map_longitude.value|default:'' }}" data-requires-location="true"></div>
             <div id="map-message" class="map-message">Finding the property…</div>
             <div class="map-actions">
                 <button type="button" id="undo-map-point" class="button button-secondary" disabled>Undo point</button>
                 <button type="button" id="clear-map" class="button button-secondary" disabled>Clear outline</button>
             </div>
+            {% else %}
+            <div class="map-unavailable"><strong>The aerial map is unavailable.</strong> You can still calculate using your postcode and a manual roof area.</div>
+            {% endif %}
+
+            <div id="manual-location-fallback" class="manual-location-fallback" data-postcode="{{ property.postcode }}" data-lookup-url="{% url 'water_calculator:postcode-location' %}"{% if google_maps_api_key %} hidden{% endif %}>
+                <h2>Use the Postcode Fallback</h2>
+                <p>We will use the centre of {{ property.postcode }} as an approximate location for rainfall matching. Enter the horizontal roof area below; a site survey would confirm both.</p>
+                <button type="button" id="use-postcode-location" class="button button-secondary">Use Postcode Location</button>
+                <p id="postcode-location-status" class="fallback-status" aria-live="polite"></p>
+                <small>Your postcode is sent to Postcodes.io only if you choose this fallback. See our <a href="{% url 'privacy' %}" target="_blank">privacy notice</a>.</small>
+            </div>
         </div>
-        {% else %}
-        <div class="map-unavailable"><strong>Map measurement is unavailable.</strong> Please try again later or contact Avonmoor for an assessment.</div>
-        {% endif %}
 
         {% for field in form.visible_fields %}
         <div class="form-field{% if field.name == 'area_m2' %} area-field{% endif %}{% if field.name == 'intended_use' or field.name == 'has_existing_collection' %} choice-field{% endif %}">
@@ -42,14 +50,10 @@
             {% if field.errors %}<div class="form-error">{{ field.errors }}</div>{% endif %}
         </div>
         {% endfor %}
-        {% if google_maps_api_key %}
-        <button type="submit" class="button button-primary button-wide">Calculate my rainwater potential</button>
-        {% else %}
-        <a class="button button-secondary button-wide" href="mailto:hello@avonmoor.co.uk">Contact Avonmoor</a>
-        {% endif %}
+        <button type="submit" id="calculate-submit" class="button button-primary button-wide">Calculate My Rainwater Potential</button>
     </form>
 </section>
 {% endblock %}
 {% block scripts %}
-{% if google_maps_api_key %}<script src="{% static 'js/roof_measure.js' %}" defer></script>{% endif %}
+<script src="{% static 'js/roof_measure.js' %}?v=20260901-2" defer></script>
 {% endblock %}
