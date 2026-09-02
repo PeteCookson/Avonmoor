@@ -14,7 +14,7 @@
         </div>
         <div class="report-title">
             <p class="eyebrow">Survey Report</p>
-            <h1>Roof yield assessment</h1>
+            <h1>Rainwater assessment</h1>
         </div>
         <dl class="report-meta">
             <div><dt>Survey reference</dt><dd>{{ survey.reference }}</dd></div>
@@ -106,6 +106,71 @@
         {% endif %}
     </section>
 
+    {% if assessment %}
+    <section class="report-section report-sizing-section">
+        <div class="report-section-heading">
+            <div><p class="eyebrow">Demand and Storage</p><h2>Preliminary system sizing</h2></div>
+            <span>18-day balance</span>
+        </div>
+        <div class="report-summary report-design-summary">
+            <div>
+                <span>Annual non-potable demand</span>
+                <strong>{{ assessment.annual_demand_litres|floatformat:'0g' }} L</strong>
+            </div>
+            <div class="report-primary-metric">
+                <span>Preliminary storage</span>
+                <strong>{% if assessment.preliminary_storage_litres %}{{ assessment.preliminary_storage_litres|floatformat:'0g' }} L{% else %}Not available{% endif %}</strong>
+            </div>
+            <div>
+                <span>Capacity modelled</span>
+                <strong>{% if assessment.analysis_capacity_litres %}{{ assessment.analysis_capacity_litres|floatformat:'0g' }} L{% else %}Not available{% endif %}</strong>
+            </div>
+            <div>
+                <span>Demand supplied</span>
+                <strong>{% if assessment.water_balance %}{{ assessment.water_balance.demand_coverage_percent }}%{% else %}Not available{% endif %}</strong>
+            </div>
+        </div>
+
+        {% if assessment.storage_exceeds_site_maximum %}
+        <p class="report-warning"><strong>Design conflict:</strong> the preliminary capacity exceeds the recorded practical site maximum.</p>
+        {% endif %}
+
+        <dl class="report-site-grid">
+            <div><dt>Intended use</dt><dd>{{ assessment.intended_use_labels|join:', ' }}</dd></div>
+            <div><dt>Demand evidence</dt><dd>{{ assessment.get_demand_basis_display }}</dd></div>
+            <div><dt>Tank location</dt><dd>{{ assessment.get_tank_location_display }}</dd></div>
+            <div><dt>System type</dt><dd>{{ assessment.get_system_type_display }}</dd></div>
+            <div><dt>Installation access</dt><dd>{{ assessment.get_access_rating_display }}</dd></div>
+            <div><dt>Overflow</dt><dd>{{ assessment.get_overflow_destination_display }}</dd></div>
+            <div><dt>Electrical supply</dt><dd>{{ assessment.get_power_available_display }}</dd></div>
+            <div><dt>Site constraints</dt><dd>{% if assessment.site_constraint_labels %}{{ assessment.site_constraint_labels|join:', ' }}{% else %}None recorded{% endif %}</dd></div>
+        </dl>
+
+        {% if assessment.water_balance %}
+        <div class="report-table-wrap">
+            <table class="report-table report-balance-table">
+                <thead><tr><th>Month</th><th>Harvest</th><th>Demand</th><th>Supplied</th><th>Shortfall</th><th>Overflow</th></tr></thead>
+                <tbody>
+                    {% for row in assessment.water_balance.rows %}
+                    <tr><th scope="row">{{ row.month }}</th><td>{{ row.yield_litres|floatformat:'0g' }} L</td><td>{{ row.demand_litres|floatformat:'0g' }} L</td><td>{{ row.supplied_litres|floatformat:'0g' }} L</td><td>{{ row.shortfall_litres|floatformat:'0g' }} L</td><td>{{ row.overflow_litres|floatformat:'0g' }} L</td></tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr><th scope="row">Annual</th><td>{{ survey.estimated_annual_yield_litres|floatformat:'0g' }} L</td><td>{{ assessment.water_balance.annual_demand_litres|floatformat:'0g' }} L</td><td>{{ assessment.water_balance.annual_supplied_litres|floatformat:'0g' }} L</td><td>{{ assessment.water_balance.annual_shortfall_litres|floatformat:'0g' }} L</td><td>{{ assessment.water_balance.annual_overflow_litres|floatformat:'0g' }} L</td></tr>
+                </tfoot>
+            </table>
+        </div>
+        {% endif %}
+
+        {% if assessment.route_notes or assessment.assessment_notes %}
+        <div class="report-assessment-notes">
+            {% if assessment.route_notes %}<div><strong>Routes and overflow</strong><p>{{ assessment.route_notes|linebreaksbr }}</p></div>{% endif %}
+            {% if assessment.assessment_notes %}<div><strong>Assessment notes</strong><p>{{ assessment.assessment_notes|linebreaksbr }}</p></div>{% endif %}
+        </div>
+        {% endif %}
+    </section>
+    {% endif %}
+
     {% if survey.notes %}
     <section class="report-section report-notes">
         <p class="eyebrow">Site Record</p>
@@ -116,7 +181,7 @@
 
     <section class="report-disclaimer">
         <h2>Assessment limitations</h2>
-        <p>This report is an indicative rainwater yield assessment, not a quotation or system design. Yield is based on the horizontal roof footprint, recorded runoff and system-efficiency factors, and the stated rainfall dataset. A final proposal must confirm roof dimensions, gutter and downpipe routing, intended water demand, storage location, access, ground conditions, drainage, excavation requirements and installation constraints.</p>
+        <p>This report is a preliminary rainwater assessment, not a quotation or final system design. Yield is based on the horizontal roof footprint, recorded runoff and system-efficiency factors, and the stated rainfall dataset. The storage figure uses an 18-day balance of the lower annual yield or recorded non-potable demand, rounded to a practical capacity. The representative water balance distributes monthly yield and demand evenly across each month. Final sizing, back-up supply, water quality, components and installation must be confirmed for the actual site and checked against BS EN 16941-1:2024 and applicable water regulations.</p>
     </section>
 
     <footer class="report-footer">

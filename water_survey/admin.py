@@ -1,6 +1,6 @@
 from django.contrib import admin
 
-from .models import RainfallGridPoint, RoofSection, Survey
+from .models import RainfallGridPoint, RoofSection, Survey, SystemAssessment
 
 
 @admin.register(RainfallGridPoint)
@@ -21,6 +21,12 @@ class RoofSectionInline(admin.TabularInline):
     extra = 0
 
 
+class SystemAssessmentInline(admin.StackedInline):
+    model = SystemAssessment
+    extra = 0
+    max_num = 1
+
+
 @admin.register(Survey)
 class SurveyAdmin(admin.ModelAdmin):
     list_display = (
@@ -39,4 +45,4 @@ class SurveyAdmin(admin.ModelAdmin):
         'created_at',
         'updated_at',
     )
-    inlines = (RoofSectionInline,)
+    inlines = (RoofSectionInline, SystemAssessmentInline)

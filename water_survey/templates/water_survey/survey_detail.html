@@ -11,6 +11,7 @@
     <div class="detail-actions">
         <a class="button button-secondary" href="{% url 'water_survey:survey-report' survey.pk %}">Print report</a>
         <a class="button button-secondary" href="{% url 'water_survey:survey-update' survey.pk %}">Edit survey</a>
+        <a class="button button-secondary" href="{% url 'water_survey:system-assessment' survey.pk %}">Demand &amp; sizing</a>
         <a class="button button-primary" href="{% url 'water_survey:roof-section-create' survey.pk %}">Add roof</a>
     </div>
 </div>
@@ -107,6 +108,95 @@
     {% empty %}
     <div class="inline-empty"><p>No roof areas measured yet.</p><a href="{% url 'water_survey:roof-section-create' survey.pk %}">Add the first roof section →</a></div>
     {% endfor %}
+</section>
+
+<section class="section-block sizing-block">
+    <div class="section-heading">
+        <h2>Demand and System Sizing</h2>
+        {% if assessment %}<a href="{% url 'water_survey:system-assessment' survey.pk %}">Edit assessment</a>{% endif %}
+    </div>
+    {% if assessment %}
+        <div class="sizing-metrics">
+            <div>
+                <span>Annual non-potable demand</span>
+                <strong>{{ assessment.annual_demand_litres|floatformat:'0g' }} L</strong>
+            </div>
+            <div>
+                <span>Preliminary storage</span>
+                <strong>{% if assessment.preliminary_storage_litres %}{{ assessment.preliminary_storage_litres|floatformat:'0g' }} L{% else %}Not available{% endif %}</strong>
+                <small>18-day yield/demand balance</small>
+            </div>
+            <div>
+                <span>Capacity modelled</span>
+                <strong>{% if assessment.analysis_capacity_litres %}{{ assessment.analysis_capacity_litres|floatformat:'0g' }} L{% else %}Not available{% endif %}</strong>
+                {% if assessment.proposed_storage_litres %}<small>Surveyor-selected capacity</small>{% else %}<small>Preliminary capacity</small>{% endif %}
+            </div>
+            <div>
+                <span>Demand supplied</span>
+                <strong>{% if assessment.water_balance %}{{ assessment.water_balance.demand_coverage_percent }}%{% else %}Not available{% endif %}</strong>
+                <small>Representative repeated climate year</small>
+            </div>
+        </div>
+
+        {% if assessment.storage_exceeds_site_maximum %}
+        <div class="sizing-warning"><strong>Storage conflict:</strong> the preliminary capacity exceeds the recorded practical site maximum. Revise the demand, storage arrangement or expected coverage before proposing the system.</div>
+        {% endif %}
+
+        <dl class="site-summary-grid">
+            <div><dt>Intended use</dt><dd>{{ assessment.intended_use_labels|join:', ' }}</dd></div>
+            <div><dt>Demand evidence</dt><dd>{{ assessment.get_demand_basis_display }}</dd></div>
+            <div><dt>Tank location</dt><dd>{{ assessment.get_tank_location_display }}</dd></div>
+            <div><dt>System type</dt><dd>{{ assessment.get_system_type_display }}</dd></div>
+            <div><dt>Access</dt><dd>{{ assessment.get_access_rating_display }}</dd></div>
+            <div><dt>Overflow</dt><dd>{{ assessment.get_overflow_destination_display }}</dd></div>
+            <div><dt>Electrical supply</dt><dd>{{ assessment.get_power_available_display }}</dd></div>
+            <div><dt>Site constraints</dt><dd>{% if assessment.site_constraint_labels %}{{ assessment.site_constraint_labels|join:', ' }}{% else %}None recorded{% endif %}</dd></div>
+        </dl>
+
+        {% if assessment.water_balance %}
+        <div class="rainfall-table-wrap sizing-table-wrap">
+            <table class="rainfall-table sizing-table">
+                <thead><tr><th>Month</th><th>Harvest</th><th>Demand</th><th>Rainwater supplied</th><th>Shortfall</th><th>Overflow</th></tr></thead>
+                <tbody>
+                    {% for row in assessment.water_balance.rows %}
+                    <tr>
+                        <th scope="row">{{ row.month }}</th>
+                        <td>{{ row.yield_litres|floatformat:'0g' }} L</td>
+                        <td>{{ row.demand_litres|floatformat:'0g' }} L</td>
+                        <td>{{ row.supplied_litres|floatformat:'0g' }} L</td>
+                        <td>{{ row.shortfall_litres|floatformat:'0g' }} L</td>
+                        <td>{{ row.overflow_litres|floatformat:'0g' }} L</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+                <tfoot>
+                    <tr>
+                        <th scope="row">Annual</th>
+                        <td>{{ survey.estimated_annual_yield_litres|floatformat:'0g' }} L</td>
+                        <td>{{ assessment.water_balance.annual_demand_litres|floatformat:'0g' }} L</td>
+                        <td>{{ assessment.water_balance.annual_supplied_litres|floatformat:'0g' }} L</td>
+                        <td>{{ assessment.water_balance.annual_shortfall_litres|floatformat:'0g' }} L</td>
+                        <td>{{ assessment.water_balance.annual_overflow_litres|floatformat:'0g' }} L</td>
+                    </tr>
+                </tfoot>
+            </table>
+        </div>
+        {% else %}
+        <div class="inline-empty"><p>Add monthly rainfall, roof catchment and non-zero demand to calculate the water balance.</p></div>
+        {% endif %}
+
+        {% if assessment.route_notes or assessment.assessment_notes %}
+        <div class="assessment-note-grid">
+            {% if assessment.route_notes %}<div><strong>Routes and overflow</strong><p>{{ assessment.route_notes|linebreaksbr }}</p></div>{% endif %}
+            {% if assessment.assessment_notes %}<div><strong>Assessment notes</strong><p>{{ assessment.assessment_notes|linebreaksbr }}</p></div>{% endif %}
+        </div>
+        {% endif %}
+    {% else %}
+        <div class="inline-empty">
+            <p>Demand and installation constraints have not been assessed. Storage cannot be recommended responsibly from annual roof yield alone.</p>
+            <a href="{% url 'water_survey:system-assessment' survey.pk %}">Start demand and system sizing →</a>
+        </div>
+    {% endif %}
 </section>
 
 {% if survey.notes %}<section class="section-block"><h2>Survey notes</h2><p>{{ survey.notes|linebreaksbr }}</p></section>{% endif %}

@@ -1,11 +1,17 @@
 import uuid
 from decimal import Decimal
+from functools import cached_property
 
 from django.conf import settings
 from django.core.exceptions import ValidationError
 from django.db import models
 
-from .services.calculations import calculate_yield_litres
+from .services.calculations import (
+    calculate_preliminary_storage_litres,
+    calculate_yield_litres,
+    normalise_monthly_demand,
+    simulate_storage_balance,
+)
 from .services.rainfall import MONTHS, normalise_monthly_rainfall
 
 
@@ -193,7 +199,7 @@ class RoofSection(models.Model):
     polygon = models.JSONField(
         default=dict,
         blank=True,
-        help_text='GeoJSON roof outline. Populated by the map tool in the next stage.',
+        help_text='GeoJSON roof outline captured by the map tool.',
     )
     sort_order = models.PositiveSmallIntegerField(default=0)
 
@@ -232,3 +238,219 @@ class RoofSection(models.Model):
         if self.survey.annual_rainfall_mm is None:
             return None
         return self.calculate_yield(self.survey.annual_rainfall_mm)
+
+
+class SystemAssessment(models.Model):
+    class DemandBasis(models.TextChoices):
+        CUSTOMER = 'customer', 'Customer estimate'
+        FIXTURE = 'fixture', 'Fixture and usage estimate'
+        METERED = 'metered', 'Measured or metered use'
+        OTHER = 'other', 'Other evidence'
+
+    class TankLocation(models.TextChoices):
+        UNASSESSED = 'unassessed', 'Not assessed'
+        ABOVE_GROUND = 'above_ground', 'Above ground'
+        BELOW_GROUND = 'below_ground', 'Below ground'
+        INTERNAL = 'internal', 'Inside an outbuilding'
+        MIXED = 'mixed', 'Combined storage locations'
+
+    class SystemType(models.TextChoices):
+        UNASSESSED = 'unassessed', 'Not assessed'
+        GRAVITY = 'gravity', 'Gravity-fed above-ground system'
+        ABOVE_GROUND_PUMPED = 'above_pumped', 'Pumped above-ground system'
+        BELOW_GROUND_PUMPED = 'below_pumped', 'Pumped below-ground system'
+        HEADER_TANK = 'header_tank', 'Pumped system with header tank'
+        BESPOKE = 'bespoke', 'Bespoke or commercial system'
+
+    class AccessRating(models.TextChoices):
+        UNASSESSED = 'unassessed', 'Not assessed'
+        GOOD = 'good', 'Good plant and delivery access'
+        RESTRICTED = 'restricted', 'Restricted access'
+        HAND_DIG = 'hand_dig', 'Hand excavation likely'
+        SPECIALIST = 'specialist', 'Specialist lifting or excavation required'
+
+    class OverflowDestination(models.TextChoices):
+        UNASSESSED = 'unassessed', 'Not assessed'
+        SOAKAWAY = 'soakaway', 'Soakaway or infiltration area'
+        SURFACE_WATER = 'surface_water', 'Surface-water drainage'
+        WATERCOURSE = 'watercourse', 'Watercourse or pond'
+        GARDEN = 'garden', 'Controlled discharge to garden'
+        OTHER = 'other', 'Other or requires investigation'
+
+    class PowerAvailability(models.TextChoices):
+        UNKNOWN = 'unknown', 'Not assessed'
+        YES = 'yes', 'Suitable supply available'
+        NO = 'no', 'No suitable supply available'
+
+    INTENDED_USE_CHOICES = (
+        ('garden', 'Garden watering'),
+        ('vehicles', 'Vehicle washing'),
+        ('toilets', 'Toilet flushing'),
+        ('laundry', 'Washing machine'),
+        ('livestock', 'Livestock watering'),
+        ('commercial', 'Commercial or operational use'),
+        ('other', 'Other non-potable use'),
+    )
+    SITE_CONSTRAINT_CHOICES = (
+        ('narrow_access', 'Narrow access'),
+        ('limited_excavator', 'Limited excavator access'),
+        ('slope', 'Sloping ground'),
+        ('clay', 'Clay ground'),
+        ('rock', 'Rock or difficult excavation'),
+        ('high_water_table', 'High water table or flood risk'),
+        ('services', 'Buried services'),
+        ('tree_roots', 'Trees or protected root zones'),
+        ('listed_property', 'Listed building or planning sensitivity'),
+    )
+
+    survey = models.OneToOneField(
+        Survey,
+        on_delete=models.CASCADE,
+        related_name='system_assessment',
+    )
+    intended_uses = models.JSONField(default=list)
+    demand_basis = models.CharField(
+        max_length=20,
+        choices=DemandBasis.choices,
+        default=DemandBasis.CUSTOMER,
+    )
+    occupants = models.PositiveSmallIntegerField(null=True, blank=True)
+    monthly_demand_litres = models.JSONField(default=dict)
+    tank_location = models.CharField(
+        max_length=20,
+        choices=TankLocation.choices,
+        default=TankLocation.UNASSESSED,
+    )
+    system_type = models.CharField(
+        max_length=20,
+        choices=SystemType.choices,
+        default=SystemType.UNASSESSED,
+    )
+    access_rating = models.CharField(
+        max_length=20,
+        choices=AccessRating.choices,
+        default=AccessRating.UNASSESSED,
+    )
+    site_constraints = models.JSONField(default=list, blank=True)
+    overflow_destination = models.CharField(
+        max_length=20,
+        choices=OverflowDestination.choices,
+        default=OverflowDestination.UNASSESSED,
+    )
+    power_available = models.CharField(
+        max_length=10,
+        choices=PowerAvailability.choices,
+        default=PowerAvailability.UNKNOWN,
+    )
+    maximum_storage_litres = models.PositiveIntegerField(null=True, blank=True)
+    proposed_storage_litres = models.PositiveIntegerField(null=True, blank=True)
+    route_notes = models.TextField(blank=True)
+    assessment_notes = models.TextField(blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-updated_at']
+
+    def __str__(self):
+        return f'System assessment for {self.survey}'
+
+    def clean(self):
+        errors = {}
+        valid_uses = {value for value, _ in self.INTENDED_USE_CHOICES}
+        if not isinstance(self.intended_uses, list):
+            errors['intended_uses'] = 'Select one or more intended uses.'
+        elif not self.intended_uses:
+            errors['intended_uses'] = 'Select at least one intended use.'
+        elif set(self.intended_uses) - valid_uses:
+            errors['intended_uses'] = 'One or more intended uses are invalid.'
+
+        valid_constraints = {value for value, _ in self.SITE_CONSTRAINT_CHOICES}
+        if not isinstance(self.site_constraints, list):
+            errors['site_constraints'] = 'Site constraints must be a list.'
+        elif set(self.site_constraints) - valid_constraints:
+            errors['site_constraints'] = (
+                'One or more site constraints are invalid.'
+            )
+
+        try:
+            normalise_monthly_demand(self.monthly_demand_litres)
+        except ValueError as error:
+            errors['monthly_demand_litres'] = str(error)
+
+        if (
+            self.maximum_storage_litres
+            and self.proposed_storage_litres
+            and self.proposed_storage_litres > self.maximum_storage_litres
+        ):
+            errors['proposed_storage_litres'] = (
+                'The proposed storage exceeds the recorded site maximum.'
+            )
+
+        if errors:
+            raise ValidationError(errors)
+
+    @property
+    def normalised_monthly_demand(self):
+        try:
+            return normalise_monthly_demand(self.monthly_demand_litres)
+        except ValueError:
+            return {}
+
+    @property
+    def annual_demand_litres(self):
+        return sum(self.normalised_monthly_demand.values(), Decimal('0'))
+
+    @property
+    def intended_use_labels(self):
+        labels = dict(self.INTENDED_USE_CHOICES)
+        return [labels[value] for value in self.intended_uses if value in labels]
+
+    @property
+    def site_constraint_labels(self):
+        labels = dict(self.SITE_CONSTRAINT_CHOICES)
+        return [
+            labels[value] for value in self.site_constraints if value in labels
+        ]
+
+    @property
+    def preliminary_storage_litres(self):
+        annual_yield = self.survey.estimated_annual_yield_litres
+        if annual_yield is None:
+            return None
+        return calculate_preliminary_storage_litres(
+            annual_yield=annual_yield,
+            annual_demand=self.annual_demand_litres,
+        )
+
+    @property
+    def analysis_capacity_litres(self):
+        return self.proposed_storage_litres or self.preliminary_storage_litres
+
+    @property
+    def storage_exceeds_site_maximum(self):
+        return bool(
+            self.maximum_storage_litres
+            and self.preliminary_storage_litres
+            and self.preliminary_storage_litres > self.maximum_storage_litres
+        )
+
+    @cached_property
+    def water_balance(self):
+        capacity = self.analysis_capacity_litres
+        monthly_yields = {
+            row['key']: row['yield_litres']
+            for row in self.survey.monthly_yield_rows
+        }
+        if not capacity or not monthly_yields or not self.normalised_monthly_demand:
+            return None
+
+        balance = simulate_storage_balance(
+            monthly_yield_litres=monthly_yields,
+            monthly_demand_litres=self.normalised_monthly_demand,
+            capacity_litres=capacity,
+        )
+        month_labels = dict(MONTHS)
+        for row in balance['rows']:
+            row['month'] = month_labels[row['key']]
+        return balance

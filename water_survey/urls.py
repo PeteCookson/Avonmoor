@@ -11,6 +11,7 @@ from .views import (
     SurveyListView,
     SurveyReportView,
     SurveyUpdateView,
+    SystemAssessmentView,
 )
 
 app_name = 'water_survey'
@@ -20,6 +21,11 @@ urlpatterns = [
     path('new/', SurveyCreateView.as_view(), name='survey-create'),
     path('<int:pk>/', SurveyDetailView.as_view(), name='survey-detail'),
     path('<int:pk>/report/', SurveyReportView.as_view(), name='survey-report'),
+    path(
+        '<int:pk>/system-assessment/',
+        SystemAssessmentView.as_view(),
+        name='system-assessment',
+    ),
     path('<int:pk>/edit/', SurveyUpdateView.as_view(), name='survey-update'),
     path('<int:pk>/delete/', SurveyDeleteView.as_view(), name='survey-delete'),
     path(

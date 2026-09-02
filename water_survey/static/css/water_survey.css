@@ -308,6 +308,90 @@ dd { margin: 3px 0 0; color: var(--ink); font-weight: 700; font-variant-numeric:
 .rainfall-table thead th { color: var(--ink-soft); font-size: 10px; letter-spacing: .1em; text-transform: uppercase; }
 .rainfall-table tbody th { font-family: inherit; font-weight: 700; }
 
+.assessment-form-panel {
+    border: 1px solid var(--line);
+    border-top: 5px solid var(--water-sky);
+    border-radius: var(--radius-card);
+    background: var(--surface);
+    box-shadow: var(--shadow-soft);
+}
+.assessment-heading { padding: clamp(24px, 5vw, 44px); border-bottom: 1px solid var(--line); }
+.assessment-heading h1 { margin-bottom: 10px; }
+.assessment-heading .lede { margin-bottom: 0; }
+.assessment-form { display: grid; }
+.assessment-section { min-width: 0; margin: 0; padding: clamp(24px, 5vw, 40px); border: 0; border-bottom: 1px solid var(--line); }
+.assessment-section legend {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    width: 100%;
+    margin: 0 0 8px;
+    padding: 0;
+    color: var(--water-navy);
+    font-size: 24px;
+    font-weight: 500;
+}
+.assessment-section legend span {
+    display: inline-grid;
+    width: 32px;
+    height: 32px;
+    place-items: center;
+    border-radius: 50%;
+    color: #FFFFFF;
+    background: var(--water-blue);
+    font-size: 12px;
+    font-weight: 700;
+}
+.section-intro { max-width: 760px; margin-bottom: 24px; color: var(--ink-soft); }
+.assessment-grid { display: grid; gap: 18px; }
+.assessment-grid-two { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.assessment-field { display: grid; gap: 7px; min-width: 0; margin-top: 18px; }
+.assessment-field label { color: var(--water-navy); font-size: 14px; font-weight: 700; }
+.assessment-field input, .assessment-field select, .assessment-field textarea {
+    width: 100%;
+    min-height: 48px;
+    padding: 11px 12px;
+    border: 1px solid #9EB0B8;
+    border-radius: 6px;
+    color: var(--ink);
+    background: #FFFFFF;
+    font: inherit;
+}
+.assessment-field textarea { min-height: 108px; resize: vertical; }
+.assessment-field input:focus, .assessment-field select:focus, .assessment-field textarea:focus {
+    border-color: var(--water-blue);
+    outline: 3px solid rgba(81, 164, 207, .28);
+}
+.assessment-field small { color: var(--ink-soft); font-size: 12px; }
+.assessment-field .errorlist { margin: 0; padding: 0; color: var(--danger); list-style: none; font-size: 13px; font-weight: 700; }
+.checkbox-field > div { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 8px 18px; }
+.checkbox-field > div > div label { min-height: 44px; display: flex; align-items: center; gap: 10px; padding: 8px 10px; border: 1px solid var(--line); border-radius: 6px; background: #FFFFFF; cursor: pointer; }
+.checkbox-field input { width: 20px; min-height: 20px; margin: 0; padding: 0; accent-color: var(--water-blue); }
+.demand-month-grid { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 0 18px; }
+.monthly-tools { display: flex; align-items: center; gap: 14px; margin-bottom: 4px; }
+.monthly-tools small { color: var(--ink-soft); }
+.assessment-submit { display: flex; align-items: center; justify-content: space-between; gap: 24px; padding: clamp(24px, 5vw, 40px); }
+.assessment-submit p { max-width: 570px; margin-bottom: 0; color: var(--ink-soft); }
+.assessment-submit .button { flex: 0 0 auto; }
+
+.sizing-block { border-top: 4px solid var(--water-blue); }
+.sizing-block .section-heading a { min-height: 44px; display: inline-flex; align-items: center; font-size: 14px; font-weight: 700; text-decoration: none; }
+.sizing-metrics { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); margin-top: 22px; border: 1px solid var(--line); border-radius: var(--radius-card); overflow: hidden; }
+.sizing-metrics > div { min-height: 126px; display: flex; flex-direction: column; justify-content: center; padding: 18px; border-left: 1px solid var(--line); }
+.sizing-metrics > div:first-child { border-left: 0; }
+.sizing-metrics span { color: var(--ink-soft); font-size: 11px; font-weight: 700; letter-spacing: .06em; text-transform: uppercase; }
+.sizing-metrics strong { margin-top: 7px; color: var(--water-navy); font-size: 25px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.1; }
+.sizing-metrics small { margin-top: 5px; color: var(--ink-soft); }
+.sizing-warning, .report-warning { margin-top: 18px; padding: 14px 16px; border-left: 4px solid var(--danger); color: #702A27; background: var(--danger-pale); }
+.site-summary-grid, .report-site-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px 28px; margin: 24px 0; }
+.site-summary-grid > div, .report-site-grid > div { min-width: 0; }
+.site-summary-grid dd, .report-site-grid dd { overflow-wrap: anywhere; font-weight: 500; }
+.sizing-table-wrap { margin-top: 24px; }
+.sizing-table tfoot th, .sizing-table tfoot td { border-top: 2px solid var(--water-blue); color: var(--water-navy); font-weight: 700; }
+.assessment-note-grid, .report-assessment-notes { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 16px; margin-top: 24px; }
+.assessment-note-grid > div, .report-assessment-notes > div { padding: 18px; border-left: 4px solid var(--water-sky); background: var(--pale-blue); }
+.assessment-note-grid p, .report-assessment-notes p { margin: 6px 0 0; color: var(--ink-soft); }
+
 .survey-auth { display: grid; place-items: center; padding: 24px; background: var(--water-navy); }
 .auth-card { width: min(460px, 100%); padding: clamp(28px, 8vw, 52px); border-top: 5px solid var(--water-sky); }
 .auth-brand { display: block; text-decoration: none; }
@@ -333,6 +417,9 @@ dd { margin: 3px 0 0; color: var(--ink); font-weight: 700; font-variant-numeric:
 .report-summary span { color: var(--ink-soft); font-size: 10px; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
 .report-summary strong { margin-top: 6px; color: var(--water-navy); font-size: 24px; font-weight: 500; font-variant-numeric: tabular-nums; line-height: 1.08; }
 .report-summary small { margin-top: 3px; color: var(--ink-soft); font-weight: 600; }
+.report-design-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); margin-bottom: 20px; }
+.report-design-summary > div { min-height: 100px; padding: 14px; }
+.report-design-summary strong { font-size: 20px; }
 .report-primary-metric { border-top: 5px solid var(--water-sky); background: var(--pale-blue); }
 .report-primary-metric strong { font-size: clamp(32px, 6vw, 45px); }
 .report-section { margin-top: 31px; }
@@ -348,6 +435,7 @@ dd { margin: 3px 0 0; color: var(--ink); font-weight: 700; font-variant-numeric:
 .report-table th:first-child { text-align: left; }
 .report-table thead th { color: var(--ink-soft); font-size: 9px; letter-spacing: .08em; text-transform: uppercase; }
 .report-table tbody th { font-family: inherit; font-weight: 700; }
+.report-table tfoot th, .report-table tfoot td { border-top: 2px solid var(--water-blue); color: var(--water-navy); font-weight: 700; }
 .report-table tbody th small { display: block; margin-top: 3px; color: var(--ink-soft); font-weight: 400; }
 .report-monthly-table { max-width: 600px; margin-right: auto; margin-left: auto; }
 .report-notes { padding: 18px 20px; border-left: 4px solid var(--water-sky); background: var(--pale-blue); }
@@ -384,6 +472,15 @@ dd { margin: 3px 0 0; color: var(--ink); font-weight: 700; font-variant-numeric:
     .danger-zone .button { width: 100%; }
     .rainfall-summary { align-items: stretch; flex-direction: column; }
     .rainfall-summary .button { width: 100%; }
+    .assessment-grid-two, .demand-month-grid, .checkbox-field > div { grid-template-columns: 1fr; }
+    .monthly-tools { align-items: stretch; flex-direction: column; }
+    .monthly-tools .button { width: 100%; }
+    .assessment-submit { align-items: stretch; flex-direction: column; }
+    .assessment-submit .button { width: 100%; }
+    .sizing-metrics { grid-template-columns: 1fr 1fr; }
+    .sizing-metrics > div:nth-child(odd) { border-left: 0; }
+    .sizing-metrics > div:nth-child(n+3) { border-top: 1px solid var(--line); }
+    .site-summary-grid, .assessment-note-grid { grid-template-columns: 1fr; }
     .form-panel { padding-right: 18px; padding-left: 18px; }
     .roof-map { height: 52vh; min-height: 330px; }
     .report-toolbar { align-items: stretch; flex-direction: column; }
@@ -422,12 +519,15 @@ dd { margin: 3px 0 0; color: var(--ink); font-weight: 700; font-variant-numeric:
     .report-property { flex-direction: row; padding: 4mm 0; }
     .report-property h2 { font-size: 18pt; }
     .report-summary { grid-template-columns: 1.5fr 1fr 1fr; }
+    .report-design-summary { grid-template-columns: repeat(4, minmax(0, 1fr)); }
     .report-summary > div { min-height: 23mm; padding: 3mm 4mm; border-top: 0; border-left: 1px solid var(--line); }
     .report-summary > div:first-child { border-left: 0; }
     .report-summary strong { font-size: 17pt; }
     .report-primary-metric strong { font-size: 22pt; }
     .report-section { margin-top: 5mm; }
     .report-section, .report-notes, .report-disclaimer, .report-summary { break-inside: avoid; }
+    .report-sizing-section { break-inside: auto; }
+    .report-site-grid, .report-assessment-notes { break-inside: avoid; }
     .report-section-heading { break-after: avoid; }
     .report-table-wrap { overflow: visible; }
     .report-table { font-size: 8.5pt; }

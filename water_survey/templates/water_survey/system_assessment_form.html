@@ -1,0 +1,140 @@
+{% extends 'water_survey/base.html' %}
+{% block title %}Demand and System Sizing – {{ survey }}{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'water_survey:survey-detail' survey.pk %}">← Back to survey</a>
+
+<section class="assessment-form-panel">
+    <div class="assessment-heading">
+        <div>
+            <p class="eyebrow">Stage 3 · Demand and System Sizing</p>
+            <h1>{{ survey.property_name|default:survey.address_line_1 }}</h1>
+            <p class="lede">Record the expected non-potable demand and the practical installation limits. The preliminary capacity is calculated only after these are combined with the measured roof and local rainfall.</p>
+        </div>
+    </div>
+
+    <form method="post" class="assessment-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+
+        <fieldset class="assessment-section">
+            <legend><span>01</span> Water demand</legend>
+            <p class="section-intro">Enter rainwater uses only. Do not enter the property’s full mains-water consumption unless every litre is genuinely intended to be replaced.</p>
+            <div class="assessment-field checkbox-field">
+                {{ form.intended_uses.label_tag }}
+                {{ form.intended_uses }}
+                {{ form.intended_uses.errors }}
+            </div>
+            <div class="assessment-grid assessment-grid-two">
+                <div class="assessment-field">
+                    {{ form.demand_basis.label_tag }}
+                    {{ form.demand_basis }}
+                    {{ form.demand_basis.errors }}
+                </div>
+                <div class="assessment-field">
+                    {{ form.occupants.label_tag }}
+                    {{ form.occupants }}
+                    {{ form.occupants.errors }}
+                </div>
+            </div>
+        </fieldset>
+
+        <fieldset class="assessment-section">
+            <legend><span>02</span> Monthly demand</legend>
+            <p class="section-intro">Enter the expected total litres required in each month. Seasonal entries matter: garden demand that peaks in summer cannot be judged from an annual total alone.</p>
+            <div class="monthly-tools">
+                <button type="button" class="button button-secondary" id="copy-january-demand">Copy January across all months</button>
+                <small>Use this for steady demand, then adjust seasonal months individually.</small>
+            </div>
+            <div class="demand-month-grid">
+                {% for field in demand_fields %}
+                <div class="assessment-field">
+                    {{ field.label_tag }}
+                    {{ field }}
+                    {{ field.errors }}
+                </div>
+                {% endfor %}
+            </div>
+        </fieldset>
+
+        <fieldset class="assessment-section">
+            <legend><span>03</span> Storage and installation</legend>
+            <div class="assessment-grid assessment-grid-two">
+                <div class="assessment-field">
+                    {{ form.tank_location.label_tag }}
+                    {{ form.tank_location }}
+                    {{ form.tank_location.errors }}
+                </div>
+                <div class="assessment-field">
+                    {{ form.system_type.label_tag }}
+                    {{ form.system_type }}
+                    {{ form.system_type.errors }}
+                </div>
+                <div class="assessment-field">
+                    {{ form.access_rating.label_tag }}
+                    {{ form.access_rating }}
+                    {{ form.access_rating.errors }}
+                </div>
+                <div class="assessment-field">
+                    {{ form.power_available.label_tag }}
+                    {{ form.power_available }}
+                    {{ form.power_available.errors }}
+                </div>
+                <div class="assessment-field">
+                    {{ form.overflow_destination.label_tag }}
+                    {{ form.overflow_destination }}
+                    {{ form.overflow_destination.errors }}
+                </div>
+            </div>
+            <div class="assessment-field checkbox-field">
+                {{ form.site_constraints.label_tag }}
+                {{ form.site_constraints }}
+                {{ form.site_constraints.errors }}
+            </div>
+            <div class="assessment-grid assessment-grid-two">
+                <div class="assessment-field">
+                    {{ form.maximum_storage_litres.label_tag }}
+                    {{ form.maximum_storage_litres }}
+                    {% if form.maximum_storage_litres.help_text %}<small>{{ form.maximum_storage_litres.help_text }}</small>{% endif %}
+                    {{ form.maximum_storage_litres.errors }}
+                </div>
+                <div class="assessment-field">
+                    {{ form.proposed_storage_litres.label_tag }}
+                    {{ form.proposed_storage_litres }}
+                    {% if form.proposed_storage_litres.help_text %}<small>{{ form.proposed_storage_litres.help_text }}</small>{% endif %}
+                    {{ form.proposed_storage_litres.errors }}
+                </div>
+            </div>
+            <div class="assessment-field">
+                {{ form.route_notes.label_tag }}
+                {{ form.route_notes }}
+                {{ form.route_notes.errors }}
+            </div>
+            <div class="assessment-field">
+                {{ form.assessment_notes.label_tag }}
+                {{ form.assessment_notes }}
+                {{ form.assessment_notes.errors }}
+            </div>
+        </fieldset>
+
+        <div class="assessment-submit">
+            <p>The result is a preliminary design aid. Final component selection and installation details still require professional confirmation.</p>
+            <button type="submit" class="button button-primary">Save and calculate sizing</button>
+        </div>
+    </form>
+</section>
+{% endblock %}
+{% block scripts %}
+<script>
+(() => {
+    const copyButton = document.getElementById('copy-january-demand');
+    const january = document.getElementById('id_jan_demand_litres');
+    if (!copyButton || !january) return;
+
+    copyButton.addEventListener('click', () => {
+        document.querySelectorAll('[id$="_demand_litres"]').forEach((field) => {
+            field.value = january.value;
+        });
+    });
+})();
+</script>
+{% endblock %}

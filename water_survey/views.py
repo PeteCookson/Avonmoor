@@ -10,13 +10,19 @@ from django.views.generic import (
     CreateView,
     DeleteView,
     DetailView,
+    FormView,
     ListView,
     UpdateView,
 )
 
-from .forms import RoofSectionForm, SurveyForm, SurveyUpdateForm
-from .models import RoofSection, Survey
-from .services.rainfall import apply_nearest_rainfall_to_survey
+from .forms import (
+    RoofSectionForm,
+    SurveyForm,
+    SurveyUpdateForm,
+    SystemAssessmentForm,
+)
+from .models import RoofSection, Survey, SystemAssessment
+from .services.rainfall import MONTHS, apply_nearest_rainfall_to_survey
 
 
 class OwnedSurveyMixin(LoginRequiredMixin):
@@ -53,6 +59,13 @@ class SurveyDetailView(OwnedSurveyMixin, DetailView):
     template_name = 'water_survey/survey_detail.html'
     context_object_name = 'survey'
 
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['assessment'] = getattr(
+            context['survey'], 'system_assessment', None
+        )
+        return context
+
 
 class SurveyReportView(OwnedSurveyMixin, DetailView):
     model = Survey
@@ -62,6 +75,9 @@ class SurveyReportView(OwnedSurveyMixin, DetailView):
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context['report_generated_at'] = timezone.localtime()
+        context['assessment'] = getattr(
+            context['survey'], 'system_assessment', None
+        )
         return context
 
 
@@ -220,3 +236,63 @@ class RainfallRefreshView(LoginRequiredMixin, View):
             messages.success(request, 'Local monthly rainfall has been updated.')
 
         return redirect('water_survey:survey-detail', pk=survey.pk)
+
+
+class SystemAssessmentView(LoginRequiredMixin, FormView):
+    form_class = SystemAssessmentForm
+    template_name = 'water_survey/system_assessment_form.html'
+
+    def dispatch(self, request, *args, **kwargs):
+        if not request.user.is_authenticated:
+            return self.handle_no_permission()
+
+        queryset = Survey.objects.all()
+        if not request.user.is_superuser:
+            queryset = queryset.filter(created_by=request.user)
+        self.survey = get_object_or_404(queryset, pk=kwargs['pk'])
+        self.assessment = getattr(
+            self.survey, 'system_assessment', None
+        ) or SystemAssessment(survey=self.survey)
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['instance'] = self.assessment
+        return kwargs
+
+    def get_initial(self):
+        initial = super().get_initial()
+        if self.assessment.pk:
+            return initial
+
+        lead = getattr(self.survey, 'calculator_lead', None)
+        if lead:
+            intended_use_map = {
+                'garden': ['garden'],
+                'garden_vehicles': ['garden', 'vehicles'],
+                'home': ['toilets', 'laundry'],
+                'rural': ['livestock', 'commercial'],
+                'unsure': ['other'],
+            }
+            initial['intended_uses'] = intended_use_map.get(
+                lead.intended_use, []
+            )
+        return initial
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context['survey'] = self.survey
+        context['assessment'] = self.assessment
+        context['demand_fields'] = [
+            context['form'][f'{key}_demand_litres'] for key, _ in MONTHS
+        ]
+        return context
+
+    def form_valid(self, form):
+        form.instance.survey = self.survey
+        form.save()
+        messages.success(
+            self.request,
+            'Demand and system sizing assessment has been saved.',
+        )
+        return redirect('water_survey:survey-detail', pk=self.survey.pk)

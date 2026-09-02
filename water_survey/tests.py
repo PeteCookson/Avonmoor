@@ -10,10 +10,12 @@ from django.test import override_settings
 from django.test import SimpleTestCase, TestCase
 from django.urls import reverse
 
-from .models import RainfallGridPoint, RoofSection, Survey
+from .models import RainfallGridPoint, RoofSection, Survey, SystemAssessment
 from .services.calculations import (
     calculate_monthly_yields,
+    calculate_preliminary_storage_litres,
     calculate_yield_litres,
+    simulate_storage_balance,
 )
 from .services.geometry import calculate_geojson_area_m2
 from .services.rainfall import (
@@ -100,6 +102,43 @@ class YieldCalculationTests(SimpleTestCase):
 
         self.assertEqual(list(result), ['Jan', 'Feb'])
         self.assertEqual(result['Jan'], Decimal('1000.00'))
+
+    def test_preliminary_storage_uses_18_days_of_lower_annual_volume(self):
+        demand_limited = calculate_preliminary_storage_litres(
+            annual_yield=100000,
+            annual_demand=36500,
+        )
+        yield_limited = calculate_preliminary_storage_litres(
+            annual_yield=20000,
+            annual_demand=100000,
+        )
+
+        self.assertEqual(demand_limited, 2000)
+        self.assertEqual(yield_limited, 1000)
+
+    def test_zero_demand_has_no_storage_recommendation(self):
+        result = calculate_preliminary_storage_litres(
+            annual_yield=100000,
+            annual_demand=0,
+        )
+
+        self.assertIsNone(result)
+
+    def test_storage_balance_reports_supply_shortfall_and_overflow(self):
+        monthly_yield = {month: 1000 for month in TEST_MONTHLY_RAINFALL}
+        monthly_demand = {month: 500 for month in TEST_MONTHLY_RAINFALL}
+
+        result = simulate_storage_balance(
+            monthly_yield_litres=monthly_yield,
+            monthly_demand_litres=monthly_demand,
+            capacity_litres=1000,
+        )
+
+        self.assertEqual(result['annual_demand_litres'], Decimal('6000.00'))
+        self.assertEqual(result['annual_supplied_litres'], Decimal('6000.00'))
+        self.assertEqual(result['annual_shortfall_litres'], Decimal('0.00'))
+        self.assertGreater(result['annual_overflow_litres'], Decimal('0'))
+        self.assertEqual(result['demand_coverage_percent'], Decimal('100.0'))
 
 
 class GeometryCalculationTests(SimpleTestCase):
@@ -330,7 +369,7 @@ class SurveyAccessTests(TestCase):
         )
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Roof yield assessment')
+        self.assertContains(response, 'Rainwater assessment')
         self.assertContains(response, 'Estimated annual harvest')
         self.assertContains(response, 'avonmoor-water-lockup-light.svg')
         self.assertContains(response, '1 Test Lane')
@@ -351,6 +390,121 @@ class SurveyAccessTests(TestCase):
 
         self.assertContains(response, f'href="{report_url}"')
         self.assertContains(response, 'Print report')
+
+    def assessment_post_data(self, monthly_demand='3000'):
+        data = {
+            'intended_uses': ['garden', 'toilets'],
+            'demand_basis': SystemAssessment.DemandBasis.CUSTOMER,
+            'occupants': '4',
+            'tank_location': SystemAssessment.TankLocation.BELOW_GROUND,
+            'system_type': SystemAssessment.SystemType.BELOW_GROUND_PUMPED,
+            'access_rating': SystemAssessment.AccessRating.GOOD,
+            'site_constraints': ['clay'],
+            'overflow_destination': SystemAssessment.OverflowDestination.SOAKAWAY,
+            'power_available': SystemAssessment.PowerAvailability.YES,
+            'maximum_storage_litres': '5000',
+            'proposed_storage_litres': '3000',
+            'route_notes': 'Route DP1 to the tank and overflow to soakaway.',
+            'assessment_notes': 'Customer estimate to be checked on site.',
+        }
+        for month in TEST_MONTHLY_RAINFALL:
+            data[f'{month}_demand_litres'] = monthly_demand
+        return data
+
+    def test_system_assessment_requires_login(self):
+        url = reverse(
+            'water_survey:system-assessment', args=[self.survey.pk]
+        )
+
+        response = self.client.get(url)
+
+        self.assertRedirects(response, f"{reverse('login')}?next={url}")
+
+    def test_owner_can_save_demand_and_system_assessment(self):
+        self.client.force_login(self.user)
+
+        response = self.client.post(
+            reverse(
+                'water_survey:system-assessment', args=[self.survey.pk]
+            ),
+            self.assessment_post_data(),
+        )
+
+        self.assertRedirects(
+            response,
+            reverse('water_survey:survey-detail', args=[self.survey.pk]),
+        )
+        assessment = SystemAssessment.objects.get(survey=self.survey)
+        self.assertEqual(assessment.annual_demand_litres, Decimal('36000.00'))
+        self.assertEqual(assessment.monthly_demand_litres['jul'], '3000')
+        self.assertEqual(assessment.intended_uses, ['garden', 'toilets'])
+        self.assertEqual(assessment.proposed_storage_litres, 3000)
+
+    def test_assessment_rejects_capacity_above_site_maximum(self):
+        self.client.force_login(self.user)
+        data = self.assessment_post_data()
+        data['maximum_storage_litres'] = '2000'
+        data['proposed_storage_litres'] = '3000'
+
+        response = self.client.post(
+            reverse(
+                'water_survey:system-assessment', args=[self.survey.pk]
+            ),
+            data,
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response,
+            'The proposed storage exceeds the recorded site maximum.',
+        )
+        self.assertFalse(
+            SystemAssessment.objects.filter(survey=self.survey).exists()
+        )
+
+    def test_other_user_cannot_view_system_assessment(self):
+        self.client.force_login(self.other_user)
+
+        response = self.client.get(
+            reverse(
+                'water_survey:system-assessment', args=[self.survey.pk]
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+
+    def test_detail_and_report_include_water_balance(self):
+        self.survey.monthly_rainfall_mm = TEST_MONTHLY_RAINFALL
+        self.survey.save(update_fields=['monthly_rainfall_mm'])
+        assessment = SystemAssessment.objects.create(
+            survey=self.survey,
+            intended_uses=['garden', 'toilets'],
+            demand_basis=SystemAssessment.DemandBasis.CUSTOMER,
+            monthly_demand_litres={
+                month: '3000' for month in TEST_MONTHLY_RAINFALL
+            },
+            tank_location=SystemAssessment.TankLocation.BELOW_GROUND,
+            system_type=SystemAssessment.SystemType.BELOW_GROUND_PUMPED,
+            access_rating=SystemAssessment.AccessRating.GOOD,
+            overflow_destination=SystemAssessment.OverflowDestination.SOAKAWAY,
+            power_available=SystemAssessment.PowerAvailability.YES,
+            proposed_storage_litres=3000,
+        )
+        self.client.force_login(self.user)
+
+        detail_response = self.client.get(
+            reverse('water_survey:survey-detail', args=[self.survey.pk])
+        )
+        report_response = self.client.get(
+            reverse('water_survey:survey-report', args=[self.survey.pk])
+        )
+
+        self.assertEqual(assessment.preliminary_storage_litres, 2000)
+        self.assertContains(detail_response, 'Demand and System Sizing')
+        self.assertContains(detail_response, '36,000 L')
+        self.assertContains(detail_response, '3,000 L')
+        self.assertContains(report_response, 'Preliminary system sizing')
+        self.assertContains(report_response, 'BS EN 16941-1:2024')
 
     def test_other_user_cannot_view_survey_report(self):
         self.client.force_login(self.other_user)
