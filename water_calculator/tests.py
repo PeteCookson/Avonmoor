@@ -145,6 +145,9 @@ class PublicCalculatorJourneyTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'How much rainwater is your roof losing?')
+        self.assertContains(response, 'href="/" class="brand-logo"')
+        self.assertContains(response, 'img/favicon.ico')
+        self.assertContains(response, 'img/favicon-32x32.png')
         self.assertEqual(CustomerSurveyLead.objects.count(), 0)
 
     def test_property_step_redirects_to_map_measurement(self):
@@ -181,6 +184,10 @@ class PublicCalculatorJourneyTests(TestCase):
         self.assertContains(response, 'data-postcode="TQ10 9AB"')
         self.assertContains(response, 'Use the Postcode Fallback')
         self.assertContains(response, 'data-lookup-url="/rainwater-calculator/postcode-location/"')
+        self.assertContains(
+            response,
+            'This measures the flat ground area covered by the roof',
+        )
         self.assertContains(response, 'js/roof_measure.js')
 
     @patch('water_calculator.views.urlopen')
@@ -266,6 +273,7 @@ class PublicCalculatorJourneyTests(TestCase):
 
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, '79,800')
+        self.assertContains(response, 'class="result-unit">litres/year</span>')
         self.assertContains(response, 'Unlock the Detailed Results')
         self.assertNotContains(response, 'Planning range, not a final specification')
         self.assertNotContains(response, 'Met Office HadUK-Grid')

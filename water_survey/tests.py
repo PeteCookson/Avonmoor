@@ -274,6 +274,8 @@ class SurveyAccessTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Avonmoor Rainwater Harvesting')
         self.assertContains(response, 'avonmoor-water-lockup-light.svg')
+        self.assertContains(response, 'href="/" aria-label="Avonmoor home"')
+        self.assertContains(response, 'img/favicon.ico')
 
     def test_survey_workspace_header_uses_full_avonmoor_lockup(self):
         self.client.force_login(self.user)
@@ -282,6 +284,8 @@ class SurveyAccessTests(TestCase):
 
         self.assertContains(response, 'avonmoor-master-horizontal-dark.svg')
         self.assertContains(response, 'Survey Workspace')
+        self.assertContains(response, 'href="/" class="brand-logo"')
+        self.assertContains(response, 'img/favicon-32x32.png')
 
     def test_add_roof_requires_login(self):
         url = reverse(

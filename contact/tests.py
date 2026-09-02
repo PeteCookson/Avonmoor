@@ -1,6 +1,7 @@
 from unittest.mock import patch
 
 from django.core import mail
+from django.contrib.staticfiles import finders
 from django.test import TestCase
 
 from .forms import ContactForm
@@ -17,6 +18,8 @@ class ContactPageTests(TestCase):
         self.assertContains(response, '/garden-property-maintenance/')
         self.assertContains(response, '/rainwater-harvesting/')
         self.assertContains(response, 'avonmoor-master-horizontal-light.svg')
+        self.assertNotContains(response, 'gateway-number')
+        self.assertIsNotNone(finders.find('img/rainwater-country-house.webp'))
 
     def test_footer_preserves_all_socials_and_roman_year(self):
         response = self.client.get('/')
@@ -35,7 +38,7 @@ class ContactPageTests(TestCase):
         response = self.client.get('/garden-property-maintenance/')
 
         self.assertEqual(response.status_code, 200)
-        self.assertContains(response, 'Look after the place you live.')
+        self.assertContains(response, 'Looking after the place you love.')
         self.assertContains(response, 'South Brent')
         self.assertNotContains(response, 'Non-gas')
 
@@ -45,11 +48,28 @@ class ContactPageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Tell us what you need.')
         self.assertNotContains(response, 'South Brent')
-        self.assertContains(response, 'css/contact.css?v=20260901-5')
+        self.assertContains(response, 'css/contact.css?v=20260902-6')
+        self.assertNotContains(response, '<p class="eyebrow">Avonmoor</p>')
         self.assertContains(
             response,
             'Garden, Property and Other enquiries: TQ10, TQ11 and PL21.',
         )
+
+    def test_rainwater_page_uses_new_service_message_and_image(self):
+        response = self.client.get('/rainwater-harvesting/')
+
+        self.assertContains(response, 'Store the rain when it falls.')
+        self.assertContains(response, 'Use it when it doesn’t.')
+        stylesheet = finders.find('css/contact.css')
+        with open(stylesheet, encoding='utf-8') as css_file:
+            self.assertIn('rainwater-country-house.webp', css_file.read())
+
+    def test_public_and_admin_pages_use_avonmoor_favicon(self):
+        for path in ('/', '/contact/', '/admin/login/'):
+            with self.subTest(path=path):
+                response = self.client.get(path)
+                self.assertContains(response, 'img/favicon.ico')
+                self.assertContains(response, 'img/favicon-32x32.png')
 
     @patch(
         'contact.views.send_branded_notification',

@@ -54,15 +54,14 @@ h3 { margin-bottom: 10px; font-size: 22px; font-weight: 500; line-height: 1.2; }
 .home-lede { max-width: 390px; margin-bottom: 3px; color: var(--ink-soft); font-size: 19px; }
 .service-gateway { padding-bottom: clamp(72px, 10vw, 130px); }
 .gateway-grid { display: grid; grid-template-columns: 1fr 1fr; }
-.gateway-card { min-height: 560px; position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: space-between; overflow: hidden; padding: clamp(28px, 4vw, 52px); color: var(--white); text-decoration: none; }
+.gateway-card { min-height: 560px; position: relative; isolation: isolate; display: flex; flex-direction: column; justify-content: flex-end; overflow: hidden; padding: clamp(28px, 4vw, 52px); color: var(--white); text-decoration: none; }
 .gateway-card::after { content: ""; position: absolute; z-index: -1; inset: 0; transition: opacity .4s ease; }
 .gateway-garden::before { content: ""; position: absolute; z-index: -2; inset: 0; background: url('/static/img/house.webp') center / cover no-repeat; transition: transform .6s ease; }
 .gateway-garden::after { background: linear-gradient(180deg, rgba(17, 34, 27, .36), rgba(17, 34, 27, .92)); }
-.gateway-water { background: var(--navy); }
-.gateway-water::after { opacity: .58; background: repeating-linear-gradient(120deg, transparent 0 54px, rgba(81, 164, 207, .13) 55px 56px); }
+.gateway-water::before { content: ""; position: absolute; z-index: -2; inset: 0; background: url('/static/img/rainwater-country-house.webp') 38% center / cover no-repeat; transition: transform .6s ease; }
+.gateway-water::after { background: linear-gradient(180deg, rgba(20, 48, 65, .25), rgba(13, 37, 50, .94)); }
 .gateway-card:hover::before { transform: scale(1.025); }
 .gateway-card:hover::after { opacity: .78; }
-.gateway-number { align-self: flex-end; color: rgba(255, 255, 255, .66); font-size: 13px; font-weight: 700; letter-spacing: .12em; }
 .gateway-card-copy { max-width: 520px; }
 .gateway-label { margin-bottom: 11px; color: #D8E6E1; font-size: 13px; font-weight: 700; letter-spacing: .02em; }
 .gateway-water .gateway-label { color: var(--sky); }
@@ -85,7 +84,8 @@ h3 { margin-bottom: 10px; font-size: 22px; font-weight: 500; line-height: 1.2; }
 .service-hero { min-height: 650px; display: grid; align-items: end; padding: clamp(100px, 14vw, 180px) 0 clamp(70px, 10vw, 120px); color: var(--white); }
 .garden-hero { position: relative; isolation: isolate; background: url('/static/img/house.webp') center / cover no-repeat; }
 .garden-hero::after { content: ""; position: absolute; z-index: -1; inset: 0; background: linear-gradient(90deg, rgba(20, 38, 31, .92), rgba(20, 38, 31, .38)); }
-.water-hero { background: var(--navy); }
+.water-hero { position: relative; isolation: isolate; background: url('/static/img/rainwater-country-house.webp') 52% center / cover no-repeat; }
+.water-hero::after { content: ""; position: absolute; z-index: -1; inset: 0; background: linear-gradient(90deg, rgba(16, 42, 56, .96), rgba(16, 42, 56, .48)); }
 .service-hero-grid { display: grid; grid-template-columns: minmax(0, 1.25fr) minmax(280px, .55fr); align-items: end; gap: clamp(42px, 9vw, 120px); }
 .service-hero-copy { max-width: 780px; }
 .service-hero h1 { color: var(--white); }

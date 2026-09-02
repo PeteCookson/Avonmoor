@@ -7,17 +7,21 @@
     <meta name="theme-color" content="#1A303D">
     <meta name="description" content="Estimate how much rainwater your roof could harvest using local Met Office rainfall data.">
     <title>{% block title %}Rainwater calculator{% endblock %} | Avonmoor</title>
-    <link rel="stylesheet" href="{% static 'css/water_survey.css' %}?v=20260902-1">
-    <link rel="stylesheet" href="{% static 'css/water_calculator.css' %}">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/apple-touch-icon.png' %}">
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicon-16x16.png' %}">
+    <link rel="stylesheet" href="{% static 'css/water_survey.css' %}?v=20260902-2">
+    <link rel="stylesheet" href="{% static 'css/water_calculator.css' %}?v=20260902-2">
 </head>
 <body class="survey-app calculator-app">
     <header class="app-header calculator-header">
-        <a href="{% url 'water_calculator:start' %}" class="brand" aria-label="Avonmoor Rainwater Harvesting calculator">
-            <span class="brand-logo" aria-hidden="true">
-                <img class="brand-master" src="{% static 'img/avonmoor-master-horizontal-dark.svg' %}" alt="">
-            </span>
-            <strong class="brand-workspace">Rainwater Calculator</strong>
-        </a>
+        <div class="brand">
+            <a href="{% url 'home' %}" class="brand-logo" aria-label="Avonmoor home">
+                <img class="brand-master" src="{% static 'img/avonmoor-master-horizontal-dark.svg' %}" alt="Avonmoor">
+            </a>
+            <a class="brand-workspace" href="{% url 'water_calculator:start' %}">Rainwater Calculator</a>
+        </div>
         <a class="calculator-header-link" href="mailto:hello@avonmoor.co.uk">Need help?</a>
     </header>
     <main class="app-main calculator-main">

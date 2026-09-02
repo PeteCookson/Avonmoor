@@ -6,11 +6,17 @@
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <meta name="theme-color" content="#1A303D">
     <title>Survey login | Avonmoor Rainwater Harvesting</title>
-    <link rel="stylesheet" href="{% static 'css/water_survey.css' %}?v=20260902-1">
+    <link rel="apple-touch-icon" sizes="180x180" href="{% static 'img/apple-touch-icon.png' %}">
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
+    <link rel="icon" type="image/png" sizes="32x32" href="{% static 'img/favicon-32x32.png' %}">
+    <link rel="icon" type="image/png" sizes="16x16" href="{% static 'img/favicon-16x16.png' %}">
+    <link rel="stylesheet" href="{% static 'css/water_survey.css' %}?v=20260902-2">
 </head>
 <body class="survey-app survey-auth">
     <main class="auth-card">
-        <img class="auth-lockup" src="{% static 'img/avonmoor-water-lockup-light.svg' %}" alt="Avonmoor Rainwater Harvesting">
+        <a class="auth-brand" href="{% url 'home' %}" aria-label="Avonmoor home">
+            <img class="auth-lockup" src="{% static 'img/avonmoor-water-lockup-light.svg' %}" alt="Avonmoor Rainwater Harvesting">
+        </a>
         <p class="eyebrow">Internal Survey Workspace</p>
         <h1>Sign in</h1>
         <p class="lede">Access property surveys, roof measurements and evidence-led rainwater estimates.</p>

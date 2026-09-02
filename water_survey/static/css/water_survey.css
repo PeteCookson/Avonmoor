@@ -52,16 +52,22 @@ button, input, select, textarea { font-family: inherit; }
     border-bottom: 3px solid var(--water-sky);
 }
 
-.brand { display: flex; align-items: center; gap: 12px; color: #FFFFFF; text-decoration: none; }
-.brand-logo { display: block; flex: 0 0 auto; }
+.brand { display: flex; align-items: center; gap: 12px; color: #FFFFFF; }
+.brand-logo { min-height: 44px; display: inline-flex; align-items: center; flex: 0 0 auto; text-decoration: none; }
 .brand-master { width: clamp(165px, 22vw, 205px); height: auto; display: block; }
 .brand-workspace {
+    min-height: 44px;
+    display: inline-flex;
+    align-items: center;
     padding-left: 12px;
     border-left: 1px solid rgba(255, 255, 255, .42);
+    color: #FFFFFF;
     font-size: 17px;
     font-weight: 500;
     line-height: 1.1;
+    text-decoration: none;
 }
+.brand-workspace:hover { text-decoration: underline; }
 
 .text-button {
     min-height: 44px;
@@ -304,6 +310,7 @@ dd { margin: 3px 0 0; color: var(--ink); font-weight: 700; font-variant-numeric:
 
 .survey-auth { display: grid; place-items: center; padding: 24px; background: var(--water-navy); }
 .auth-card { width: min(460px, 100%); padding: clamp(28px, 8vw, 52px); border-top: 5px solid var(--water-sky); }
+.auth-brand { display: block; text-decoration: none; }
 .auth-lockup { width: 220px; max-width: 100%; display: block; margin: -18px auto 8px; }
 .auth-card > .eyebrow { margin-top: 4px; }
 

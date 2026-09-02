@@ -5,11 +5,11 @@
 <section class="calculator-results-hero">
     <div>
         <p class="eyebrow">Your Indicative Result</p>
-        <h1>{{ estimate.annual_harvest_litres|floatformat:'0g' }} <span>litres/year</span></h1>
+        <h1><span class="result-number">{{ estimate.annual_harvest_litres|floatformat:'0g' }}</span><span class="result-unit">litres/year</span></h1>
         <p>Potential harvest from {{ estimate.roof_area_m2|floatformat:1 }} m² of {{ estimate.roof_material_label|lower }} roof using {% if estimate.location_method == 'postcode' %}an approximate postcode-centre location and {% endif %}long-term local rainfall data.</p>
     </div>
     {% if full_report_unlocked and estimate.uncaptured_litres %}
-    <div class="lost-water-callout"><span>Potential Currently Uncaptured</span><strong>{{ estimate.uncaptured_litres|floatformat:'0g' }}</strong><b>L/year</b><small>Assuming this roof currently has no collection system.</small></div>
+    <div class="lost-water-callout"><span>Potential Currently Uncaptured</span><div class="lost-water-value"><strong>{{ estimate.uncaptured_litres|floatformat:'0g' }}</strong><b>L/year</b></div><small>Assuming this roof currently has no collection system.</small></div>
     {% endif %}
 </section>
 
