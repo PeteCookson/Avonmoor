@@ -362,6 +362,8 @@ class SurveyAccessTests(TestCase):
         self.assertRedirects(response, f"{reverse('login')}?next={url}")
 
     def test_owner_can_view_printable_survey_report(self):
+        self.survey.notes = 'Internal site record that customers must not see.'
+        self.survey.save(update_fields=['notes'])
         self.client.force_login(self.user)
 
         response = self.client.get(
@@ -377,6 +379,23 @@ class SurveyAccessTests(TestCase):
         self.assertContains(response, 'Main roof')
         self.assertContains(response, 'Print / Save PDF')
         self.assertContains(response, 'Assessment limitations')
+        self.assertNotContains(response, 'Site Record')
+        self.assertNotContains(response, 'Survey notes')
+        self.assertNotContains(
+            response, 'Internal site record that customers must not see.'
+        )
+
+    def test_internal_survey_notes_remain_visible_in_workspace(self):
+        self.survey.notes = 'Internal access details for the surveyor.'
+        self.survey.save(update_fields=['notes'])
+        self.client.force_login(self.user)
+
+        response = self.client.get(
+            reverse('water_survey:survey-detail', args=[self.survey.pk])
+        )
+
+        self.assertContains(response, 'Survey notes')
+        self.assertContains(response, 'Internal access details for the surveyor.')
 
     def test_survey_detail_links_to_printable_report(self):
         self.client.force_login(self.user)
@@ -489,6 +508,8 @@ class SurveyAccessTests(TestCase):
             overflow_destination=SystemAssessment.OverflowDestination.SOAKAWAY,
             power_available=SystemAssessment.PowerAvailability.YES,
             proposed_storage_litres=3000,
+            route_notes='Route DP1 beneath the side path.',
+            assessment_notes='Allow for seasonal garden demand.',
         )
         self.client.force_login(self.user)
 
@@ -504,6 +525,10 @@ class SurveyAccessTests(TestCase):
         self.assertContains(detail_response, '36,000 L')
         self.assertContains(detail_response, '3,000 L')
         self.assertContains(report_response, 'Preliminary system sizing')
+        self.assertContains(report_response, '<h3>Routes and overflow</h3>')
+        self.assertContains(report_response, 'Route DP1 beneath the side path.')
+        self.assertContains(report_response, '<h3>Assessment notes</h3>')
+        self.assertContains(report_response, 'Allow for seasonal garden demand.')
         self.assertContains(report_response, 'BS EN 16941-1:2024')
 
     def test_other_user_cannot_view_survey_report(self):

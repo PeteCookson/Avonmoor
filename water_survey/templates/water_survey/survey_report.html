@@ -164,18 +164,10 @@
 
         {% if assessment.route_notes or assessment.assessment_notes %}
         <div class="report-assessment-notes">
-            {% if assessment.route_notes %}<div><strong>Routes and overflow</strong><p>{{ assessment.route_notes|linebreaksbr }}</p></div>{% endif %}
-            {% if assessment.assessment_notes %}<div><strong>Assessment notes</strong><p>{{ assessment.assessment_notes|linebreaksbr }}</p></div>{% endif %}
+            {% if assessment.route_notes %}<div><h3>Routes and overflow</h3><p>{{ assessment.route_notes|linebreaksbr }}</p></div>{% endif %}
+            {% if assessment.assessment_notes %}<div><h3>Assessment notes</h3><p>{{ assessment.assessment_notes|linebreaksbr }}</p></div>{% endif %}
         </div>
         {% endif %}
-    </section>
-    {% endif %}
-
-    {% if survey.notes %}
-    <section class="report-section report-notes">
-        <p class="eyebrow">Site Record</p>
-        <h2>Survey notes</h2>
-        <p>{{ survey.notes|linebreaksbr }}</p>
     </section>
     {% endif %}
 
