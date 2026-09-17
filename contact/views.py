@@ -48,8 +48,6 @@ def contact_view(request):
                 f'{subject_label} ENQUIRY — {service} — '
                 f'{enquiry.postcode} — {enquiry.name}'
             )
-            from_email = 'hello@avonmoor.co.uk'
-            recipient_list = ['hello@avonmoor.co.uk']
             try:
                 send_branded_notification(
                     subject=subject,
@@ -64,8 +62,6 @@ def contact_view(request):
                         ('Service requested', service),
                     ],
                     reply_to=enquiry.email,
-                    from_email=from_email,
-                    recipient_list=recipient_list,
                 )
             except Exception:
                 # The enquiry is already safely stored in the database. An

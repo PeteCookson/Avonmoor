@@ -72,7 +72,7 @@ def send_branded_notification(
         subject=subject,
         body='\n'.join(text_lines),
         from_email=from_email or settings.EMAIL_HOST_USER,
-        to=recipient_list or [settings.EMAIL_HOST_USER],
+        to=recipient_list or settings.NOTIFICATION_RECIPIENTS,
         reply_to=[reply_to] if reply_to else None,
     )
     email.attach_alternative(html_body, 'text/html')

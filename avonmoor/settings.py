@@ -90,6 +90,15 @@ EMAIL_PORT = config('EMAIL_PORT')
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD')
+NOTIFICATION_RECIPIENTS = [EMAIL_HOST_USER]
+NOTIFICATION_BACKUP_EMAIL = config(
+    'NOTIFICATION_BACKUP_EMAIL', default=''
+).strip()
+if (
+    NOTIFICATION_BACKUP_EMAIL
+    and NOTIFICATION_BACKUP_EMAIL not in NOTIFICATION_RECIPIENTS
+):
+    NOTIFICATION_RECIPIENTS.append(NOTIFICATION_BACKUP_EMAIL)
 
 # This browser-visible key must be restricted to Avonmoor web referrers and the
 # Maps JavaScript API in Google Cloud Console.
