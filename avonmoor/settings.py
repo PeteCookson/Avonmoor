@@ -14,22 +14,15 @@ SECRET_KEY = config('DJANGO_SECRET_KEY')
 # SECURITY WARNING: don't run with debug turned on in production!
 DEBUG = False
 
-ALLOWED_HOSTS = [
-    '127.0.0.1',
-    'pcookson.pythonanywhere.com',
-    'www.avonmoor.co.uk',
-    ]
+ALLOWED_HOSTS = config('ALLOWED_HOSTS', default='127.0.0.1,localhost,pcookson.pythonanywhere.com,www.avonmoor.co.uk,avonmoor.co.uk').split(',')
 
 TIME_ZONE = 'Europe/London'
 
 USE_TZ = True
 
-CSRF_TRUSTED_ORIGINS = [
-    'https://8000-petecookson-avonmoor-jiqppey2tgk.ws-eu114.gitpod.io',
-    'http://127.0.0.1',
-    'https://127.0.0.1',
-    # Add any other trusted origins if needed
-]
+CSRF_TRUSTED_ORIGINS = [origin.strip() for origin in config(
+    'CSRF_TRUSTED_ORIGINS', default='https://www.avonmoor.co.uk,https://avonmoor.co.uk'
+).split(',') if origin.strip()]
 
 # Application definition
 INSTALLED_APPS = [
@@ -46,6 +39,7 @@ INSTALLED_APPS = [
 
 MIDDLEWARE = [
     'django.middleware.security.SecurityMiddleware',
+    'whitenoise.middleware.WhiteNoiseMiddleware',
     'django.contrib.sessions.middleware.SessionMiddleware',
     'django.middleware.common.CommonMiddleware',
     'django.middleware.csrf.CsrfViewMiddleware',
@@ -76,12 +70,17 @@ WSGI_APPLICATION = 'avonmoor.wsgi.application'
 
 # Database
 # https://docs.djangoproject.com/en/5.0/ref/settings/#databases
+import dj_database_url
+
 DATABASES = {
-    'default': {
-        'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
-    }
+    'default': dj_database_url.config(
+        default=f'sqlite:///{BASE_DIR / "db.sqlite3"}',
+        conn_max_age=600,
+        conn_health_checks=True,
+    )
 }
+
+SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
 
 # Email settings
 EMAIL_BACKEND = config('EMAIL_BACKEND')
@@ -140,6 +139,7 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_URL = '/static/'
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
+STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
 
 # Directory to hold user-uploaded files
 MEDIA_URL = '/media/'
