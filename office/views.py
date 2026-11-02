@@ -8,8 +8,9 @@ from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import ValidationError
 from django.core.exceptions import PermissionDenied
 from django.core.mail import EmailMessage
+from django.db import transaction
 from django.db.models.deletion import ProtectedError
-from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum
+from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse, reverse_lazy
@@ -36,6 +37,27 @@ from .pdf import build_invoice_pdf
 
 
 logger = logging.getLogger(__name__)
+
+
+def append_work_entries(invoice, work_entries):
+    """Append linked work entries after the draft's existing invoice lines."""
+
+    last_position = invoice.lines.aggregate(
+        last_position=Max('sort_order')
+    )['last_position']
+    next_position = 0 if last_position is None else last_position + 1
+    for offset, entry in enumerate(work_entries):
+        InvoiceLine.objects.create(
+            invoice=invoice,
+            work_entry=entry,
+            service_date=entry.service_date,
+            category=entry.category,
+            description=entry.description,
+            quantity=entry.quantity,
+            unit=entry.unit,
+            unit_price=entry.unit_price,
+            sort_order=next_position + offset,
+        )
 
 
 class OfficeAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -311,24 +333,17 @@ class InvoiceCreateView(OfficeAccessMixin, CreateView):
     def form_valid(self, form):
         form.instance.created_by = self.request.user
         response = super().form_valid(form)
-        for position, entry in enumerate(form.cleaned_data['work_entries']):
-            InvoiceLine.objects.create(
-                invoice=self.object,
-                work_entry=entry,
-                service_date=entry.service_date,
-                category=entry.category,
-                description=entry.description,
-                quantity=entry.quantity,
-                unit=entry.unit,
-                unit_price=entry.unit_price,
-                sort_order=position,
-            )
+        append_work_entries(self.object, form.cleaned_data['work_entries'])
         messages.success(self.request, 'Draft invoice created. Check it before issuing.')
         return response
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(page_title='New invoice', submit_label='Create draft')
+        context.update(
+            page_title='New invoice',
+            submit_label='Create draft',
+            invoice_form=True,
+        )
         return context
 
     def get_success_url(self):
@@ -366,8 +381,32 @@ class InvoiceEditView(OfficeAccessMixin, View):
         form = InvoiceForm(request.POST, instance=invoice)
         formset = InvoiceLineFormSet(request.POST, instance=invoice)
         if form.is_valid() and formset.is_valid():
-            form.save()
-            formset.save()
+            selected_ids = list(
+                form.cleaned_data['work_entries'].values_list('pk', flat=True)
+            )
+            with transaction.atomic():
+                selected_work = list(
+                    WorkEntry.objects.select_for_update()
+                    .filter(pk__in=selected_ids, invoice_line__isnull=True)
+                    .select_related('property', 'property__customer')
+                    .order_by('service_date', 'pk')
+                )
+                if len(selected_work) != len(selected_ids):
+                    form.add_error(
+                        'work_entries',
+                        'One of these work entries has just been invoiced elsewhere. '
+                        'Reload the draft and try again.',
+                    )
+                else:
+                    form.save()
+                    formset.save()
+                    append_work_entries(invoice, selected_work)
+            if form.errors:
+                return render(
+                    request,
+                    self.template_name,
+                    {'invoice': invoice, 'form': form, 'formset': formset},
+                )
             messages.success(request, 'Draft invoice updated.')
             return redirect('office:invoice-detail', pk=invoice.pk)
         return render(

@@ -1,4 +1,5 @@
 from django import forms
+from django.db.models import Q
 from django.forms import inlineformset_factory
 
 from .models import Customer, Invoice, InvoiceLine, Property, WorkEntry
@@ -6,6 +7,65 @@ from .models import Customer, Invoice, InvoiceLine, Property, WorkEntry
 
 class DateInput(forms.DateInput):
     input_type = 'date'
+
+
+class CustomerPropertySelect(forms.Select):
+    """Expose property ownership so the invoice UI can filter safely."""
+
+    def create_option(self, name, value, label, selected, index, **kwargs):
+        option = super().create_option(
+            name, value, label, selected, index, **kwargs
+        )
+        instance = getattr(value, 'instance', None)
+        if instance is not None:
+            option['attrs']['data-customer-id'] = instance.customer_id
+        return option
+
+
+class WorkEntryCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
+    """Expose work ownership for customer/property filtering in the browser."""
+
+    def create_option(self, name, value, label, selected, index, **kwargs):
+        option = super().create_option(
+            name, value, label, selected, index, **kwargs
+        )
+        instance = getattr(value, 'instance', None)
+        if instance is not None:
+            option['attrs']['data-customer-id'] = instance.property.customer_id
+            option['attrs']['data-property-id'] = instance.property_id
+        return option
+
+
+def configure_invoice_choices(form):
+    """Limit bound choices and annotate unbound choices for client filtering."""
+
+    current_property_id = getattr(form.instance, 'property_id', None)
+    properties = Property.objects.filter(active=True)
+    if current_property_id:
+        properties = Property.objects.filter(
+            Q(active=True) | Q(pk=current_property_id)
+        )
+    properties = properties.select_related('customer')
+    work_entries = WorkEntry.objects.filter(
+        invoice_line__isnull=True
+    ).select_related('property', 'property__customer')
+
+    if form.is_bound:
+        customer_id = form.data.get(form.add_prefix('customer'))
+        property_id = form.data.get(form.add_prefix('property'))
+        if customer_id:
+            properties = properties.filter(customer_id=customer_id)
+            work_entries = work_entries.filter(
+                property__customer_id=customer_id
+            )
+            if property_id:
+                work_entries = work_entries.filter(property_id=property_id)
+        else:
+            properties = properties.none()
+            work_entries = work_entries.none()
+
+    form.fields['property'].queryset = properties
+    form.fields['work_entries'].queryset = work_entries
 
 
 class CustomerForm(forms.ModelForm):
@@ -102,24 +162,22 @@ class InvoiceCreateForm(forms.ModelForm):
     work_entries = forms.ModelMultipleChoiceField(
         queryset=WorkEntry.objects.none(),
         required=False,
-        widget=forms.CheckboxSelectMultiple,
+        widget=WorkEntryCheckboxSelectMultiple,
         help_text='Optional: include any completed, uninvoiced work now.',
     )
 
     class Meta:
         model = Invoice
         fields = ['customer', 'property', 'issue_date']
-        widgets = {'issue_date': DateInput()}
+        widgets = {
+            'property': CustomerPropertySelect(),
+            'issue_date': DateInput(),
+        }
 
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
         self.fields['customer'].queryset = Customer.objects.filter(active=True)
-        self.fields['property'].queryset = Property.objects.filter(
-            active=True
-        ).select_related('customer')
-        self.fields['work_entries'].queryset = WorkEntry.objects.filter(
-            invoice_line__isnull=True
-        ).select_related('property', 'property__customer')
+        configure_invoice_choices(self)
 
     def clean(self):
         cleaned = super().clean()
@@ -143,17 +201,51 @@ class InvoiceCreateForm(forms.ModelForm):
 
 
 class InvoiceForm(forms.ModelForm):
+    work_entries = forms.ModelMultipleChoiceField(
+        queryset=WorkEntry.objects.none(),
+        required=False,
+        label='Add completed work',
+        widget=WorkEntryCheckboxSelectMultiple,
+        help_text='Optional: add completed, uninvoiced work to this draft.',
+    )
+
     class Meta:
         model = Invoice
         fields = ['customer', 'property', 'issue_date']
-        widgets = {'issue_date': DateInput()}
+        widgets = {
+            'property': CustomerPropertySelect(),
+            'issue_date': DateInput(),
+        }
+
+    def __init__(self, *args, **kwargs):
+        super().__init__(*args, **kwargs)
+        current_customer_id = getattr(self.instance, 'customer_id', None)
+        customers = Customer.objects.filter(active=True)
+        if current_customer_id:
+            customers = Customer.objects.filter(
+                Q(active=True) | Q(pk=current_customer_id)
+            )
+        self.fields['customer'].queryset = customers
+        configure_invoice_choices(self)
 
     def clean(self):
         cleaned = super().clean()
         customer = cleaned.get('customer')
         property_record = cleaned.get('property')
+        work_entries = cleaned.get('work_entries')
         if property_record and customer and property_record.customer_id != customer.id:
             self.add_error('property', 'Select a property belonging to this customer.')
+        if work_entries and customer:
+            invalid = [
+                entry for entry in work_entries
+                if entry.property.customer_id != customer.id
+                or (property_record and entry.property_id != property_record.id)
+            ]
+            if invalid:
+                self.add_error(
+                    'work_entries',
+                    'Every selected work entry must belong to this customer and property.',
+                )
         return cleaned
 
 
@@ -180,6 +272,16 @@ class InvoiceLineForm(forms.ModelForm):
             'description': forms.TextInput(),
             'sort_order': forms.HiddenInput(),
         }
+
+    def has_changed(self):
+        """Ignore the spare line until the user enters billable content."""
+
+        if self.is_bound and not any(
+            self.data.get(self.add_prefix(field_name))
+            for field_name in ('description', 'quantity', 'unit_price')
+        ):
+            return False
+        return super().has_changed()
 
 
 InvoiceLineFormSet = inlineformset_factory(

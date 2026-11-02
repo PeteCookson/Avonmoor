@@ -8,6 +8,7 @@ from django.test import TestCase
 from django.test import override_settings
 from django.urls import reverse
 
+from .forms import InvoiceForm
 from .models import Customer, Invoice, InvoiceEmail, InvoiceLine, Property, WorkEntry
 
 
@@ -268,6 +269,165 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertEqual(invoice.lines.count(), 1)
         self.assertEqual(invoice.total, Decimal('50.00'))
         self.assertTrue(self.work.is_invoiced)
+
+    def test_invoice_forms_expose_customer_ownership_for_safe_filtering(self):
+        response = self.client.get(reverse('office:invoice-create'))
+        self.assertContains(response, 'data-invoice-form')
+        self.assertContains(
+            response, f'data-customer-id="{self.customer.pk}"'
+        )
+        self.assertContains(
+            response, f'data-property-id="{self.property.pk}"'
+        )
+        self.assertContains(response, 'office/js/invoice_form.js')
+
+    def test_create_rejects_property_owned_by_another_customer(self):
+        other = Customer.objects.create(
+            display_name='Other Customer',
+            billing_address_1='2 Other Road',
+            postcode='TQ10 9BB',
+        )
+        other_property = Property.objects.create(
+            customer=other,
+            address_line_1='2 Other Road',
+            postcode='TQ10 9BB',
+        )
+        response = self.client.post(
+            reverse('office:invoice-create'),
+            {
+                'customer': self.customer.pk,
+                'property': other_property.pk,
+                'issue_date': '2026-11-02',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Invoice.objects.exists())
+        self.assertIn('property', response.context['form'].errors)
+        self.assertIn(
+            'not one of the available choices',
+            response.context['form'].errors['property'][0],
+        )
+
+    def test_edit_draft_can_add_completed_work_entry(self):
+        invoice = self.make_invoice()
+        existing_line = invoice.lines.get()
+        extra_work = WorkEntry.objects.create(
+            property=self.property,
+            service_date=date(2026, 11, 2),
+            category=WorkEntry.Category.LABOUR,
+            description='Hedge trimming',
+            quantity=Decimal('1.50'),
+            unit=WorkEntry.Unit.HOURS,
+            unit_price=Decimal('25.00'),
+            created_by=self.staff,
+        )
+        response = self.client.post(
+            reverse('office:invoice-edit', args=[invoice.pk]),
+            {
+                'customer': self.customer.pk,
+                'property': self.property.pk,
+                'issue_date': '2026-11-02',
+                'work_entries': [extra_work.pk],
+                'lines-TOTAL_FORMS': '2',
+                'lines-INITIAL_FORMS': '1',
+                'lines-MIN_NUM_FORMS': '0',
+                'lines-MAX_NUM_FORMS': '1000',
+                'lines-0-id': existing_line.pk,
+                'lines-0-service_date': existing_line.service_date.isoformat(),
+                'lines-0-category': existing_line.category,
+                'lines-0-description': existing_line.description,
+                'lines-0-quantity': existing_line.quantity,
+                'lines-0-unit': existing_line.unit,
+                'lines-0-unit_price': existing_line.unit_price,
+                'lines-0-sort_order': existing_line.sort_order,
+            },
+        )
+        self.assertRedirects(
+            response, reverse('office:invoice-detail', args=[invoice.pk])
+        )
+        invoice.refresh_from_db()
+        extra_work.refresh_from_db()
+        self.assertEqual(invoice.lines.count(), 2)
+        self.assertEqual(invoice.total, Decimal('87.50'))
+        self.assertEqual(extra_work.invoice_line.invoice, invoice)
+
+    def test_edit_draft_rejects_work_from_another_customer(self):
+        invoice = self.make_invoice()
+        existing_line = invoice.lines.get()
+        other = Customer.objects.create(
+            display_name='Other Customer',
+            billing_address_1='2 Other Road',
+            postcode='TQ10 9BB',
+        )
+        other_property = Property.objects.create(
+            customer=other,
+            address_line_1='2 Other Road',
+            postcode='TQ10 9BB',
+        )
+        other_work = WorkEntry.objects.create(
+            property=other_property,
+            service_date=date(2026, 11, 2),
+            description='Other garden',
+            quantity=Decimal('1.00'),
+            unit_price=Decimal('30.00'),
+            created_by=self.staff,
+        )
+        response = self.client.post(
+            reverse('office:invoice-edit', args=[invoice.pk]),
+            {
+                'customer': self.customer.pk,
+                'property': self.property.pk,
+                'issue_date': '2026-11-02',
+                'work_entries': [other_work.pk],
+                'lines-TOTAL_FORMS': '1',
+                'lines-INITIAL_FORMS': '1',
+                'lines-MIN_NUM_FORMS': '0',
+                'lines-MAX_NUM_FORMS': '1000',
+                'lines-0-id': existing_line.pk,
+                'lines-0-service_date': existing_line.service_date.isoformat(),
+                'lines-0-category': existing_line.category,
+                'lines-0-description': existing_line.description,
+                'lines-0-quantity': existing_line.quantity,
+                'lines-0-unit': existing_line.unit,
+                'lines-0-unit_price': existing_line.unit_price,
+                'lines-0-sort_order': existing_line.sort_order,
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(invoice.lines.count(), 1)
+        self.assertFalse(other_work.is_invoiced)
+        self.assertIn('work_entries', response.context['form'].errors)
+        self.assertIn(
+            'not one of the available choices',
+            response.context['form'].errors['work_entries'][0],
+        )
+
+    def test_edit_draft_rejects_work_from_another_property_for_same_customer(self):
+        invoice = self.make_invoice()
+        second_property = Property.objects.create(
+            customer=self.customer,
+            address_line_1='2 Test Lane',
+            postcode='TQ10 9AB',
+        )
+        second_work = WorkEntry.objects.create(
+            property=second_property,
+            service_date=date(2026, 11, 2),
+            description='Second property work',
+            quantity=Decimal('1.00'),
+            unit_price=Decimal('25.00'),
+            created_by=self.staff,
+        )
+        form = InvoiceForm(
+            data={
+                'customer': self.customer.pk,
+                'property': self.property.pk,
+                'issue_date': '2026-11-02',
+                'work_entries': [second_work.pk],
+            },
+            instance=invoice,
+        )
+        self.assertFalse(form.is_valid())
+        self.assertIn('work_entries', form.errors)
 
     def test_issue_and_download_branded_pdf(self):
         invoice = self.make_invoice()
