@@ -1,0 +1,26 @@
+{% extends 'office/base.html' %}
+{% block title %}{{ invoice.display_number }} | Avonmoor Office{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'office:invoice-list' %}">← Invoices</a>
+<div class="page-heading">
+    <div><p class="eyebrow">INVOICE</p><h1>{{ invoice.display_number }}</h1><p class="lede">{{ invoice.customer.display_name }} · {{ invoice.issue_date|date:'d F Y' }}</p></div>
+    <span class="status status-{{ invoice.status }} status-large">{{ invoice.get_status_display }}</span>
+</div>
+<section class="panel invoice-summary">
+    <div><span>Bill to</span><strong>{{ invoice.billing_details.display_name }}</strong><p>{{ invoice.billing_details.billing_address_1 }}<br>{% if invoice.billing_details.billing_address_2 %}{{ invoice.billing_details.billing_address_2 }}<br>{% endif %}{{ invoice.billing_details.town }}{% if invoice.billing_details.county %}, {{ invoice.billing_details.county }}{% endif %}<br>{{ invoice.billing_details.postcode }}</p></div>
+    <div><span>Total</span><strong class="invoice-total">£{{ invoice.total|floatformat:2 }}</strong></div>
+</section>
+<section class="panel table-panel"><div class="table-wrap"><table><thead><tr><th>Date</th><th>Description</th><th>Category</th><th>Quantity</th><th>Rate</th><th>Total</th></tr></thead><tbody>
+{% for line in invoice.lines.all %}<tr><td>{{ line.service_date|date:'d M Y' }}</td><td>{{ line.description }}</td><td>{{ line.get_category_display }}</td><td>{{ line.quantity|floatformat:-2 }} {{ line.get_unit_display }}</td><td>£{{ line.unit_price|floatformat:2 }}</td><td><b>£{{ line.total|floatformat:2 }}</b></td></tr>{% empty %}<tr><td colspan="6">No invoice lines yet.</td></tr>{% endfor %}
+</tbody><tfoot><tr><th colspan="5">Total due</th><th>£{{ invoice.total|floatformat:2 }}</th></tr></tfoot></table></div></section>
+<div class="button-row invoice-actions">
+{% if invoice.status == 'draft' %}
+<a class="button button-secondary" href="{% url 'office:invoice-edit' invoice.pk %}">Edit draft</a>
+<form method="post" action="{% url 'office:invoice-issue' invoice.pk %}" onsubmit="return confirm('Issue and lock this invoice?');">{% csrf_token %}<button class="button button-primary" type="submit">Issue invoice</button></form>
+{% else %}
+<a class="button button-primary" href="{% url 'office:invoice-pdf' invoice.pk %}">Download PDF</a>
+{% if invoice.status == 'issued' %}<form method="post" action="{% url 'office:invoice-paid' invoice.pk %}">{% csrf_token %}<button class="button button-secondary" type="submit">Mark paid</button></form>{% endif %}
+{% if invoice.status == 'issued' or invoice.status == 'paid' %}<form method="post" action="{% url 'office:invoice-cancel' invoice.pk %}" onsubmit="return confirm('Cancel this invoice? The record will be retained.');">{% csrf_token %}<button class="button button-danger" type="submit">Cancel invoice</button></form>{% endif %}
+{% endif %}
+</div>
+{% endblock %}

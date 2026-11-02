@@ -1,0 +1,28 @@
+{% extends 'office/base.html' %}
+{% block title %}{{ customer.display_name }} | Avonmoor Office{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'office:customer-list' %}">← Customers</a>
+<div class="page-heading">
+    <div><p class="eyebrow">CUSTOMER</p><h1>{{ customer.display_name }}</h1><p class="lede">{{ customer.contact_name }}{% if customer.email %} · {{ customer.email }}{% endif %}{% if customer.phone %} · {{ customer.phone }}{% endif %}</p></div>
+    <div class="button-row"><a class="button button-secondary" href="{% url 'office:customer-edit' customer.pk %}">Edit customer</a><a class="button button-primary" href="{% url 'office:invoice-create' %}">New invoice</a></div>
+</div>
+<div class="dashboard-grid">
+    <section class="panel">
+        <div class="section-heading"><h2>Billing address</h2></div>
+        <address>{% for line in customer.billing_address_lines %}{{ line }}{% if not forloop.last %}<br>{% endif %}{% endfor %}</address>
+        {% if customer.notes %}<hr><p>{{ customer.notes|linebreaksbr }}</p>{% endif %}
+    </section>
+    <section class="panel">
+        <div class="section-heading"><h2>Properties</h2><a href="{% url 'office:property-create' customer.pk %}">Add property</a></div>
+        {% if customer.properties.all %}<div class="compact-list">
+        {% for property in customer.properties.all %}<a href="{% url 'office:property-edit' property.pk %}"><span><b>{{ property }}</b><small>{% for line in property.address_lines %}{{ line }}{% if not forloop.last %}, {% endif %}{% endfor %}</small></span><span>Open</span></a>{% endfor %}
+        </div>{% else %}<p class="empty-copy">No properties recorded.</p>{% endif %}
+    </section>
+</div>
+<section class="panel table-panel">
+    <div class="section-heading"><h2>Invoices</h2></div>
+    {% if customer.invoices.all %}<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Date</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody>
+    {% for invoice in customer.invoices.all %}<tr><td><b>{{ invoice.display_number }}</b></td><td>{{ invoice.issue_date|date:'d M Y' }}</td><td><span class="status status-{{ invoice.status }}">{{ invoice.get_status_display }}</span></td><td>£{{ invoice.total|floatformat:2 }}</td><td><a href="{% url 'office:invoice-detail' invoice.pk %}">Open</a></td></tr>{% endfor %}
+    </tbody></table></div>{% else %}<p class="empty-copy">No invoices yet.</p>{% endif %}
+</section>
+{% endblock %}
