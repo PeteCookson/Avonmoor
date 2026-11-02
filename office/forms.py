@@ -28,6 +28,12 @@ class CustomerForm(forms.ModelForm):
 
 
 class PropertyForm(forms.ModelForm):
+    same_as_billing = forms.BooleanField(
+        required=False,
+        label='Same as billing address',
+        help_text='Use the customer billing address for this property.',
+    )
+
     class Meta:
         model = Property
         fields = [
@@ -39,6 +45,42 @@ class PropertyForm(forms.ModelForm):
             'postcode',
             'active',
         ]
+
+    def __init__(self, *args, customer=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.customer = customer or getattr(self.instance, 'customer', None)
+        for field_name in ('address_line_1', 'address_line_2', 'town', 'county', 'postcode'):
+            self.fields[field_name].required = False
+        if self.instance.pk and self.customer:
+            same = all(
+                getattr(self.instance, property_field) == getattr(self.customer, billing_field)
+                for property_field, billing_field in (
+                    ('address_line_1', 'billing_address_1'),
+                    ('address_line_2', 'billing_address_2'),
+                    ('town', 'town'),
+                    ('county', 'county'),
+                    ('postcode', 'postcode'),
+                )
+            )
+            self.initial['same_as_billing'] = same
+
+    def clean(self):
+        cleaned = super().clean()
+        if cleaned.get('same_as_billing'):
+            if not self.customer:
+                raise forms.ValidationError('A customer is required to copy the billing address.')
+            cleaned.update(
+                address_line_1=self.customer.billing_address_1,
+                address_line_2=self.customer.billing_address_2,
+                town=self.customer.town,
+                county=self.customer.county,
+                postcode=self.customer.postcode,
+            )
+        else:
+            for field_name in ('address_line_1', 'postcode'):
+                if not cleaned.get(field_name):
+                    self.add_error(field_name, 'This field is required.')
+        return cleaned
 
 
 class WorkEntryForm(forms.ModelForm):
@@ -113,6 +155,12 @@ class InvoiceForm(forms.ModelForm):
         if property_record and customer and property_record.customer_id != customer.id:
             self.add_error('property', 'Select a property belonging to this customer.')
         return cleaned
+
+
+class InvoiceEmailForm(forms.Form):
+    recipient = forms.EmailField(label='Send to')
+    subject = forms.CharField(max_length=255)
+    message = forms.CharField(widget=forms.Textarea(attrs={'rows': 8}))
 
 
 class InvoiceLineForm(forms.ModelForm):

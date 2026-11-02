@@ -3,10 +3,12 @@ from decimal import Decimal
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
+from django.core import mail
 from django.test import TestCase
+from django.test import override_settings
 from django.urls import reverse
 
-from .models import Customer, Invoice, InvoiceLine, Property, WorkEntry
+from .models import Customer, Invoice, InvoiceEmail, InvoiceLine, Property, WorkEntry
 
 
 class OfficeFixtureMixin:
@@ -83,6 +85,13 @@ class OfficeAccessTests(OfficeFixtureMixin, TestCase):
             response = self.client.get(reverse('office:dashboard'))
             self.assertEqual(response.status_code, 200)
 
+    def test_staff_login_without_next_redirects_to_office(self):
+        response = self.client.post(
+            reverse('login'),
+            {'username': 'accountant', 'password': 'test-password'},
+        )
+        self.assertRedirects(response, reverse('office:dashboard'))
+
     def test_staff_can_open_all_stage_one_pages(self):
         self.client.force_login(self.staff)
         urls = [
@@ -102,11 +111,57 @@ class OfficeAccessTests(OfficeFixtureMixin, TestCase):
                 self.assertEqual(self.client.get(url).status_code, 200)
 
 
+class PropertyWorkflowTests(OfficeFixtureMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.staff)
+
+    def test_property_can_copy_customer_billing_address(self):
+        response = self.client.post(
+            reverse('office:property-create', args=[self.customer.pk]),
+            {
+                'same_as_billing': 'on',
+                'name': 'Billing address property',
+                'address_line_1': '',
+                'address_line_2': '',
+                'town': '',
+                'county': '',
+                'postcode': '',
+                'active': 'on',
+            },
+        )
+        self.assertEqual(response.status_code, 302)
+        property_record = Property.objects.get(name='Billing address property')
+        self.assertEqual(property_record.address_line_1, self.customer.billing_address_1)
+        self.assertEqual(property_record.town, self.customer.town)
+        self.assertEqual(property_record.postcode, self.customer.postcode)
+
+    def test_unused_property_can_be_deleted(self):
+        unused = Property.objects.create(
+            customer=self.customer,
+            name='Unused',
+            address_line_1='2 Test Lane',
+            postcode='TQ10 9AB',
+        )
+        response = self.client.post(
+            reverse('office:property-delete', args=[unused.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertFalse(Property.objects.filter(pk=unused.pk).exists())
+
+    def test_property_with_history_cannot_be_deleted(self):
+        response = self.client.post(
+            reverse('office:property-delete', args=[self.property.pk])
+        )
+        self.assertEqual(response.status_code, 302)
+        self.assertTrue(Property.objects.filter(pk=self.property.pk).exists())
+
+
 class InvoiceModelTests(OfficeFixtureMixin, TestCase):
     def test_issue_assigns_sequential_number_and_freezes_customer(self):
         invoice = self.make_invoice()
         issued = invoice.issue()
-        self.assertEqual(issued.number, 'INV-2026-001')
+        self.assertEqual(issued.number, 'INV-20261102-001')
         self.assertEqual(issued.status, Invoice.Status.ISSUED)
         self.assertEqual(issued.total, Decimal('50.00'))
         self.assertEqual(issued.customer_snapshot['display_name'], 'Test Customer')
@@ -142,8 +197,8 @@ class InvoiceModelTests(OfficeFixtureMixin, TestCase):
             unit_price=second_work.unit_price,
         )
         second = second.issue()
-        self.assertEqual(first.number, 'INV-2026-001')
-        self.assertEqual(second.number, 'INV-2027-001')
+        self.assertEqual(first.number, 'INV-20261231-001')
+        self.assertEqual(second.number, 'INV-20270103-001')
 
     def test_invoice_requires_line_before_issue(self):
         invoice = Invoice.objects.create(
@@ -205,7 +260,7 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
-        self.assertIn('INV-2026-001.pdf', response['Content-Disposition'])
+        self.assertIn('INV-20261102-001.pdf', response['Content-Disposition'])
         self.assertTrue(response.content.startswith(b'%PDF'))
         self.assertGreater(len(response.content), 5000)
 
@@ -240,3 +295,28 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertEqual(invoice_export['Content-Type'], 'text/csv')
         self.assertIn(invoice.number.encode(), invoice_export.content)
         self.assertIn(b'50.00', invoice_export.content)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        EMAIL_HOST_USER='hello@avonmoor.co.uk',
+    )
+    def test_issued_invoice_can_be_emailed_with_pdf_and_audit_record(self):
+        invoice = self.make_invoice().issue()
+        response = self.client.post(
+            reverse('office:invoice-email', args=[invoice.pk]),
+            {
+                'recipient': 'alex@example.com',
+                'subject': f'Invoice {invoice.number} from Avonmoor Ltd',
+                'message': 'Please find the invoice attached.',
+            },
+        )
+        self.assertRedirects(
+            response, reverse('office:invoice-detail', args=[invoice.pk])
+        )
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertEqual(mail.outbox[0].to, ['alex@example.com'])
+        self.assertEqual(mail.outbox[0].attachments[0][0], f'{invoice.number}.pdf')
+        self.assertEqual(mail.outbox[0].attachments[0][2], 'application/pdf')
+        sent = InvoiceEmail.objects.get(invoice=invoice)
+        self.assertEqual(sent.recipient, 'alex@example.com')
+        self.assertEqual(sent.sent_by, self.staff)

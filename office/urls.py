@@ -28,6 +28,11 @@ urlpatterns = [
         views.PropertyUpdateView.as_view(),
         name='property-edit',
     ),
+    path(
+        'properties/<int:pk>/delete/',
+        views.PropertyDeleteView.as_view(),
+        name='property-delete',
+    ),
     path('work/', views.WorkEntryListView.as_view(), name='work-list'),
     path('work/new/', views.WorkEntryCreateView.as_view(), name='work-create'),
     path(
@@ -66,6 +71,11 @@ urlpatterns = [
         'invoices/<int:pk>/pdf/',
         views.InvoicePdfView.as_view(),
         name='invoice-pdf',
+    ),
+    path(
+        'invoices/<int:pk>/email/',
+        views.InvoiceEmailView.as_view(),
+        name='invoice-email',
     ),
     path(
         'invoices/<int:pk>/paid/',

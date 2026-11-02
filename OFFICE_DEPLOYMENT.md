@@ -10,10 +10,12 @@ Private invoicing and work-record module for Avonmoor Ltd.
 - Draft invoice creation from uninvoiced work.
 - Sequential invoice numbers in the format `INV-YYYY-001`.
 - Immutable customer/address snapshots when an invoice is issued.
-- Branded A4 PDF download with Avonmoor Ltd bank and company details.
+- Branded A4 PDF download or confirmed email delivery with Avonmoor Ltd bank
+  and company details.
 - Issued, paid and cancelled statuses.
 - Customer and invoice CSV exports for the accountant.
-- No automated invoice email and no bank connection in Stage 1.
+- No automated invoice email and no bank connection in Stage 1. A staff user
+  must review and confirm each invoice email before it is sent.
 
 ## Release steps
 
@@ -29,7 +31,8 @@ Private invoicing and work-record module for Avonmoor Ltd.
 
 ## Important numbering rule
 
-The first invoice issued in each calendar year receives `INV-YYYY-001`.
+Invoice numbers use the invoice date plus a sequential annual suffix, for
+example `INV-20261102-001`.
 Before issuing a live invoice, import the highest existing invoice number for
 that year or update the `Invoice sequence` record in Django admin. This prevents
 duplicate numbering when historical invoices already exist.

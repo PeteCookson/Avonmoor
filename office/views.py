@@ -1,10 +1,14 @@
 import csv
+import logging
 from decimal import Decimal
 
+from django.conf import settings
 from django.contrib import messages
 from django.contrib.auth.mixins import LoginRequiredMixin, UserPassesTestMixin
 from django.core.exceptions import ValidationError
 from django.core.exceptions import PermissionDenied
+from django.core.mail import EmailMessage
+from django.db.models.deletion import ProtectedError
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
@@ -21,13 +25,17 @@ from django.views.generic import (
 from .forms import (
     CustomerForm,
     InvoiceCreateForm,
+    InvoiceEmailForm,
     InvoiceForm,
     InvoiceLineFormSet,
     PropertyForm,
     WorkEntryForm,
 )
-from .models import Customer, Invoice, InvoiceLine, Property, WorkEntry
+from .models import Customer, Invoice, InvoiceEmail, InvoiceLine, Property, WorkEntry
 from .pdf import build_invoice_pdf
+
+
+logger = logging.getLogger(__name__)
 
 
 class OfficeAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
@@ -141,6 +149,11 @@ class PropertyCreateView(OfficeAccessMixin, CreateView):
         form.instance.customer = self.customer
         return super().form_valid(form)
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['customer'] = self.customer
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(
@@ -159,6 +172,11 @@ class PropertyUpdateView(OfficeAccessMixin, UpdateView):
     form_class = PropertyForm
     template_name = 'office/form.html'
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['customer'] = self.object.customer
+        return kwargs
+
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
         context.update(page_title='Edit property', submit_label='Save changes')
@@ -167,6 +185,23 @@ class PropertyUpdateView(OfficeAccessMixin, UpdateView):
     def get_success_url(self):
         messages.success(self.request, 'Property updated.')
         return reverse('office:customer-detail', args=[self.object.customer_id])
+
+
+class PropertyDeleteView(OfficeAccessMixin, View):
+    def post(self, request, pk):
+        property_record = get_object_or_404(Property, pk=pk)
+        customer_id = property_record.customer_id
+        try:
+            property_record.delete()
+        except ProtectedError:
+            messages.error(
+                request,
+                'This property cannot be deleted because it has work or invoice history. '
+                'Edit it and untick Active instead.',
+            )
+        else:
+            messages.success(request, 'Property deleted.')
+        return redirect('office:customer-detail', pk=customer_id)
 
 
 class WorkEntryListView(OfficeAccessMixin, ListView):
@@ -252,7 +287,7 @@ class InvoiceDetailView(OfficeAccessMixin, DetailView):
 
     def get_queryset(self):
         return Invoice.objects.select_related('customer', 'property').prefetch_related(
-            'lines'
+            'lines', 'email_history__sent_by'
         )
 
 
@@ -359,6 +394,92 @@ class InvoicePdfView(OfficeAccessMixin, View):
             f'attachment; filename="{invoice.number}.pdf"'
         )
         return response
+
+
+class InvoiceEmailView(OfficeAccessMixin, View):
+    template_name = 'office/invoice_email.html'
+
+    def get_invoice(self, pk):
+        return get_object_or_404(
+            Invoice.objects.select_related('customer').prefetch_related('lines'),
+            pk=pk,
+        )
+
+    def initial(self, invoice):
+        details = invoice.billing_details
+        recipient_name = details.get('contact_name') or details.get('display_name')
+        return {
+            'recipient': details.get('email', ''),
+            'subject': f'Invoice {invoice.number} from Avonmoor Ltd',
+            'message': (
+                f'Dear {recipient_name},\n\n'
+                f'Please find attached invoice {invoice.number} for £{invoice.total:.2f}.\n\n'
+                'Avonmoor Ltd'
+            ),
+        }
+
+    def emailable_invoice(self, request, pk):
+        invoice = self.get_invoice(pk)
+        if invoice.status not in (Invoice.Status.ISSUED, Invoice.Status.PAID):
+            messages.warning(request, 'Only issued or paid invoices can be emailed.')
+            return invoice, redirect('office:invoice-detail', pk=invoice.pk)
+        return invoice, None
+
+    def get(self, request, pk):
+        self.invoice, blocked = self.emailable_invoice(request, pk)
+        if blocked:
+            return blocked
+        form = InvoiceEmailForm(initial=self.initial(self.invoice))
+        return render(
+            request,
+            self.template_name,
+            {'invoice': self.invoice, 'form': form},
+        )
+
+    def post(self, request, pk):
+        self.invoice, blocked = self.emailable_invoice(request, pk)
+        if blocked:
+            return blocked
+        form = InvoiceEmailForm(request.POST)
+        if form.is_valid():
+            email = EmailMessage(
+                subject=form.cleaned_data['subject'],
+                body=form.cleaned_data['message'],
+                from_email=settings.EMAIL_HOST_USER,
+                to=[form.cleaned_data['recipient']],
+                reply_to=[settings.EMAIL_HOST_USER],
+            )
+            email.attach(
+                f'{self.invoice.number}.pdf',
+                build_invoice_pdf(self.invoice),
+                'application/pdf',
+            )
+            try:
+                email.send(fail_silently=False)
+            except Exception:
+                logger.exception('Invoice email could not be sent')
+                messages.error(
+                    request,
+                    'The invoice email could not be sent. Check the address and try again.',
+                )
+            else:
+                InvoiceEmail.objects.create(
+                    invoice=self.invoice,
+                    recipient=form.cleaned_data['recipient'],
+                    subject=form.cleaned_data['subject'],
+                    body=form.cleaned_data['message'],
+                    sent_by=request.user,
+                )
+                messages.success(
+                    request,
+                    f'{self.invoice.number} emailed to {form.cleaned_data["recipient"]}.',
+                )
+                return redirect('office:invoice-detail', pk=self.invoice.pk)
+        return render(
+            request,
+            self.template_name,
+            {'invoice': self.invoice, 'form': form},
+        )
 
 
 class InvoiceMarkPaidView(OfficeAccessMixin, View):

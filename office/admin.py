@@ -1,6 +1,14 @@
 from django.contrib import admin
 
-from .models import Customer, Invoice, InvoiceLine, InvoiceSequence, Property, WorkEntry
+from .models import (
+    Customer,
+    Invoice,
+    InvoiceEmail,
+    InvoiceLine,
+    InvoiceSequence,
+    Property,
+    WorkEntry,
+)
 
 
 class PropertyInline(admin.TabularInline):
@@ -82,3 +90,13 @@ class InvoiceAdmin(admin.ModelAdmin):
 class InvoiceSequenceAdmin(admin.ModelAdmin):
     list_display = ('year', 'last_number')
     ordering = ('-year',)
+
+
+@admin.register(InvoiceEmail)
+class InvoiceEmailAdmin(admin.ModelAdmin):
+    list_display = ('invoice', 'recipient', 'sent_at', 'sent_by')
+    search_fields = ('invoice__number', 'recipient', 'subject')
+    readonly_fields = ('invoice', 'recipient', 'subject', 'body', 'sent_by', 'sent_at')
+
+    def has_add_permission(self, request):
+        return False
