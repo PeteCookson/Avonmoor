@@ -10,6 +10,7 @@ from django.urls import reverse
 
 from .forms import InvoiceForm
 from .models import Customer, Invoice, InvoiceEmail, InvoiceLine, Property, WorkEntry
+from .views import available_work_entries_for_update
 
 
 class OfficeFixtureMixin:
@@ -428,6 +429,11 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         )
         self.assertFalse(form.is_valid())
         self.assertIn('work_entries', form.errors)
+
+    def test_edit_work_lock_query_avoids_postgres_outer_join(self):
+        query = str(available_work_entries_for_update([self.work.pk]).query)
+        self.assertNotIn('OUTER JOIN', query.upper())
+        self.assertIn('NOT', query.upper())
 
     def test_issue_and_download_branded_pdf(self):
         invoice = self.make_invoice()

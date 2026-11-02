@@ -60,6 +60,21 @@ def append_work_entries(invoice, work_entries):
         )
 
 
+def available_work_entries_for_update(selected_ids):
+    """Lock uninvoiced work without an outer join PostgreSQL cannot lock."""
+
+    invoiced_work_ids = InvoiceLine.objects.filter(
+        work_entry_id__isnull=False
+    ).values('work_entry_id')
+    return (
+        WorkEntry.objects.select_for_update()
+        .filter(pk__in=selected_ids)
+        .exclude(pk__in=invoiced_work_ids)
+        .select_related('property', 'property__customer')
+        .order_by('service_date', 'pk')
+    )
+
+
 class OfficeAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
     def test_func(self):
         return self.request.user.is_staff
@@ -386,10 +401,7 @@ class InvoiceEditView(OfficeAccessMixin, View):
             )
             with transaction.atomic():
                 selected_work = list(
-                    WorkEntry.objects.select_for_update()
-                    .filter(pk__in=selected_ids, invoice_line__isnull=True)
-                    .select_related('property', 'property__customer')
-                    .order_by('service_date', 'pk')
+                    available_work_entries_for_update(selected_ids)
                 )
                 if len(selected_work) != len(selected_ids):
                     form.add_error(
