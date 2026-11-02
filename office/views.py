@@ -430,7 +430,7 @@ class InvoiceEmailView(OfficeAccessMixin, View):
             'subject': f'Invoice {invoice.number} from Avonmoor Ltd',
             'message': (
                 f'Dear {greeting_name},\n\n'
-                f'Please find attached invoice {invoice.number} for £{invoice.total:.2f}.\n\n'
+                f'Please find attached invoice {invoice.number}.\n\n'
                 'Avonmoor Ltd'
             ),
         }
