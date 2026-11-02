@@ -48,6 +48,18 @@ class OfficeAccessMixin(LoginRequiredMixin, UserPassesTestMixin):
         return super().handle_no_permission()
 
 
+class OwnerOnlyMixin(LoginRequiredMixin, UserPassesTestMixin):
+    """Limit destructive Office actions to the Avonmoor owner account."""
+
+    def test_func(self):
+        return self.request.user.is_superuser
+
+    def handle_no_permission(self):
+        if self.request.user.is_authenticated:
+            raise PermissionDenied
+        return super().handle_no_permission()
+
+
 class OfficeDashboardView(OfficeAccessMixin, View):
     template_name = 'office/dashboard.html'
 
@@ -187,7 +199,7 @@ class PropertyUpdateView(OfficeAccessMixin, UpdateView):
         return reverse('office:customer-detail', args=[self.object.customer_id])
 
 
-class PropertyDeleteView(OfficeAccessMixin, View):
+class PropertyDeleteView(OwnerOnlyMixin, View):
     def post(self, request, pk):
         property_record = get_object_or_404(Property, pk=pk)
         customer_id = property_record.customer_id
@@ -407,12 +419,17 @@ class InvoiceEmailView(OfficeAccessMixin, View):
 
     def initial(self, invoice):
         details = invoice.billing_details
-        recipient_name = details.get('contact_name') or details.get('display_name')
+        recipient_name = (
+            details.get('contact_name') or details.get('display_name') or ''
+        ).strip()
+        greeting_name = (
+            recipient_name.split(maxsplit=1)[0] if recipient_name else 'there'
+        )
         return {
             'recipient': details.get('email', ''),
             'subject': f'Invoice {invoice.number} from Avonmoor Ltd',
             'message': (
-                f'Dear {recipient_name},\n\n'
+                f'Dear {greeting_name},\n\n'
                 f'Please find attached invoice {invoice.number} for £{invoice.total:.2f}.\n\n'
                 'Avonmoor Ltd'
             ),

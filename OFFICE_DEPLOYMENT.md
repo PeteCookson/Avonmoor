@@ -8,7 +8,7 @@ Private invoicing and work-record module for Avonmoor Ltd.
 - Customers with separate billing and property addresses.
 - Completed work entries for labour, materials and waste.
 - Draft invoice creation from uninvoiced work.
-- Sequential invoice numbers in the format `INV-YYYY-001`.
+- Date-based sequential invoice numbers in the format `INV-YYYYMMDD-001`.
 - Immutable customer/address snapshots when an invoice is issued.
 - Branded A4 PDF download or confirmed email delivery with Avonmoor Ltd bank
   and company details.
@@ -25,7 +25,9 @@ Private invoicing and work-record module for Avonmoor Ltd.
    `python manage.py collectstatic --noinput` both completed during the Render
    build.
 3. Create the accountant's Django user in `/admin/` and enable **Staff status**.
-   Do not enable **Superuser status**.
+   Do not enable **Superuser status** and do not assign individual Django model
+   permissions. Staff status grants access to Office; destructive property
+   deletion remains restricted to the owner/superuser account.
 4. Sign in and open `/office/`.
 5. Enter or import customer records before issuing the first live invoice.
 

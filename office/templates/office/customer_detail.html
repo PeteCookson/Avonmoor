@@ -15,7 +15,7 @@
     <section class="panel">
         <div class="section-heading"><h2>Properties</h2><a href="{% url 'office:property-create' customer.pk %}">Add property</a></div>
         {% if customer.properties.all %}<div class="compact-list property-list">
-        {% for property in customer.properties.all %}<div class="property-row"><a href="{% url 'office:property-edit' property.pk %}"><span><b>{{ property }}</b><small>{% for line in property.address_lines %}{{ line }}{% if not forloop.last %}, {% endif %}{% endfor %}</small></span><span>Edit</span></a><form method="post" action="{% url 'office:property-delete' property.pk %}" onsubmit="return confirm('Delete this property? This is only allowed when it has no work or invoice history.');">{% csrf_token %}<button class="button-link-danger" type="submit">Delete</button></form></div>{% endfor %}
+        {% for property in customer.properties.all %}<div class="property-row"><a href="{% url 'office:property-edit' property.pk %}"><span><b>{{ property }}</b><small>{% for line in property.address_lines %}{{ line }}{% if not forloop.last %}, {% endif %}{% endfor %}</small></span><span>Edit</span></a>{% if request.user.is_superuser %}<form method="post" action="{% url 'office:property-delete' property.pk %}" onsubmit="return confirm('Delete this property? This is only allowed when it has no work or invoice history.');">{% csrf_token %}<button class="button-link-danger" type="submit">Delete</button></form>{% endif %}</div>{% endfor %}
         </div>{% else %}<p class="empty-copy">No properties recorded.</p>{% endif %}
     </section>
 </div>
