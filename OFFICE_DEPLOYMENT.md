@@ -19,12 +19,13 @@ Private invoicing and work-record module for Avonmoor Ltd.
 
 1. Deploy the feature branch to a Render preview service or merge it into the
    branch used by the Avonmoor Render web service.
-2. Run `python manage.py migrate --noinput` from Render Shell.
-3. Confirm `python manage.py collectstatic --noinput` ran during the build.
-4. Create the accountant's Django user in `/admin/` and enable **Staff status**.
+2. Confirm `python manage.py migrate --noinput` and
+   `python manage.py collectstatic --noinput` both completed during the Render
+   build.
+3. Create the accountant's Django user in `/admin/` and enable **Staff status**.
    Do not enable **Superuser status**.
-5. Sign in and open `/office/`.
-6. Enter or import customer records before issuing the first live invoice.
+4. Sign in and open `/office/`.
+5. Enter or import customer records before issuing the first live invoice.
 
 ## Important numbering rule
 
