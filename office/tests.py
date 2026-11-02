@@ -14,7 +14,10 @@ from .models import Customer, Invoice, InvoiceEmail, InvoiceLine, Property, Work
 class OfficeFixtureMixin:
     def setUp(self):
         self.staff = get_user_model().objects.create_user(
-            username='pete', password='test-password', is_staff=True
+            username='pete',
+            password='test-password',
+            is_staff=True,
+            is_superuser=True,
         )
         self.accountant = get_user_model().objects.create_user(
             username='accountant', password='test-password', is_staff=True
@@ -155,6 +158,27 @@ class PropertyWorkflowTests(OfficeFixtureMixin, TestCase):
         )
         self.assertEqual(response.status_code, 302)
         self.assertTrue(Property.objects.filter(pk=self.property.pk).exists())
+
+    def test_accountant_cannot_delete_property(self):
+        unused = Property.objects.create(
+            customer=self.customer,
+            name='Accountant must not delete this',
+            address_line_1='3 Test Lane',
+            postcode='TQ10 9AC',
+        )
+        self.client.force_login(self.accountant)
+        response = self.client.post(
+            reverse('office:property-delete', args=[unused.pk])
+        )
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Property.objects.filter(pk=unused.pk).exists())
+
+    def test_accountant_does_not_see_property_delete_action(self):
+        self.client.force_login(self.accountant)
+        response = self.client.get(
+            reverse('office:customer-detail', args=[self.customer.pk])
+        )
+        self.assertNotContains(response, 'Delete')
 
 
 class InvoiceModelTests(OfficeFixtureMixin, TestCase):
@@ -320,3 +344,13 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         sent = InvoiceEmail.objects.get(invoice=invoice)
         self.assertEqual(sent.recipient, 'alex@example.com')
         self.assertEqual(sent.sent_by, self.staff)
+
+    def test_invoice_email_greeting_uses_contact_first_name(self):
+        self.customer.contact_name = 'Paul Ream'
+        self.customer.save()
+        invoice = self.make_invoice().issue()
+        response = self.client.get(
+            reverse('office:invoice-email', args=[invoice.pk])
+        )
+        self.assertContains(response, 'Dear Paul,')
+        self.assertNotContains(response, 'Dear Paul Ream,')
