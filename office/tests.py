@@ -354,3 +354,5 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         )
         self.assertContains(response, 'Dear Paul,')
         self.assertNotContains(response, 'Dear Paul Ream,')
+        self.assertContains(response, f'Please find attached invoice {invoice.number}.')
+        self.assertNotContains(response, f'for £{invoice.total:.2f}')
