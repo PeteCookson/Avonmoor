@@ -1,0 +1,11 @@
+{% extends 'office/base.html' %}
+{% block title %}Invoices | Avonmoor Office{% endblock %}
+{% block content %}
+<div class="page-heading"><div><p class="eyebrow">INVOICES</p><h1>Invoice register</h1><p class="lede">Draft, issue and track every Avonmoor invoice.</p></div><div class="button-row"><a class="button button-secondary" href="{% url 'office:invoice-export' %}">Export CSV</a><a class="button button-primary" href="{% url 'office:invoice-create' %}">New invoice</a></div></div>
+<div class="filter-row"><a href="{% url 'office:invoice-list' %}">All</a>{% for value,label in view.model.Status.choices %}<a href="?status={{ value }}">{{ label }}</a>{% endfor %}</div>
+<section class="panel table-panel">
+{% if invoices %}<div class="table-wrap"><table><thead><tr><th>Invoice</th><th>Customer</th><th>Date</th><th>Status</th><th>Total</th><th></th></tr></thead><tbody>
+{% for invoice in invoices %}<tr><td><b>{{ invoice.display_number }}</b></td><td>{{ invoice.customer.display_name }}{% if invoice.property %}<small>{{ invoice.property }}</small>{% endif %}</td><td>{{ invoice.issue_date|date:'d M Y' }}</td><td><span class="status status-{{ invoice.status }}">{{ invoice.get_status_display }}</span></td><td>£{{ invoice.total|floatformat:2 }}</td><td><a href="{% url 'office:invoice-detail' invoice.pk %}">Open</a></td></tr>{% endfor %}
+</tbody></table></div>{% else %}<div class="empty-state"><h2>No invoices found</h2><p>Create the first draft invoice.</p></div>{% endif %}
+</section>
+{% endblock %}

@@ -37,6 +37,7 @@ urlpatterns = [
     path('accounts/', include('django.contrib.auth.urls')),
     path('rainwater-calculator/', include('water_calculator.urls')),
     path('surveys/', include('water_survey.urls')),
+    path('office/', include('office.urls')),
     path('admin/', admin.site.urls),
 ]
 

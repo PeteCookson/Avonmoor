@@ -1,0 +1,42 @@
+{% load static %}
+<!doctype html>
+<html lang="en">
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta name="theme-color" content="#0B4540">
+    <title>{% block title %}Avonmoor Office{% endblock %}</title>
+    <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
+    <link rel="stylesheet" href="{% static 'office/css/office.css' %}?v=20261102-1">
+</head>
+<body>
+    <header class="app-header">
+        <div class="brand">
+            <a href="{% url 'home' %}" class="brand-logo" aria-label="Avonmoor home">
+                <img src="{% static 'img/avonmoor-master-horizontal-dark.svg' %}" alt="Avonmoor">
+            </a>
+            <a class="workspace-name" href="{% url 'office:dashboard' %}">Office</a>
+        </div>
+        <nav class="main-nav" aria-label="Office navigation">
+            <a href="{% url 'office:customer-list' %}">Customers</a>
+            <a href="{% url 'office:work-list' %}">Work log</a>
+            <a href="{% url 'office:invoice-list' %}">Invoices</a>
+            <a href="{% url 'water_survey:survey-list' %}">Surveys</a>
+        </nav>
+        <form method="post" action="{% url 'logout' %}" class="sign-out">
+            {% csrf_token %}
+            <button type="submit">Sign out</button>
+        </form>
+    </header>
+    <main class="app-main">
+        {% if messages %}
+        <div class="messages" aria-live="polite">
+            {% for message in messages %}
+            <div class="message message-{{ message.tags }}">{{ message }}</div>
+            {% endfor %}
+        </div>
+        {% endif %}
+        {% block content %}{% endblock %}
+    </main>
+</body>
+</html>

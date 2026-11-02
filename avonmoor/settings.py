@@ -35,6 +35,7 @@ INSTALLED_APPS = [
     'contact',
     'water_survey',
     'water_calculator',
+    'office',
 ]
 
 MIDDLEWARE = [
@@ -139,7 +140,10 @@ BASE_DIR = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 STATIC_URL = '/static/'
 
 STATIC_ROOT = os.path.join(BASE_DIR, 'staticfiles')
-STATICFILES_STORAGE = 'whitenoise.storage.CompressedManifestStaticFilesStorage'
+STATICFILES_STORAGE = config(
+    'STATICFILES_STORAGE',
+    default='whitenoise.storage.CompressedManifestStaticFilesStorage',
+)
 
 # Directory to hold user-uploaded files
 MEDIA_URL = '/media/'
