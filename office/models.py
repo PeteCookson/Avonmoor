@@ -260,7 +260,7 @@ class Invoice(models.Model):
             sequence.last_number += 1
             sequence.save(update_fields=['last_number'])
             invoice.number = (
-                f'INV-{invoice.issue_date.year}-{sequence.last_number:03d}'
+                f'INV-{invoice.issue_date:%Y%m%d}-{sequence.last_number:03d}'
             )
             invoice.customer_snapshot = invoice.customer.snapshot()
             invoice.property_snapshot = (
@@ -353,3 +353,24 @@ class InvoiceLine(models.Model):
         if self.invoice.status != Invoice.Status.DRAFT:
             raise ValidationError('Issued invoice lines cannot be deleted.')
         return super().delete(*args, **kwargs)
+
+
+class InvoiceEmail(models.Model):
+    invoice = models.ForeignKey(
+        Invoice, on_delete=models.PROTECT, related_name='email_history'
+    )
+    recipient = models.EmailField()
+    subject = models.CharField(max_length=255)
+    body = models.TextField()
+    sent_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='office_invoice_emails',
+    )
+    sent_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-sent_at', '-id']
+
+    def __str__(self):
+        return f'{self.invoice.display_number} to {self.recipient}'
