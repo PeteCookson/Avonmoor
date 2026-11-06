@@ -1,5 +1,6 @@
 from datetime import date
 from decimal import Decimal
+from unittest.mock import patch
 
 from django.contrib.auth import get_user_model
 from django.core.exceptions import ValidationError
@@ -18,6 +19,7 @@ from .models import (
     Property,
     WorkEntry,
 )
+from .mailbox import append_message_to_sent
 from .views import available_work_entries_for_update
 
 
@@ -569,7 +571,10 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
         EMAIL_HOST_USER='hello@avonmoor.co.uk',
     )
-    def test_issued_invoice_can_be_emailed_with_pdf_and_audit_record(self):
+    @patch('office.views.append_message_to_sent')
+    def test_issued_invoice_can_be_emailed_with_pdf_and_audit_record(
+        self, append_to_sent
+    ):
         invoice = self.make_invoice().issue()
         response = self.client.post(
             reverse('office:invoice-email', args=[invoice.pk]),
@@ -589,6 +594,37 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         sent = InvoiceEmail.objects.get(invoice=invoice)
         self.assertEqual(sent.recipient, 'alex@example.com')
         self.assertEqual(sent.sent_by, self.staff)
+        append_to_sent.assert_called_once()
+        copied_email = append_to_sent.call_args.args[0]
+        self.assertEqual(copied_email.subject, mail.outbox[0].subject)
+        self.assertEqual(copied_email.attachments, mail.outbox[0].attachments)
+
+    @override_settings(
+        EMAIL_BACKEND='django.core.mail.backends.locmem.EmailBackend',
+        EMAIL_HOST_USER='hello@avonmoor.co.uk',
+    )
+    @patch(
+        'office.views.append_message_to_sent',
+        side_effect=RuntimeError('IMAP unavailable'),
+    )
+    def test_sent_email_is_audited_when_sent_folder_copy_fails(
+        self, append_to_sent
+    ):
+        invoice = self.make_invoice().issue()
+        response = self.client.post(
+            reverse('office:invoice-email', args=[invoice.pk]),
+            {
+                'recipient': 'alex@example.com',
+                'subject': f'Invoice {invoice.number} from Avonmoor Ltd',
+                'message': 'Please find the invoice attached.',
+            },
+            follow=True,
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(len(mail.outbox), 1)
+        self.assertTrue(InvoiceEmail.objects.filter(invoice=invoice).exists())
+        self.assertContains(response, 'could not be saved in Sent')
+        append_to_sent.assert_called_once()
 
     def test_invoice_email_greeting_uses_contact_first_name(self):
         self.customer.contact_name = 'Paul Ream'
@@ -601,3 +637,74 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertNotContains(response, 'Dear Paul Ream,')
         self.assertContains(response, f'Please find attached invoice {invoice.number}.')
         self.assertNotContains(response, f'for £{invoice.total:.2f}')
+
+
+class SentMailboxTests(TestCase):
+    @override_settings(
+        EMAIL_IMAP_HOST='imap.example.com',
+        EMAIL_IMAP_PORT=993,
+        EMAIL_HOST_USER='hello@avonmoor.co.uk',
+        EMAIL_HOST_PASSWORD='mailbox-password',
+        EMAIL_SENT_FOLDER='',
+    )
+    @patch('office.mailbox.imaplib.IMAP4_SSL')
+    def test_complete_email_is_appended_to_advertised_sent_folder(
+        self, imap_class
+    ):
+        connection = imap_class.return_value
+        connection.list.return_value = (
+            'OK',
+            [
+                b'(\\HasNoChildren) "/" "INBOX"',
+                b'(\\HasNoChildren \\Sent) "/" "Sent Items"',
+            ],
+        )
+        connection.append.return_value = ('OK', [b'APPEND completed'])
+        email = mail.EmailMessage(
+            subject='Invoice GPM-20261106-001 from Avonmoor Ltd',
+            body='Please find the invoice attached.',
+            from_email='hello@avonmoor.co.uk',
+            to=['alex@example.com'],
+        )
+        email.attach('invoice.pdf', b'%PDF-test', 'application/pdf')
+
+        folder = append_message_to_sent(email)
+
+        self.assertEqual(folder, 'Sent Items')
+        imap_class.assert_called_once_with('imap.example.com', 993)
+        connection.login.assert_called_once_with(
+            'hello@avonmoor.co.uk', 'mailbox-password'
+        )
+        append_args = connection.append.call_args.args
+        self.assertEqual(append_args[0], 'Sent Items')
+        self.assertEqual(append_args[1], '(\\Seen)')
+        self.assertIn(
+            b'Subject: Invoice GPM-20261106-001 from Avonmoor Ltd',
+            append_args[3],
+        )
+        self.assertIn(b'filename="invoice.pdf"', append_args[3])
+        connection.logout.assert_called_once()
+
+    @override_settings(
+        EMAIL_IMAP_HOST='imap.example.com',
+        EMAIL_IMAP_PORT=993,
+        EMAIL_HOST_USER='hello@avonmoor.co.uk',
+        EMAIL_HOST_PASSWORD='mailbox-password',
+        EMAIL_SENT_FOLDER='Sent',
+    )
+    @patch('office.mailbox.imaplib.IMAP4_SSL')
+    def test_configured_sent_folder_does_not_depend_on_list(self, imap_class):
+        connection = imap_class.return_value
+        connection.append.return_value = ('OK', [b'APPEND completed'])
+        email = mail.EmailMessage(
+            subject='Invoice',
+            body='Attached.',
+            from_email='hello@avonmoor.co.uk',
+            to=['alex@example.com'],
+        )
+
+        folder = append_message_to_sent(email)
+
+        self.assertEqual(folder, 'Sent')
+        connection.list.assert_not_called()
+        self.assertEqual(connection.append.call_args.args[0], 'Sent')

@@ -41,6 +41,7 @@ from .models import (
     Property,
     WorkEntry,
 )
+from .mailbox import append_message_to_sent
 from .pdf import build_invoice_pdf
 
 
@@ -686,10 +687,24 @@ class InvoiceEmailView(BranchContextMixin, OfficeAccessMixin, View):
                     body=form.cleaned_data['message'],
                     sent_by=request.user,
                 )
-                messages.success(
-                    request,
-                    f'{self.invoice.number} emailed to {form.cleaned_data["recipient"]}.',
-                )
+                try:
+                    append_message_to_sent(email)
+                except Exception:
+                    logger.exception(
+                        'Invoice email was sent but could not be copied to Sent'
+                    )
+                    messages.warning(
+                        request,
+                        f'{self.invoice.number} was emailed to '
+                        f'{form.cleaned_data["recipient"]}, but the mailbox copy '
+                        'could not be saved in Sent. The Office email history was saved.',
+                    )
+                else:
+                    messages.success(
+                        request,
+                        f'{self.invoice.number} emailed to '
+                        f'{form.cleaned_data["recipient"]} and saved in Sent.',
+                    )
                 return redirect(
                     'office:invoice-detail',
                     branch=self.branch,

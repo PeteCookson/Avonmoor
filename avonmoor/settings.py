@@ -93,6 +93,12 @@ EMAIL_PORT = config('EMAIL_PORT', default='587', cast=int)
 EMAIL_USE_TLS = config('EMAIL_USE_TLS', cast=bool, default=True)
 EMAIL_HOST_USER = config('EMAIL_HOST_USER', default='')
 EMAIL_HOST_PASSWORD = config('EMAIL_HOST_PASSWORD', default='')
+EMAIL_IMAP_HOST = config(
+    'EMAIL_IMAP_HOST',
+    default=(EMAIL_HOST.replace('smtp.', 'imap.', 1) if EMAIL_HOST else ''),
+)
+EMAIL_IMAP_PORT = config('EMAIL_IMAP_PORT', default='993', cast=int)
+EMAIL_SENT_FOLDER = config('EMAIL_SENT_FOLDER', default='').strip()
 NOTIFICATION_RECIPIENTS = [EMAIL_HOST_USER]
 NOTIFICATION_BACKUP_EMAIL = config(
     'NOTIFICATION_BACKUP_EMAIL', default=''
