@@ -78,9 +78,9 @@ def append_message_to_sent(email_message):
         folder = _sent_mailbox(connection)
         raw_message = email_message.message().as_bytes(linesep='\r\n')
         status, _ = connection.append(
-            folder,
+            _quote_mailbox_name(folder),
             '(\\Seen)',
-            imaplib.Time2Internaldate(time.time()),
+            time.time(),
             raw_message,
         )
         if status != 'OK':
