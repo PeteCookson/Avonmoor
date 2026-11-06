@@ -2,7 +2,14 @@ from django import forms
 from django.db.models import Q
 from django.forms import inlineformset_factory
 
-from .models import Customer, Invoice, InvoiceLine, Property, WorkEntry
+from .models import (
+    BusinessBranch,
+    Customer,
+    Invoice,
+    InvoiceLine,
+    Property,
+    WorkEntry,
+)
 
 
 class DateInput(forms.DateInput):
@@ -36,18 +43,22 @@ class WorkEntryCheckboxSelectMultiple(forms.CheckboxSelectMultiple):
         return option
 
 
-def configure_invoice_choices(form):
+def configure_invoice_choices(form, branch):
     """Limit bound choices and annotate unbound choices for client filtering."""
 
     current_property_id = getattr(form.instance, 'property_id', None)
-    properties = Property.objects.filter(active=True)
+    properties = Property.objects.filter(
+        active=True, customer__branch=branch
+    )
     if current_property_id:
         properties = Property.objects.filter(
-            Q(active=True) | Q(pk=current_property_id)
+            Q(active=True) | Q(pk=current_property_id),
+            customer__branch=branch,
         )
     properties = properties.select_related('customer')
     work_entries = WorkEntry.objects.filter(
-        invoice_line__isnull=True
+        invoice_line__isnull=True,
+        property__customer__branch=branch,
     ).select_related('property', 'property__customer')
 
     if form.is_bound:
@@ -157,6 +168,19 @@ class WorkEntryForm(forms.ModelForm):
         ]
         widgets = {'service_date': DateInput()}
 
+    def __init__(self, *args, branch=BusinessBranch.GARDEN, **kwargs):
+        super().__init__(*args, **kwargs)
+        current_property_id = getattr(self.instance, 'property_id', None)
+        properties = Property.objects.filter(
+            active=True, customer__branch=branch
+        )
+        if current_property_id:
+            properties = Property.objects.filter(
+                Q(active=True) | Q(pk=current_property_id),
+                customer__branch=branch,
+            )
+        self.fields['property'].queryset = properties.select_related('customer')
+
 
 class InvoiceCreateForm(forms.ModelForm):
     work_entries = forms.ModelMultipleChoiceField(
@@ -174,16 +198,21 @@ class InvoiceCreateForm(forms.ModelForm):
             'issue_date': DateInput(),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, branch=BusinessBranch.GARDEN, **kwargs):
         super().__init__(*args, **kwargs)
-        self.fields['customer'].queryset = Customer.objects.filter(active=True)
-        configure_invoice_choices(self)
+        self.branch = branch
+        self.fields['customer'].queryset = Customer.objects.filter(
+            active=True, branch=branch
+        )
+        configure_invoice_choices(self, branch)
 
     def clean(self):
         cleaned = super().clean()
         customer = cleaned.get('customer')
         property_record = cleaned.get('property')
         work_entries = cleaned.get('work_entries')
+        if customer and customer.branch != self.branch:
+            self.add_error('customer', 'Select a customer from this branch.')
         if property_record and customer and property_record.customer_id != customer.id:
             self.add_error('property', 'Select a property belonging to this customer.')
         if work_entries and customer:
@@ -217,22 +246,28 @@ class InvoiceForm(forms.ModelForm):
             'issue_date': DateInput(),
         }
 
-    def __init__(self, *args, **kwargs):
+    def __init__(self, *args, branch=None, **kwargs):
         super().__init__(*args, **kwargs)
+        branch = branch or getattr(
+            self.instance, 'branch', BusinessBranch.GARDEN
+        )
+        self.branch = branch
         current_customer_id = getattr(self.instance, 'customer_id', None)
-        customers = Customer.objects.filter(active=True)
+        customers = Customer.objects.filter(active=True, branch=branch)
         if current_customer_id:
             customers = Customer.objects.filter(
-                Q(active=True) | Q(pk=current_customer_id)
+                Q(active=True) | Q(pk=current_customer_id), branch=branch
             )
         self.fields['customer'].queryset = customers
-        configure_invoice_choices(self)
+        configure_invoice_choices(self, branch)
 
     def clean(self):
         cleaned = super().clean()
         customer = cleaned.get('customer')
         property_record = cleaned.get('property')
         work_entries = cleaned.get('work_entries')
+        if customer and customer.branch != self.branch:
+            self.add_error('customer', 'Select a customer from this branch.')
         if property_record and customer and property_record.customer_id != customer.id:
             self.add_error('property', 'Select a property belonging to this customer.')
         if work_entries and customer:

@@ -7,7 +7,18 @@ from django.db import models, transaction
 from django.utils import timezone
 
 
+class BusinessBranch(models.TextChoices):
+    GARDEN = 'garden', 'Garden & Property'
+    RAINWATER = 'rainwater', 'Rainwater Harvesting'
+
+
 class Customer(models.Model):
+    branch = models.CharField(
+        max_length=12,
+        choices=BusinessBranch.choices,
+        default=BusinessBranch.GARDEN,
+        db_index=True,
+    )
     display_name = models.CharField(max_length=160)
     contact_name = models.CharField(max_length=160, blank=True)
     email = models.EmailField(blank=True)
@@ -166,11 +177,23 @@ class WorkEntry(models.Model):
 
 
 class InvoiceSequence(models.Model):
-    year = models.PositiveSmallIntegerField(unique=True)
+    branch = models.CharField(
+        max_length=12,
+        choices=BusinessBranch.choices,
+        default=BusinessBranch.GARDEN,
+    )
+    year = models.PositiveSmallIntegerField()
     last_number = models.PositiveIntegerField(default=0)
 
+    class Meta:
+        constraints = [
+            models.UniqueConstraint(
+                fields=['branch', 'year'], name='office_invoice_sequence_branch_year'
+            )
+        ]
+
     def __str__(self):
-        return f'{self.year}: {self.last_number}'
+        return f'{self.get_branch_display()} {self.year}: {self.last_number}'
 
 
 class Invoice(models.Model):
@@ -180,6 +203,12 @@ class Invoice(models.Model):
         PAID = 'paid', 'Paid'
         CANCELLED = 'cancelled', 'Cancelled'
 
+    branch = models.CharField(
+        max_length=12,
+        choices=BusinessBranch.choices,
+        default=BusinessBranch.GARDEN,
+        db_index=True,
+    )
     customer = models.ForeignKey(
         Customer, on_delete=models.PROTECT, related_name='invoices'
     )
@@ -215,6 +244,10 @@ class Invoice(models.Model):
         return self.number or f'Draft invoice {self.pk or "new"}'
 
     def clean(self):
+        if self.customer_id and self.branch != self.customer.branch:
+            raise ValidationError(
+                {'customer': 'The customer must belong to this invoice branch.'}
+            )
         if self.property_id and self.customer_id:
             if self.property.customer_id != self.customer_id:
                 raise ValidationError(
@@ -255,13 +288,17 @@ class Invoice(models.Model):
                 raise ValidationError('Invoice line totals cannot be negative.')
 
             sequence, _ = InvoiceSequence.objects.select_for_update().get_or_create(
-                year=invoice.issue_date.year
+                branch=invoice.branch,
+                year=invoice.issue_date.year,
             )
             sequence.last_number += 1
             sequence.save(update_fields=['last_number'])
-            invoice.number = (
-                f'INV-{invoice.issue_date:%Y%m%d}-{sequence.last_number:03d}'
+            prefix = (
+                'GPM'
+                if invoice.branch == BusinessBranch.GARDEN
+                else 'RWH'
             )
+            invoice.number = f'{prefix}-{invoice.issue_date:%Y%m%d}-{sequence.last_number:03d}'
             invoice.customer_snapshot = invoice.customer.snapshot()
             invoice.property_snapshot = (
                 invoice.property.snapshot() if invoice.property_id else {}
@@ -339,6 +376,8 @@ class InvoiceLine(models.Model):
         if self.invoice_id and self.invoice.status != Invoice.Status.DRAFT:
             errors['description'] = 'Issued invoice lines cannot be changed.'
         if self.work_entry_id and self.invoice_id:
+            if self.work_entry.property.customer.branch != self.invoice.branch:
+                errors['work_entry'] = 'Work must belong to the invoice branch.'
             if self.work_entry.property.customer_id != self.invoice.customer_id:
                 errors['work_entry'] = 'Work must belong to the invoice customer.'
             if (

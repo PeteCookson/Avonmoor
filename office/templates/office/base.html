@@ -7,20 +7,23 @@
     <meta name="theme-color" content="#0B4540">
     <title>{% block title %}Avonmoor Office{% endblock %}</title>
     <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
-    <link rel="stylesheet" href="{% static 'office/css/office.css' %}?v=20261102-1">
+    <link rel="stylesheet" href="{% static 'office/css/office.css' %}?v=20261104-1">
 </head>
-<body>
+<body{% if branch %} class="branch-{{ branch }}"{% endif %}>
     <header class="app-header">
         <div class="brand">
             <a href="{% url 'home' %}" class="brand-logo" aria-label="Avonmoor home">
                 <img src="{% static 'img/avonmoor-master-horizontal-dark.svg' %}" alt="Avonmoor">
             </a>
-            <a class="workspace-name" href="{% url 'office:dashboard' %}">Office</a>
+            <a class="workspace-name" href="{% if branch %}{% url 'office:branch-dashboard' branch %}{% else %}{% url 'office:dashboard' %}{% endif %}">Office{% if branch_meta %} · {{ branch_meta.short_label }}{% endif %}</a>
         </div>
         <nav class="main-nav" aria-label="Office navigation">
-            <a href="{% url 'office:customer-list' %}">Customers</a>
-            <a href="{% url 'office:work-list' %}">Work log</a>
-            <a href="{% url 'office:invoice-list' %}">Invoices</a>
+            {% if branch %}
+            <a href="{% url 'office:customer-list' branch %}">Customers</a>
+            <a href="{% url 'office:work-list' branch %}">{{ branch_meta.work_label }}</a>
+            <a href="{% url 'office:invoice-list' branch %}">Invoices</a>
+            <a href="{% url 'office:dashboard' %}">Switch branch</a>
+            {% endif %}
             <a href="{% url 'water_survey:survey-list' %}">Surveys</a>
         </nav>
         <form method="post" action="{% url 'logout' %}" class="sign-out">

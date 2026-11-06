@@ -1,0 +1,21 @@
+{% extends 'office/base.html' %}
+{% block title %}Choose branch | Avonmoor Office{% endblock %}
+{% block content %}
+<div class="branch-heading">
+    <p class="eyebrow">AVONMOOR OFFICE</p>
+    <h1>Choose a business branch</h1>
+    <p class="lede">Customer records, work and invoices remain completely separate.</p>
+</div>
+<div class="branch-grid">
+    <a class="branch-card branch-card-garden" href="{% url 'office:branch-dashboard' 'garden' %}">
+        <span class="branch-kicker">GARDEN &amp; PROPERTY</span>
+        <strong>Garden &amp; Property</strong>
+        <small>Customers, completed work and GPM invoices</small>
+    </a>
+    <a class="branch-card branch-card-rainwater" href="{% url 'office:branch-dashboard' 'rainwater' %}">
+        <span class="branch-kicker">RAINWATER HARVESTING</span>
+        <strong>Rainwater Harvesting</strong>
+        <small>Customers, jobs and RWH invoices</small>
+    </a>
+</div>
+{% endblock %}

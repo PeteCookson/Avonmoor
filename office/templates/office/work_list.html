@@ -1,11 +1,11 @@
 {% extends 'office/base.html' %}
 {% block title %}Work log | Avonmoor Office{% endblock %}
 {% block content %}
-<div class="page-heading"><div><p class="eyebrow">WORK LOG</p><h1>Completed work</h1><p class="lede">Record work once, then pull it into an invoice.</p></div><a class="button button-primary" href="{% url 'office:work-create' %}">Record work</a></div>
-<div class="filter-row"><a href="{% url 'office:work-list' %}">All</a><a href="?status=uninvoiced">Uninvoiced</a><a href="?status=invoiced">Invoiced</a></div>
+<div class="page-heading"><div><p class="eyebrow">{{ branch_meta.label|upper }}</p><h1>{% if branch == 'rainwater' %}Rainwater jobs{% else %}Completed work{% endif %}</h1><p class="lede">Record each charge once, then pull it into an invoice.</p></div><a class="button button-primary" href="{% url 'office:work-create' branch %}">{{ branch_meta.record_label }}</a></div>
+<div class="filter-row"><a href="{% url 'office:work-list' branch %}">All</a><a href="?status=uninvoiced">Uninvoiced</a><a href="?status=invoiced">Invoiced</a></div>
 <section class="panel table-panel">
 {% if work_entries %}<div class="table-wrap"><table><thead><tr><th>Date</th><th>Customer / property</th><th>Description</th><th>Type</th><th>Total</th><th>Status</th><th></th></tr></thead><tbody>
-{% for entry in work_entries %}<tr><td>{{ entry.service_date|date:'d M Y' }}</td><td><b>{{ entry.property.customer.display_name }}</b><small>{{ entry.property }}</small></td><td>{{ entry.description }}</td><td>{{ entry.get_category_display }}</td><td>£{{ entry.total|floatformat:2 }}</td><td>{% if entry.is_invoiced %}<span class="status status-paid">Invoiced</span>{% else %}<span class="status status-draft">Ready</span>{% endif %}</td><td>{% if entry.is_invoiced %}<a href="{% url 'office:invoice-detail' entry.invoice_line.invoice_id %}">Invoice</a>{% else %}<a href="{% url 'office:work-edit' entry.pk %}">Edit</a>{% endif %}</td></tr>{% endfor %}
+{% for entry in work_entries %}<tr><td>{{ entry.service_date|date:'d M Y' }}</td><td><b>{{ entry.property.customer.display_name }}</b><small>{{ entry.property }}</small></td><td>{{ entry.description }}</td><td>{{ entry.get_category_display }}</td><td>£{{ entry.total|floatformat:2 }}</td><td>{% if entry.is_invoiced %}<span class="status status-paid">Invoiced</span>{% else %}<span class="status status-draft">Ready</span>{% endif %}</td><td>{% if entry.is_invoiced %}<a href="{% url 'office:invoice-detail' branch entry.invoice_line.invoice_id %}">Invoice</a>{% else %}<a href="{% url 'office:work-edit' branch entry.pk %}">Edit</a>{% endif %}</td></tr>{% endfor %}
 </tbody></table></div>{% else %}<div class="empty-state"><h2>No work entries</h2><p>Record completed work before creating the invoice.</p></div>{% endif %}
 </section>
 {% endblock %}

@@ -1,7 +1,7 @@
 {% extends 'office/base.html' %}
 {% block title %}Email {{ invoice.number }} | Avonmoor Office{% endblock %}
 {% block content %}
-<a class="back-link" href="{% url 'office:invoice-detail' invoice.pk %}">← Invoice</a>
+<a class="back-link" href="{% url 'office:invoice-detail' branch invoice.pk %}">← Invoice</a>
 <section class="form-panel">
     <p class="eyebrow">EMAIL INVOICE</p>
     <h1>{{ invoice.number }}</h1>
@@ -19,7 +19,7 @@
         <div class="attachment-note"><b>Attachment:</b> {{ invoice.number }}.pdf · £{{ invoice.total|floatformat:2 }}</div>
         <div class="button-row form-actions">
             <button class="button button-primary" type="submit">Send invoice</button>
-            <a class="button button-quiet" href="{% url 'office:invoice-detail' invoice.pk %}">Cancel</a>
+            <a class="button button-quiet" href="{% url 'office:invoice-detail' branch invoice.pk %}">Cancel</a>
         </div>
     </form>
 </section>

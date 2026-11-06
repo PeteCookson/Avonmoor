@@ -2,8 +2,8 @@
 {% block title %}Customers | Avonmoor Office{% endblock %}
 {% block content %}
 <div class="page-heading">
-    <div><p class="eyebrow">CUSTOMERS</p><h1>Customer register</h1><p class="lede">One authoritative record for each customer and property.</p></div>
-    <div class="button-row"><a class="button button-secondary" href="{% url 'office:customer-export' %}">Export CSV</a><a class="button button-primary" href="{% url 'office:customer-create' %}">New customer</a></div>
+    <div><p class="eyebrow">{{ branch_meta.label|upper }}</p><h1>Customer register</h1><p class="lede">Customer and property records for this branch.</p></div>
+    <div class="button-row"><a class="button button-secondary" href="{% url 'office:customer-export' branch %}">Export CSV</a><a class="button button-primary" href="{% url 'office:customer-create' branch %}">New customer</a></div>
 </div>
 <form method="get" class="search-form">
     <label class="sr-only" for="customer-search">Search customers</label>
@@ -18,7 +18,7 @@
             <td><b>{{ customer.display_name }}</b>{% if not customer.active %}<small>Inactive</small>{% endif %}</td>
             <td>{{ customer.contact_name|default:'—' }}<small>{{ customer.email }}</small></td>
             <td>{{ customer.postcode }}</td><td>{{ customer.property_count }}</td><td>{{ customer.invoice_count }}</td>
-            <td><a href="{% url 'office:customer-detail' customer.pk %}">Open</a></td>
+            <td><a href="{% url 'office:customer-detail' branch customer.pk %}">Open</a></td>
         </tr>{% endfor %}</tbody>
     </table></div>
     {% else %}<div class="empty-state"><h2>No customers found</h2><p>Add the first customer or change the search.</p></div>{% endif %}

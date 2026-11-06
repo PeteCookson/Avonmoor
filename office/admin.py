@@ -18,8 +18,8 @@ class PropertyInline(admin.TabularInline):
 
 @admin.register(Customer)
 class CustomerAdmin(admin.ModelAdmin):
-    list_display = ('display_name', 'contact_name', 'postcode', 'email', 'active')
-    list_filter = ('active',)
+    list_display = ('display_name', 'branch', 'contact_name', 'postcode', 'email', 'active')
+    list_filter = ('branch', 'active')
     search_fields = ('display_name', 'contact_name', 'email', 'postcode')
     inlines = (PropertyInline,)
 
@@ -27,7 +27,7 @@ class CustomerAdmin(admin.ModelAdmin):
 @admin.register(Property)
 class PropertyAdmin(admin.ModelAdmin):
     list_display = ('__str__', 'customer', 'town', 'postcode', 'active')
-    list_filter = ('active',)
+    list_filter = ('customer__branch', 'active')
     search_fields = ('name', 'address_line_1', 'postcode', 'customer__display_name')
 
 
@@ -41,7 +41,7 @@ class WorkEntryAdmin(admin.ModelAdmin):
         'quantity',
         'unit_price',
     )
-    list_filter = ('category', 'service_date')
+    list_filter = ('property__customer__branch', 'category', 'service_date')
     search_fields = ('description', 'property__customer__display_name')
 
 
@@ -70,8 +70,8 @@ class InvoiceLineInline(admin.TabularInline):
 
 @admin.register(Invoice)
 class InvoiceAdmin(admin.ModelAdmin):
-    list_display = ('display_number', 'customer', 'issue_date', 'status', 'total')
-    list_filter = ('status', 'issue_date')
+    list_display = ('display_number', 'branch', 'customer', 'issue_date', 'status', 'total')
+    list_filter = ('branch', 'status', 'issue_date')
     search_fields = ('number', 'customer__display_name')
     readonly_fields = (
         'number',
@@ -88,7 +88,7 @@ class InvoiceAdmin(admin.ModelAdmin):
 
 @admin.register(InvoiceSequence)
 class InvoiceSequenceAdmin(admin.ModelAdmin):
-    list_display = ('year', 'last_number')
+    list_display = ('branch', 'year', 'last_number')
     ordering = ('-year',)
 
 

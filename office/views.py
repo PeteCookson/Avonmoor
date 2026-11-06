@@ -13,7 +13,7 @@ from django.db.models.deletion import ProtectedError
 from django.db.models import Count, DecimalField, ExpressionWrapper, F, Max, Q, Sum
 from django.http import HttpResponse
 from django.shortcuts import get_object_or_404, redirect, render
-from django.urls import reverse, reverse_lazy
+from django.urls import reverse
 from django.utils import timezone
 from django.views import View
 from django.views.generic import (
@@ -32,11 +32,34 @@ from .forms import (
     PropertyForm,
     WorkEntryForm,
 )
-from .models import Customer, Invoice, InvoiceEmail, InvoiceLine, Property, WorkEntry
+from .models import (
+    BusinessBranch,
+    Customer,
+    Invoice,
+    InvoiceEmail,
+    InvoiceLine,
+    Property,
+    WorkEntry,
+)
 from .pdf import build_invoice_pdf
 
 
 logger = logging.getLogger(__name__)
+
+BRANCH_META = {
+    BusinessBranch.GARDEN: {
+        'label': 'Garden & Property',
+        'short_label': 'Garden',
+        'work_label': 'Work log',
+        'record_label': 'Record work',
+    },
+    BusinessBranch.RAINWATER: {
+        'label': 'Rainwater Harvesting',
+        'short_label': 'Rainwater',
+        'work_label': 'Jobs log',
+        'record_label': 'Record job',
+    },
+}
 
 
 def append_work_entries(invoice, work_entries):
@@ -97,39 +120,86 @@ class OwnerOnlyMixin(LoginRequiredMixin, UserPassesTestMixin):
         return super().handle_no_permission()
 
 
+class BranchContextMixin:
+    def dispatch(self, request, *args, **kwargs):
+        self.branch = kwargs.get('branch')
+        if self.branch not in BusinessBranch.values:
+            raise PermissionDenied
+        self.branch_meta = BRANCH_META[self.branch]
+        return super().dispatch(request, *args, **kwargs)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            branch=self.branch,
+            branch_meta=self.branch_meta,
+        )
+        return context
+
+    def branch_reverse(self, name, **kwargs):
+        kwargs['branch'] = self.branch
+        return reverse(f'office:{name}', kwargs=kwargs)
+
+    def branch_context(self, **kwargs):
+        return {
+            'branch': self.branch,
+            'branch_meta': self.branch_meta,
+            **kwargs,
+        }
+
+
 class OfficeDashboardView(OfficeAccessMixin, View):
-    template_name = 'office/dashboard.html'
+    template_name = 'office/branch_select.html'
 
     def get(self, request):
+        return render(
+            request,
+            self.template_name,
+            {'branches': BRANCH_META},
+        )
+
+
+class BranchDashboardView(BranchContextMixin, OfficeAccessMixin, View):
+    template_name = 'office/dashboard.html'
+
+    def get(self, request, branch):
         line_total = ExpressionWrapper(
             F('lines__quantity') * F('lines__unit_price'),
             output_field=DecimalField(max_digits=12, decimal_places=2),
         )
         outstanding = Invoice.objects.filter(
-            status=Invoice.Status.ISSUED
+            branch=self.branch, status=Invoice.Status.ISSUED
         ).aggregate(total=Sum(line_total))['total'] or Decimal('0.00')
-        context = {
-            'active_customers': Customer.objects.filter(active=True).count(),
-            'uninvoiced_count': WorkEntry.objects.filter(
-                invoice_line__isnull=True
+        context = self.branch_context(
+            active_customers=Customer.objects.filter(
+                active=True, branch=self.branch
             ).count(),
-            'draft_count': Invoice.objects.filter(status=Invoice.Status.DRAFT).count(),
-            'outstanding': outstanding,
-            'recent_invoices': Invoice.objects.select_related('customer')[:8],
-            'recent_work': WorkEntry.objects.select_related(
+            uninvoiced_count=WorkEntry.objects.filter(
+                invoice_line__isnull=True,
+                property__customer__branch=self.branch,
+            ).count(),
+            draft_count=Invoice.objects.filter(
+                branch=self.branch, status=Invoice.Status.DRAFT
+            ).count(),
+            outstanding=outstanding,
+            recent_invoices=Invoice.objects.filter(branch=self.branch)
+            .select_related('customer')[:8],
+            recent_work=WorkEntry.objects.filter(
+                property__customer__branch=self.branch
+            ).select_related(
                 'property', 'property__customer'
             )[:8],
-        }
+        )
         return render(request, self.template_name, context)
 
 
-class CustomerListView(OfficeAccessMixin, ListView):
+class CustomerListView(BranchContextMixin, OfficeAccessMixin, ListView):
     model = Customer
     template_name = 'office/customer_list.html'
     context_object_name = 'customers'
 
     def get_queryset(self):
-        queryset = Customer.objects.annotate(
+        queryset = Customer.objects.filter(branch=self.branch).annotate(
             property_count=Count('properties', distinct=True),
             invoice_count=Count('invoices', distinct=True),
         )
@@ -144,10 +214,14 @@ class CustomerListView(OfficeAccessMixin, ListView):
         return queryset
 
 
-class CustomerCreateView(OfficeAccessMixin, CreateView):
+class CustomerCreateView(BranchContextMixin, OfficeAccessMixin, CreateView):
     model = Customer
     form_class = CustomerForm
     template_name = 'office/form.html'
+
+    def form_valid(self, form):
+        form.instance.branch = self.branch
+        return super().form_valid(form)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -156,13 +230,16 @@ class CustomerCreateView(OfficeAccessMixin, CreateView):
 
     def get_success_url(self):
         messages.success(self.request, 'Customer saved.')
-        return reverse('office:customer-detail', args=[self.object.pk])
+        return self.branch_reverse('customer-detail', pk=self.object.pk)
 
 
-class CustomerUpdateView(OfficeAccessMixin, UpdateView):
+class CustomerUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
     model = Customer
     form_class = CustomerForm
     template_name = 'office/form.html'
+
+    def get_queryset(self):
+        return Customer.objects.filter(branch=self.branch)
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
@@ -171,27 +248,33 @@ class CustomerUpdateView(OfficeAccessMixin, UpdateView):
 
     def get_success_url(self):
         messages.success(self.request, 'Customer updated.')
-        return reverse('office:customer-detail', args=[self.object.pk])
+        return self.branch_reverse('customer-detail', pk=self.object.pk)
 
 
-class CustomerDetailView(OfficeAccessMixin, DetailView):
+class CustomerDetailView(BranchContextMixin, OfficeAccessMixin, DetailView):
     model = Customer
     template_name = 'office/customer_detail.html'
     context_object_name = 'customer'
 
     def get_queryset(self):
-        return Customer.objects.prefetch_related(
+        return Customer.objects.filter(branch=self.branch).prefetch_related(
             'properties', 'invoices', 'properties__work_entries'
         )
 
 
-class PropertyCreateView(OfficeAccessMixin, CreateView):
+class PropertyCreateView(BranchContextMixin, OfficeAccessMixin, CreateView):
     model = Property
     form_class = PropertyForm
     template_name = 'office/form.html'
 
     def dispatch(self, request, *args, **kwargs):
-        self.customer = get_object_or_404(Customer, pk=kwargs['customer_pk'])
+        self.branch = kwargs.get('branch')
+        if self.branch not in BusinessBranch.values:
+            raise PermissionDenied
+        self.branch_meta = BRANCH_META[self.branch]
+        self.customer = get_object_or_404(
+            Customer, pk=kwargs['customer_pk'], branch=self.branch
+        )
         return super().dispatch(request, *args, **kwargs)
 
     def form_valid(self, form):
@@ -213,13 +296,16 @@ class PropertyCreateView(OfficeAccessMixin, CreateView):
 
     def get_success_url(self):
         messages.success(self.request, 'Property saved.')
-        return reverse('office:customer-detail', args=[self.customer.pk])
+        return self.branch_reverse('customer-detail', pk=self.customer.pk)
 
 
-class PropertyUpdateView(OfficeAccessMixin, UpdateView):
+class PropertyUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
     model = Property
     form_class = PropertyForm
     template_name = 'office/form.html'
+
+    def get_queryset(self):
+        return Property.objects.filter(customer__branch=self.branch)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -233,12 +319,16 @@ class PropertyUpdateView(OfficeAccessMixin, UpdateView):
 
     def get_success_url(self):
         messages.success(self.request, 'Property updated.')
-        return reverse('office:customer-detail', args=[self.object.customer_id])
+        return self.branch_reverse(
+            'customer-detail', pk=self.object.customer_id
+        )
 
 
-class PropertyDeleteView(OwnerOnlyMixin, View):
-    def post(self, request, pk):
-        property_record = get_object_or_404(Property, pk=pk)
+class PropertyDeleteView(BranchContextMixin, OwnerOnlyMixin, View):
+    def post(self, request, branch, pk):
+        property_record = get_object_or_404(
+            Property, pk=pk, customer__branch=self.branch
+        )
         customer_id = property_record.customer_id
         try:
             property_record.delete()
@@ -250,17 +340,21 @@ class PropertyDeleteView(OwnerOnlyMixin, View):
             )
         else:
             messages.success(request, 'Property deleted.')
-        return redirect('office:customer-detail', pk=customer_id)
+        return redirect(
+            'office:customer-detail', branch=self.branch, pk=customer_id
+        )
 
 
-class WorkEntryListView(OfficeAccessMixin, ListView):
+class WorkEntryListView(BranchContextMixin, OfficeAccessMixin, ListView):
     model = WorkEntry
     template_name = 'office/work_list.html'
     context_object_name = 'work_entries'
     paginate_by = 40
 
     def get_queryset(self):
-        queryset = WorkEntry.objects.select_related(
+        queryset = WorkEntry.objects.filter(
+            property__customer__branch=self.branch
+        ).select_related(
             'property', 'property__customer'
         )
         status = self.request.GET.get('status')
@@ -271,11 +365,18 @@ class WorkEntryListView(OfficeAccessMixin, ListView):
         return queryset
 
 
-class WorkEntryCreateView(OfficeAccessMixin, CreateView):
+class WorkEntryCreateView(BranchContextMixin, OfficeAccessMixin, CreateView):
     model = WorkEntry
     form_class = WorkEntryForm
     template_name = 'office/form.html'
-    success_url = reverse_lazy('office:work-list')
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['branch'] = self.branch
+        return kwargs
+
+    def get_success_url(self):
+        return self.branch_reverse('work-list')
 
     def get_initial(self):
         initial = super().get_initial()
@@ -294,17 +395,37 @@ class WorkEntryCreateView(OfficeAccessMixin, CreateView):
         return context
 
 
-class WorkEntryUpdateView(OfficeAccessMixin, UpdateView):
+class WorkEntryUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
     model = WorkEntry
     form_class = WorkEntryForm
     template_name = 'office/form.html'
-    success_url = reverse_lazy('office:work-list')
+
+    def get_queryset(self):
+        return WorkEntry.objects.filter(
+            property__customer__branch=self.branch
+        )
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['branch'] = self.branch
+        return kwargs
+
+    def get_success_url(self):
+        return self.branch_reverse('work-list')
 
     def dispatch(self, request, *args, **kwargs):
-        entry = self.get_object()
+        self.branch = kwargs.get('branch')
+        if self.branch not in BusinessBranch.values:
+            raise PermissionDenied
+        self.branch_meta = BRANCH_META[self.branch]
+        entry = get_object_or_404(
+            WorkEntry,
+            pk=kwargs['pk'],
+            property__customer__branch=self.branch,
+        )
         if entry.is_invoiced:
             messages.error(request, 'Invoiced work entries cannot be changed.')
-            return redirect('office:work-list')
+            return redirect('office:work-list', branch=self.branch)
         return super().dispatch(request, *args, **kwargs)
 
     def get_context_data(self, **kwargs):
@@ -313,14 +434,14 @@ class WorkEntryUpdateView(OfficeAccessMixin, UpdateView):
         return context
 
 
-class InvoiceListView(OfficeAccessMixin, ListView):
+class InvoiceListView(BranchContextMixin, OfficeAccessMixin, ListView):
     model = Invoice
     template_name = 'office/invoice_list.html'
     context_object_name = 'invoices'
     paginate_by = 40
 
     def get_queryset(self):
-        queryset = Invoice.objects.select_related('customer', 'property').prefetch_related(
+        queryset = Invoice.objects.filter(branch=self.branch).select_related('customer', 'property').prefetch_related(
             'lines'
         )
         status = self.request.GET.get('status')
@@ -329,23 +450,29 @@ class InvoiceListView(OfficeAccessMixin, ListView):
         return queryset
 
 
-class InvoiceDetailView(OfficeAccessMixin, DetailView):
+class InvoiceDetailView(BranchContextMixin, OfficeAccessMixin, DetailView):
     model = Invoice
     template_name = 'office/invoice_detail.html'
     context_object_name = 'invoice'
 
     def get_queryset(self):
-        return Invoice.objects.select_related('customer', 'property').prefetch_related(
+        return Invoice.objects.filter(branch=self.branch).select_related('customer', 'property').prefetch_related(
             'lines', 'email_history__sent_by'
         )
 
 
-class InvoiceCreateView(OfficeAccessMixin, CreateView):
+class InvoiceCreateView(BranchContextMixin, OfficeAccessMixin, CreateView):
     model = Invoice
     form_class = InvoiceCreateForm
     template_name = 'office/form.html'
 
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['branch'] = self.branch
+        return kwargs
+
     def form_valid(self, form):
+        form.instance.branch = self.branch
         form.instance.created_by = self.request.user
         response = super().form_valid(form)
         append_work_entries(self.object, form.cleaned_data['work_entries'])
@@ -362,38 +489,44 @@ class InvoiceCreateView(OfficeAccessMixin, CreateView):
         return context
 
     def get_success_url(self):
-        return reverse('office:invoice-edit', args=[self.object.pk])
+        return self.branch_reverse('invoice-edit', pk=self.object.pk)
 
 
-class InvoiceEditView(OfficeAccessMixin, View):
+class InvoiceEditView(BranchContextMixin, OfficeAccessMixin, View):
     template_name = 'office/invoice_edit.html'
 
     def get_invoice(self, pk):
-        invoice = get_object_or_404(Invoice, pk=pk)
+        invoice = get_object_or_404(Invoice, pk=pk, branch=self.branch)
         if invoice.status != Invoice.Status.DRAFT:
             messages.warning(self.request, 'Issued invoices are locked.')
             return None
         return invoice
 
-    def get(self, request, pk):
+    def get(self, request, branch, pk):
         invoice = self.get_invoice(pk)
         if invoice is None:
-            return redirect('office:invoice-detail', pk=pk)
+            return redirect(
+                'office:invoice-detail', branch=self.branch, pk=pk
+            )
         return render(
             request,
             self.template_name,
             {
                 'invoice': invoice,
-                'form': InvoiceForm(instance=invoice),
+                'form': InvoiceForm(instance=invoice, branch=self.branch),
                 'formset': InvoiceLineFormSet(instance=invoice),
+                'branch': self.branch,
+                'branch_meta': self.branch_meta,
             },
         )
 
-    def post(self, request, pk):
+    def post(self, request, branch, pk):
         invoice = self.get_invoice(pk)
         if invoice is None:
-            return redirect('office:invoice-detail', pk=pk)
-        form = InvoiceForm(request.POST, instance=invoice)
+            return redirect(
+                'office:invoice-detail', branch=self.branch, pk=pk
+            )
+        form = InvoiceForm(request.POST, instance=invoice, branch=self.branch)
         formset = InvoiceLineFormSet(request.POST, instance=invoice)
         if form.is_valid() and formset.is_valid():
             selected_ids = list(
@@ -417,40 +550,52 @@ class InvoiceEditView(OfficeAccessMixin, View):
                 return render(
                     request,
                     self.template_name,
-                    {'invoice': invoice, 'form': form, 'formset': formset},
+                    self.branch_context(
+                        invoice=invoice, form=form, formset=formset
+                    ),
                 )
             messages.success(request, 'Draft invoice updated.')
-            return redirect('office:invoice-detail', pk=invoice.pk)
+            return redirect(
+                'office:invoice-detail', branch=self.branch, pk=invoice.pk
+            )
         return render(
             request,
             self.template_name,
-            {'invoice': invoice, 'form': form, 'formset': formset},
+            self.branch_context(invoice=invoice, form=form, formset=formset),
         )
 
 
-class InvoiceIssueView(OfficeAccessMixin, View):
-    def post(self, request, pk):
-        invoice = get_object_or_404(Invoice, pk=pk)
+class InvoiceIssueView(BranchContextMixin, OfficeAccessMixin, View):
+    def post(self, request, branch, pk):
+        invoice = get_object_or_404(Invoice, pk=pk, branch=self.branch)
         try:
             invoice = invoice.issue()
         except ValidationError as error:
             messages.error(request, '; '.join(error.messages))
-            return redirect('office:invoice-edit', pk=invoice.pk)
+            return redirect(
+                'office:invoice-edit', branch=self.branch, pk=invoice.pk
+            )
         messages.success(
             request,
             f'{invoice.number} has been issued and locked. The PDF is ready.',
         )
-        return redirect('office:invoice-detail', pk=invoice.pk)
+        return redirect(
+            'office:invoice-detail', branch=self.branch, pk=invoice.pk
+        )
 
 
-class InvoicePdfView(OfficeAccessMixin, View):
-    def get(self, request, pk):
+class InvoicePdfView(BranchContextMixin, OfficeAccessMixin, View):
+    def get(self, request, branch, pk):
         invoice = get_object_or_404(
-            Invoice.objects.prefetch_related('lines'), pk=pk
+            Invoice.objects.prefetch_related('lines'),
+            pk=pk,
+            branch=self.branch,
         )
         if invoice.status == Invoice.Status.DRAFT:
             messages.warning(request, 'Issue the invoice before downloading its PDF.')
-            return redirect('office:invoice-edit', pk=invoice.pk)
+            return redirect(
+                'office:invoice-edit', branch=self.branch, pk=invoice.pk
+            )
         content = build_invoice_pdf(invoice)
         response = HttpResponse(content, content_type='application/pdf')
         response['Content-Disposition'] = (
@@ -459,13 +604,14 @@ class InvoicePdfView(OfficeAccessMixin, View):
         return response
 
 
-class InvoiceEmailView(OfficeAccessMixin, View):
+class InvoiceEmailView(BranchContextMixin, OfficeAccessMixin, View):
     template_name = 'office/invoice_email.html'
 
     def get_invoice(self, pk):
         return get_object_or_404(
             Invoice.objects.select_related('customer').prefetch_related('lines'),
             pk=pk,
+            branch=self.branch,
         )
 
     def initial(self, invoice):
@@ -490,10 +636,12 @@ class InvoiceEmailView(OfficeAccessMixin, View):
         invoice = self.get_invoice(pk)
         if invoice.status not in (Invoice.Status.ISSUED, Invoice.Status.PAID):
             messages.warning(request, 'Only issued or paid invoices can be emailed.')
-            return invoice, redirect('office:invoice-detail', pk=invoice.pk)
+            return invoice, redirect(
+                'office:invoice-detail', branch=self.branch, pk=invoice.pk
+            )
         return invoice, None
 
-    def get(self, request, pk):
+    def get(self, request, branch, pk):
         self.invoice, blocked = self.emailable_invoice(request, pk)
         if blocked:
             return blocked
@@ -501,10 +649,10 @@ class InvoiceEmailView(OfficeAccessMixin, View):
         return render(
             request,
             self.template_name,
-            {'invoice': self.invoice, 'form': form},
+            self.branch_context(invoice=self.invoice, form=form),
         )
 
-    def post(self, request, pk):
+    def post(self, request, branch, pk):
         self.invoice, blocked = self.emailable_invoice(request, pk)
         if blocked:
             return blocked
@@ -542,43 +690,51 @@ class InvoiceEmailView(OfficeAccessMixin, View):
                     request,
                     f'{self.invoice.number} emailed to {form.cleaned_data["recipient"]}.',
                 )
-                return redirect('office:invoice-detail', pk=self.invoice.pk)
+                return redirect(
+                    'office:invoice-detail',
+                    branch=self.branch,
+                    pk=self.invoice.pk,
+                )
         return render(
             request,
             self.template_name,
-            {'invoice': self.invoice, 'form': form},
+            self.branch_context(invoice=self.invoice, form=form),
         )
 
 
-class InvoiceMarkPaidView(OfficeAccessMixin, View):
-    def post(self, request, pk):
-        invoice = get_object_or_404(Invoice, pk=pk)
+class InvoiceMarkPaidView(BranchContextMixin, OfficeAccessMixin, View):
+    def post(self, request, branch, pk):
+        invoice = get_object_or_404(Invoice, pk=pk, branch=self.branch)
         try:
             invoice.mark_paid()
         except ValidationError as error:
             messages.error(request, '; '.join(error.messages))
         else:
             messages.success(request, f'{invoice.number} marked as paid.')
-        return redirect('office:invoice-detail', pk=invoice.pk)
+        return redirect(
+            'office:invoice-detail', branch=self.branch, pk=invoice.pk
+        )
 
 
-class InvoiceCancelView(OfficeAccessMixin, View):
-    def post(self, request, pk):
-        invoice = get_object_or_404(Invoice, pk=pk)
+class InvoiceCancelView(BranchContextMixin, OfficeAccessMixin, View):
+    def post(self, request, branch, pk):
+        invoice = get_object_or_404(Invoice, pk=pk, branch=self.branch)
         try:
             invoice.cancel()
         except ValidationError as error:
             messages.error(request, '; '.join(error.messages))
         else:
             messages.success(request, f'{invoice.number} cancelled.')
-        return redirect('office:invoice-detail', pk=invoice.pk)
+        return redirect(
+            'office:invoice-detail', branch=self.branch, pk=invoice.pk
+        )
 
 
-class CustomerExportView(OfficeAccessMixin, View):
-    def get(self, request):
+class CustomerExportView(BranchContextMixin, OfficeAccessMixin, View):
+    def get(self, request, branch):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = (
-            'attachment; filename="avonmoor-customers.csv"'
+            f'attachment; filename="avonmoor-{self.branch}-customers.csv"'
         )
         writer = csv.writer(response)
         writer.writerow(
@@ -595,7 +751,7 @@ class CustomerExportView(OfficeAccessMixin, View):
                 'Active',
             ]
         )
-        for customer in Customer.objects.all():
+        for customer in Customer.objects.filter(branch=self.branch):
             writer.writerow(
                 [
                     customer.display_name,
@@ -613,11 +769,11 @@ class CustomerExportView(OfficeAccessMixin, View):
         return response
 
 
-class InvoiceExportView(OfficeAccessMixin, View):
-    def get(self, request):
+class InvoiceExportView(BranchContextMixin, OfficeAccessMixin, View):
+    def get(self, request, branch):
         response = HttpResponse(content_type='text/csv')
         response['Content-Disposition'] = (
-            'attachment; filename="avonmoor-invoices.csv"'
+            f'attachment; filename="avonmoor-{self.branch}-invoices.csv"'
         )
         writer = csv.writer(response)
         writer.writerow(
@@ -633,7 +789,7 @@ class InvoiceExportView(OfficeAccessMixin, View):
                 'Cancelled at',
             ]
         )
-        invoices = Invoice.objects.select_related(
+        invoices = Invoice.objects.filter(branch=self.branch).select_related(
             'customer', 'property'
         ).prefetch_related('lines')
         for invoice in invoices:

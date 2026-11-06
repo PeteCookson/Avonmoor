@@ -3,33 +3,33 @@
 {% block content %}
 <div class="page-heading">
     <div>
-        <p class="eyebrow">AVONMOOR OFFICE</p>
-        <h1>Business dashboard</h1>
-        <p class="lede">Customers, completed work and invoices in one place.</p>
+        <p class="eyebrow">{{ branch_meta.label|upper }}</p>
+        <h1>{{ branch_meta.label }} dashboard</h1>
+        <p class="lede">Customers, {% if branch == 'rainwater' %}jobs{% else %}completed work{% endif %} and invoices for this branch.</p>
     </div>
     <div class="button-row">
-        <a class="button button-secondary" href="{% url 'office:work-create' %}">Record work</a>
-        <a class="button button-primary" href="{% url 'office:invoice-create' %}">New invoice</a>
+        <a class="button button-secondary" href="{% url 'office:work-create' branch %}">{{ branch_meta.record_label }}</a>
+        <a class="button button-primary" href="{% url 'office:invoice-create' branch %}">New invoice</a>
     </div>
 </div>
 
 <section class="metric-grid" aria-label="Office summary">
-    <a href="{% url 'office:customer-list' %}" class="metric-card"><span>Active customers</span><strong>{{ active_customers }}</strong></a>
-    <a href="{% url 'office:work-list' %}?status=uninvoiced" class="metric-card"><span>Uninvoiced work</span><strong>{{ uninvoiced_count }}</strong></a>
-    <a href="{% url 'office:invoice-list' %}?status=draft" class="metric-card"><span>Draft invoices</span><strong>{{ draft_count }}</strong></a>
-    <a href="{% url 'office:invoice-list' %}?status=issued" class="metric-card metric-money"><span>Outstanding</span><strong>£{{ outstanding|floatformat:2 }}</strong></a>
+    <a href="{% url 'office:customer-list' branch %}" class="metric-card"><span>Active customers</span><strong>{{ active_customers }}</strong></a>
+    <a href="{% url 'office:work-list' branch %}?status=uninvoiced" class="metric-card"><span>Uninvoiced {% if branch == 'rainwater' %}jobs{% else %}work{% endif %}</span><strong>{{ uninvoiced_count }}</strong></a>
+    <a href="{% url 'office:invoice-list' branch %}?status=draft" class="metric-card"><span>Draft invoices</span><strong>{{ draft_count }}</strong></a>
+    <a href="{% url 'office:invoice-list' branch %}?status=issued" class="metric-card metric-money"><span>Outstanding</span><strong>£{{ outstanding|floatformat:2 }}</strong></a>
 </section>
 
 <div class="dashboard-grid">
     <section class="panel">
         <div class="section-heading">
             <h2>Recent invoices</h2>
-            <a href="{% url 'office:invoice-list' %}">View all</a>
+            <a href="{% url 'office:invoice-list' branch %}">View all</a>
         </div>
         {% if recent_invoices %}
         <div class="compact-list">
             {% for invoice in recent_invoices %}
-            <a href="{% url 'office:invoice-detail' invoice.pk %}">
+            <a href="{% url 'office:invoice-detail' branch invoice.pk %}">
                 <span><b>{{ invoice.display_number }}</b><small>{{ invoice.customer.display_name }}</small></span>
                 <span class="align-right"><b>£{{ invoice.total|floatformat:2 }}</b><small class="status status-{{ invoice.status }}">{{ invoice.get_status_display }}</small></span>
             </a>
@@ -40,12 +40,12 @@
     <section class="panel">
         <div class="section-heading">
             <h2>Recent work</h2>
-            <a href="{% url 'office:work-list' %}">View all</a>
+            <a href="{% url 'office:work-list' branch %}">View all</a>
         </div>
         {% if recent_work %}
         <div class="compact-list">
             {% for entry in recent_work %}
-            <a href="{% if entry.is_invoiced %}{% url 'office:invoice-detail' entry.invoice_line.invoice_id %}{% else %}{% url 'office:work-edit' entry.pk %}{% endif %}">
+            <a href="{% if entry.is_invoiced %}{% url 'office:invoice-detail' branch entry.invoice_line.invoice_id %}{% else %}{% url 'office:work-edit' branch entry.pk %}{% endif %}">
                 <span><b>{{ entry.property.customer.display_name }}</b><small>{{ entry.description }}</small></span>
                 <span class="align-right"><b>£{{ entry.total|floatformat:2 }}</b><small>{{ entry.service_date|date:'d M Y' }}</small></span>
             </a>

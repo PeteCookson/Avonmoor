@@ -23,6 +23,8 @@ from reportlab.platypus import (
     TableStyle,
 )
 
+from .models import BusinessBranch
+
 
 DEEP_GREEN = colors.HexColor('#0B4540')
 LEAF = colors.HexColor('#3E7A45')
@@ -69,6 +71,17 @@ def _address_lines(snapshot):
 
 
 def build_invoice_pdf(invoice):
+    if invoice.branch == BusinessBranch.RAINWATER:
+        primary = colors.HexColor('#1A303D')
+        secondary = colors.HexColor('#30569A')
+        pale = colors.HexColor('#EAF5FA')
+        line_colour = colors.HexColor('#D7DEE1')
+    else:
+        primary = DEEP_GREEN
+        secondary = LEAF
+        pale = PALE_GREEN
+        line_colour = LINE
+
     output = BytesIO()
     document = SimpleDocTemplate(
         output,
@@ -87,7 +100,7 @@ def build_invoice_pdf(invoice):
         fontName='AvonmoorSans',
         fontSize=9.5,
         leading=13,
-        textColor=DEEP_GREEN,
+        textColor=primary,
     )
     small = ParagraphStyle(
         'Small', parent=body, fontSize=8, leading=11, textColor=GREY
@@ -98,7 +111,7 @@ def build_invoice_pdf(invoice):
         fontSize=8,
         leading=10,
         fontName='AvonmoorSans-Bold',
-        textColor=LEAF,
+        textColor=secondary,
         spaceAfter=3,
     )
     title = ParagraphStyle(
@@ -107,7 +120,7 @@ def build_invoice_pdf(invoice):
         fontName='Times-Roman',
         fontSize=30,
         leading=34,
-        textColor=DEEP_GREEN,
+        textColor=primary,
     )
     right = ParagraphStyle('Right', parent=body, alignment=TA_RIGHT)
     table_text = ParagraphStyle('TableText', parent=body, fontSize=8.5, leading=11)
@@ -164,6 +177,7 @@ def build_invoice_pdf(invoice):
 
     invoice_meta = Paragraph(
         f'<b>Invoice number</b>&nbsp;&nbsp; {invoice.display_number}<br/>'
+        f'<b>Branch</b>&nbsp;&nbsp; {invoice.get_branch_display()}<br/>'
         f'<b>Invoice date</b>&nbsp;&nbsp; '
         f'{date_format(invoice.issue_date, "d/m/Y")}',
         right,
@@ -192,7 +206,7 @@ def build_invoice_pdf(invoice):
     address_box.setStyle(
         TableStyle(
             [
-                ('BACKGROUND', (0, 0), (-1, -1), PALE_GREEN),
+                ('BACKGROUND', (0, 0), (-1, -1), pale),
                 ('LEFTPADDING', (0, 0), (-1, -1), 5 * mm),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 5 * mm),
                 ('TOPPADDING', (0, 0), (-1, 0), 4 * mm),
@@ -233,10 +247,10 @@ def build_invoice_pdf(invoice):
     lines_table.setStyle(
         TableStyle(
             [
-                ('BACKGROUND', (0, 0), (-1, 0), DEEP_GREEN),
+                ('BACKGROUND', (0, 0), (-1, 0), primary),
                 ('TEXTCOLOR', (0, 0), (-1, 0), colors.white),
                 ('VALIGN', (0, 0), (-1, -1), 'TOP'),
-                ('GRID', (0, 0), (-1, -1), 0.4, LINE),
+                ('GRID', (0, 0), (-1, -1), 0.4, line_colour),
                 ('ROWBACKGROUNDS', (0, 1), (-1, -1), [colors.white, WARM_PAPER]),
                 ('LEFTPADDING', (0, 0), (-1, -1), 3 * mm),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 3 * mm),
@@ -255,7 +269,7 @@ def build_invoice_pdf(invoice):
     total_table.setStyle(
         TableStyle(
             [
-                ('BACKGROUND', (0, 0), (-1, -1), DEEP_GREEN),
+                ('BACKGROUND', (0, 0), (-1, -1), primary),
                 ('TEXTCOLOR', (0, 0), (-1, -1), colors.white),
                 ('LEFTPADDING', (0, 0), (-1, -1), 4 * mm),
                 ('RIGHTPADDING', (0, 0), (-1, -1), 4 * mm),
@@ -303,7 +317,7 @@ def build_invoice_pdf(invoice):
         canvas.setStrokeColor(COPPER)
         canvas.setLineWidth(0.7)
         canvas.line(17 * mm, 13 * mm, 193 * mm, 13 * mm)
-        canvas.setFillColor(DEEP_GREEN)
+        canvas.setFillColor(primary)
         canvas.setFont('AvonmoorSans-Bold', 7.5)
         canvas.drawCentredString(
             A4[0] / 2,

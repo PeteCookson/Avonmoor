@@ -9,7 +9,15 @@ from django.test import override_settings
 from django.urls import reverse
 
 from .forms import InvoiceForm
-from .models import Customer, Invoice, InvoiceEmail, InvoiceLine, Property, WorkEntry
+from .models import (
+    BusinessBranch,
+    Customer,
+    Invoice,
+    InvoiceEmail,
+    InvoiceLine,
+    Property,
+    WorkEntry,
+)
 from .views import available_work_entries_for_update
 
 
@@ -89,6 +97,20 @@ class OfficeAccessTests(OfficeFixtureMixin, TestCase):
             self.client.force_login(user)
             response = self.client.get(reverse('office:dashboard'))
             self.assertEqual(response.status_code, 200)
+
+    def test_office_home_separates_both_business_branches(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('office:dashboard'))
+        self.assertContains(response, 'Garden &amp; Property')
+        self.assertContains(response, 'Rainwater Harvesting')
+        self.assertContains(
+            response,
+            reverse('office:branch-dashboard', args=[BusinessBranch.GARDEN]),
+        )
+        self.assertContains(
+            response,
+            reverse('office:branch-dashboard', args=[BusinessBranch.RAINWATER]),
+        )
 
     def test_staff_login_without_next_redirects_to_office(self):
         response = self.client.post(
@@ -182,12 +204,30 @@ class PropertyWorkflowTests(OfficeFixtureMixin, TestCase):
         )
         self.assertNotContains(response, 'Delete')
 
+    def test_customer_registers_are_separate(self):
+        rainwater_customer = Customer.objects.create(
+            branch=BusinessBranch.RAINWATER,
+            display_name='Rainwater Only',
+            billing_address_1='2 Water Lane',
+            postcode='TQ10 9RW',
+        )
+        garden_response = self.client.get(
+            reverse('office:customer-list', args=[BusinessBranch.GARDEN])
+        )
+        rainwater_response = self.client.get(
+            reverse('office:customer-list', args=[BusinessBranch.RAINWATER])
+        )
+        self.assertContains(garden_response, self.customer.display_name)
+        self.assertNotContains(garden_response, rainwater_customer.display_name)
+        self.assertContains(rainwater_response, rainwater_customer.display_name)
+        self.assertNotContains(rainwater_response, self.customer.display_name)
+
 
 class InvoiceModelTests(OfficeFixtureMixin, TestCase):
     def test_issue_assigns_sequential_number_and_freezes_customer(self):
         invoice = self.make_invoice()
         issued = invoice.issue()
-        self.assertEqual(issued.number, 'INV-20261102-001')
+        self.assertEqual(issued.number, 'GPM-20261102-001')
         self.assertEqual(issued.status, Invoice.Status.ISSUED)
         self.assertEqual(issued.total, Decimal('50.00'))
         self.assertEqual(issued.customer_snapshot['display_name'], 'Test Customer')
@@ -223,8 +263,34 @@ class InvoiceModelTests(OfficeFixtureMixin, TestCase):
             unit_price=second_work.unit_price,
         )
         second = second.issue()
-        self.assertEqual(first.number, 'INV-20261231-001')
-        self.assertEqual(second.number, 'INV-20270103-001')
+        self.assertEqual(first.number, 'GPM-20261231-001')
+        self.assertEqual(second.number, 'GPM-20270103-001')
+
+    def test_branch_sequences_are_separate(self):
+        garden_invoice = self.make_invoice().issue()
+        rainwater_customer = Customer.objects.create(
+            branch=BusinessBranch.RAINWATER,
+            display_name='Rainwater Customer',
+            billing_address_1='2 Water Lane',
+            postcode='TQ10 9RW',
+        )
+        rainwater_invoice = Invoice.objects.create(
+            branch=BusinessBranch.RAINWATER,
+            customer=rainwater_customer,
+            issue_date=date(2026, 11, 2),
+            created_by=self.staff,
+        )
+        InvoiceLine.objects.create(
+            invoice=rainwater_invoice,
+            service_date=date(2026, 11, 2),
+            description='Rainwater system installation',
+            quantity=Decimal('1.00'),
+            unit=WorkEntry.Unit.JOB,
+            unit_price=Decimal('500.00'),
+        )
+        rainwater_invoice = rainwater_invoice.issue()
+        self.assertEqual(garden_invoice.number, 'GPM-20261102-001')
+        self.assertEqual(rainwater_invoice.number, 'RWH-20261102-001')
 
     def test_invoice_requires_line_before_issue(self):
         invoice = Invoice.objects.create(
@@ -308,6 +374,19 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
             'not one of the available choices',
             response.context['form'].errors['property'][0],
         )
+
+    def test_rainwater_invoice_rejects_garden_customer(self):
+        response = self.client.post(
+            reverse('office:invoice-create', args=[BusinessBranch.RAINWATER]),
+            {
+                'customer': self.customer.pk,
+                'property': self.property.pk,
+                'issue_date': '2026-11-02',
+            },
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Invoice.objects.exists())
+        self.assertIn('customer', response.context['form'].errors)
 
     def test_edit_draft_can_add_completed_work_entry(self):
         invoice = self.make_invoice()
@@ -450,7 +529,7 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         )
         self.assertEqual(response.status_code, 200)
         self.assertEqual(response['Content-Type'], 'application/pdf')
-        self.assertIn('INV-20261102-001.pdf', response['Content-Disposition'])
+        self.assertIn('GPM-20261102-001.pdf', response['Content-Disposition'])
         self.assertTrue(response.content.startswith(b'%PDF'))
         self.assertGreater(len(response.content), 5000)
 

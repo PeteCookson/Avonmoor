@@ -2,7 +2,7 @@
 {% load static %}
 {% block title %}Edit {{ invoice.display_number }} | Avonmoor Office{% endblock %}
 {% block content %}
-<a class="back-link" href="{% url 'office:invoice-detail' invoice.pk %}">← Invoice</a>
+<a class="back-link" href="{% url 'office:invoice-detail' branch invoice.pk %}">← Invoice</a>
 <div class="page-heading"><div><p class="eyebrow">DRAFT INVOICE</p><h1>{{ invoice.display_number }}</h1><p class="lede">Check every detail before issuing. Issued invoices are locked.</p></div></div>
 <form method="post" class="invoice-form" data-invoice-form>
 {% csrf_token %}
@@ -31,7 +31,7 @@
 {% endfor %}
 </div>
 </section>
-<div class="button-row sticky-actions"><button class="button button-primary" type="submit">Save draft</button><a class="button button-quiet" href="{% url 'office:invoice-detail' invoice.pk %}">Cancel</a></div>
+<div class="button-row sticky-actions"><button class="button button-primary" type="submit">Save draft</button><a class="button button-quiet" href="{% url 'office:invoice-detail' branch invoice.pk %}">Cancel</a></div>
 </form>
 <script src="{% static 'office/js/invoice_form.js' %}?v=20261102-1" defer></script>
 {% endblock %}

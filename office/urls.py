@@ -1,90 +1,126 @@
-from django.urls import path
+from django.urls import path, register_converter
 
 from . import views
 
 app_name = 'office'
 
+
+class BranchConverter:
+    regex = 'garden|rainwater'
+
+    def to_python(self, value):
+        return value
+
+    def to_url(self, value):
+        return value
+
+
+register_converter(BranchConverter, 'branch')
+
 urlpatterns = [
     path('', views.OfficeDashboardView.as_view(), name='dashboard'),
-    path('customers/', views.CustomerListView.as_view(), name='customer-list'),
-    path('customers/new/', views.CustomerCreateView.as_view(), name='customer-create'),
+    path('<branch:branch>/', views.BranchDashboardView.as_view(), name='branch-dashboard'),
+    path('<branch:branch>/customers/', views.CustomerListView.as_view(), name='customer-list'),
+    path('<branch:branch>/customers/new/', views.CustomerCreateView.as_view(), name='customer-create'),
     path(
-        'customers/<int:pk>/',
+        '<branch:branch>/customers/<int:pk>/',
         views.CustomerDetailView.as_view(),
         name='customer-detail',
     ),
     path(
-        'customers/<int:pk>/edit/',
+        '<branch:branch>/customers/<int:pk>/edit/',
         views.CustomerUpdateView.as_view(),
         name='customer-edit',
     ),
     path(
-        'customers/<int:customer_pk>/properties/new/',
+        '<branch:branch>/customers/<int:customer_pk>/properties/new/',
         views.PropertyCreateView.as_view(),
         name='property-create',
     ),
     path(
-        'properties/<int:pk>/edit/',
+        '<branch:branch>/properties/<int:pk>/edit/',
         views.PropertyUpdateView.as_view(),
         name='property-edit',
     ),
     path(
-        'properties/<int:pk>/delete/',
+        '<branch:branch>/properties/<int:pk>/delete/',
         views.PropertyDeleteView.as_view(),
         name='property-delete',
     ),
-    path('work/', views.WorkEntryListView.as_view(), name='work-list'),
-    path('work/new/', views.WorkEntryCreateView.as_view(), name='work-create'),
+    path('<branch:branch>/work/', views.WorkEntryListView.as_view(), name='work-list'),
+    path('<branch:branch>/work/new/', views.WorkEntryCreateView.as_view(), name='work-create'),
     path(
-        'work/<int:pk>/edit/',
+        '<branch:branch>/work/<int:pk>/edit/',
         views.WorkEntryUpdateView.as_view(),
         name='work-edit',
     ),
-    path('invoices/', views.InvoiceListView.as_view(), name='invoice-list'),
+    path('<branch:branch>/invoices/', views.InvoiceListView.as_view(), name='invoice-list'),
     path(
-        'exports/customers.csv',
+        '<branch:branch>/exports/customers.csv',
         views.CustomerExportView.as_view(),
         name='customer-export',
     ),
     path(
-        'exports/invoices.csv',
+        '<branch:branch>/exports/invoices.csv',
         views.InvoiceExportView.as_view(),
         name='invoice-export',
     ),
-    path('invoices/new/', views.InvoiceCreateView.as_view(), name='invoice-create'),
+    path('<branch:branch>/invoices/new/', views.InvoiceCreateView.as_view(), name='invoice-create'),
     path(
-        'invoices/<int:pk>/',
+        '<branch:branch>/invoices/<int:pk>/',
         views.InvoiceDetailView.as_view(),
         name='invoice-detail',
     ),
     path(
-        'invoices/<int:pk>/edit/',
+        '<branch:branch>/invoices/<int:pk>/edit/',
         views.InvoiceEditView.as_view(),
         name='invoice-edit',
     ),
     path(
-        'invoices/<int:pk>/issue/',
+        '<branch:branch>/invoices/<int:pk>/issue/',
         views.InvoiceIssueView.as_view(),
         name='invoice-issue',
     ),
     path(
-        'invoices/<int:pk>/pdf/',
+        '<branch:branch>/invoices/<int:pk>/pdf/',
         views.InvoicePdfView.as_view(),
         name='invoice-pdf',
     ),
     path(
-        'invoices/<int:pk>/email/',
+        '<branch:branch>/invoices/<int:pk>/email/',
         views.InvoiceEmailView.as_view(),
         name='invoice-email',
     ),
     path(
-        'invoices/<int:pk>/paid/',
+        '<branch:branch>/invoices/<int:pk>/paid/',
         views.InvoiceMarkPaidView.as_view(),
         name='invoice-paid',
     ),
     path(
-        'invoices/<int:pk>/cancel/',
+        '<branch:branch>/invoices/<int:pk>/cancel/',
         views.InvoiceCancelView.as_view(),
         name='invoice-cancel',
     ),
+    # Garden compatibility routes preserve existing bookmarks and integrations.
+    path('customers/', views.CustomerListView.as_view(), {'branch': 'garden'}, name='customer-list'),
+    path('customers/new/', views.CustomerCreateView.as_view(), {'branch': 'garden'}, name='customer-create'),
+    path('customers/<int:pk>/', views.CustomerDetailView.as_view(), {'branch': 'garden'}, name='customer-detail'),
+    path('customers/<int:pk>/edit/', views.CustomerUpdateView.as_view(), {'branch': 'garden'}, name='customer-edit'),
+    path('customers/<int:customer_pk>/properties/new/', views.PropertyCreateView.as_view(), {'branch': 'garden'}, name='property-create'),
+    path('properties/<int:pk>/edit/', views.PropertyUpdateView.as_view(), {'branch': 'garden'}, name='property-edit'),
+    path('properties/<int:pk>/delete/', views.PropertyDeleteView.as_view(), {'branch': 'garden'}, name='property-delete'),
+    path('work/', views.WorkEntryListView.as_view(), {'branch': 'garden'}, name='work-list'),
+    path('work/new/', views.WorkEntryCreateView.as_view(), {'branch': 'garden'}, name='work-create'),
+    path('work/<int:pk>/edit/', views.WorkEntryUpdateView.as_view(), {'branch': 'garden'}, name='work-edit'),
+    path('invoices/', views.InvoiceListView.as_view(), {'branch': 'garden'}, name='invoice-list'),
+    path('exports/customers.csv', views.CustomerExportView.as_view(), {'branch': 'garden'}, name='customer-export'),
+    path('exports/invoices.csv', views.InvoiceExportView.as_view(), {'branch': 'garden'}, name='invoice-export'),
+    path('invoices/new/', views.InvoiceCreateView.as_view(), {'branch': 'garden'}, name='invoice-create'),
+    path('invoices/<int:pk>/', views.InvoiceDetailView.as_view(), {'branch': 'garden'}, name='invoice-detail'),
+    path('invoices/<int:pk>/edit/', views.InvoiceEditView.as_view(), {'branch': 'garden'}, name='invoice-edit'),
+    path('invoices/<int:pk>/issue/', views.InvoiceIssueView.as_view(), {'branch': 'garden'}, name='invoice-issue'),
+    path('invoices/<int:pk>/pdf/', views.InvoicePdfView.as_view(), {'branch': 'garden'}, name='invoice-pdf'),
+    path('invoices/<int:pk>/email/', views.InvoiceEmailView.as_view(), {'branch': 'garden'}, name='invoice-email'),
+    path('invoices/<int:pk>/paid/', views.InvoiceMarkPaidView.as_view(), {'branch': 'garden'}, name='invoice-paid'),
+    path('invoices/<int:pk>/cancel/', views.InvoiceCancelView.as_view(), {'branch': 'garden'}, name='invoice-cancel'),
 ]
