@@ -54,9 +54,9 @@ def _sent_mailbox(connection):
 
 
 def _quote_mailbox_name(name):
-    """Quote an IMAP mailbox as an astring (imaplib does not quote it)."""
+    """Quote an IMAP mailbox name; imaplib does not quote it automatically."""
 
-    if not name or '\\r' in name or '\\n' in name or '\\x00' in name:
+    if not name or any(char in name for char in ('\\r', '\\n', '\\x00')):
         raise ValueError('Invalid IMAP mailbox name.')
     return '"' + name.replace('\\\\', '\\\\\\\\').replace('"', '\\\\"') + '"'
 
