@@ -53,6 +53,14 @@ def _sent_mailbox(connection):
     )
 
 
+def _quote_mailbox_name(name):
+    """Quote an IMAP mailbox as an astring (imaplib does not quote it)."""
+
+    if not name or '\\r' in name or '\\n' in name or '\\x00' in name:
+        raise ValueError('Invalid IMAP mailbox name.')
+    return '"' + name.replace('\\\\', '\\\\\\\\').replace('"', '\\\\"') + '"'
+
+
 def append_message_to_sent(email_message):
     """Append a complete Django email, including attachments, to IMAP Sent."""
 
