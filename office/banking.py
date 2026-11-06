@@ -13,7 +13,7 @@ from django.db import transaction as db_transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from .models import BankConnection, BankTransaction, Invoice, PaymentMatch
+from .models import BankConnection, BankTransaction, Customer, Invoice, PaymentMatch
 
 
 class MonzoAPIError(RuntimeError):
@@ -230,6 +230,72 @@ def match_payment(bank_transaction, invoice, *, method, user=None):
         return payment_match
 
 
+_CUSTOMER_NAME_STOP_WORDS = {
+    'AND',
+    'DR',
+    'MISS',
+    'MR',
+    'MRS',
+    'MS',
+    'THE',
+}
+
+
+def _normalised_words(value):
+    return re.findall(r'[A-Z0-9]+', str(value or '').upper())
+
+
+def _contains_words(search_words, candidate_words):
+    if not candidate_words or len(candidate_words) > len(search_words):
+        return False
+    width = len(candidate_words)
+    return any(
+        search_words[index:index + width] == candidate_words
+        for index in range(len(search_words) - width + 1)
+    )
+
+
+def _customer_name_invoice_candidates(searchable, invoices):
+    """Return exact-balance invoices identified unambiguously by customer name."""
+    search_words = _normalised_words(searchable)
+    customers = list(Customer.objects.only('id', 'display_name'))
+
+    # Prefer a complete customer name. It is stronger than a single first name
+    # or surname, but must still identify just one customer in the database.
+    full_name_customer_ids = {
+        customer.pk
+        for customer in customers
+        if _contains_words(search_words, _normalised_words(customer.display_name))
+    }
+    if len(full_name_customer_ids) == 1:
+        customer_id = next(iter(full_name_customer_ids))
+        return [
+            invoice for invoice in invoices if invoice.customer_id == customer_id
+        ]
+
+    # Old references often contain only a first name or surname. A single name
+    # is accepted only when it belongs to one customer across the entire ledger.
+    token_owners = {}
+    for customer in customers:
+        tokens = {
+            token
+            for token in _normalised_words(customer.display_name)
+            if len(token) >= 3 and token not in _CUSTOMER_NAME_STOP_WORDS
+        }
+        for token in tokens:
+            token_owners.setdefault(token, set()).add(customer.pk)
+
+    identified_customer_ids = {
+        next(iter(owner_ids))
+        for token, owner_ids in token_owners.items()
+        if len(owner_ids) == 1 and token in search_words
+    }
+    if len(identified_customer_ids) != 1:
+        return []
+    customer_id = next(iter(identified_customer_ids))
+    return [invoice for invoice in invoices if invoice.customer_id == customer_id]
+
+
 def auto_match_transaction(bank_transaction):
     if (
         not bank_transaction.is_incoming
@@ -237,24 +303,41 @@ def auto_match_transaction(bank_transaction):
         or hasattr(bank_transaction, 'payment_match')
     ):
         return None
-    searchable = ' '.join(
+    invoice_searchable = ' '.join(
         [
             bank_transaction.description,
             bank_transaction.reference,
             json.dumps(bank_transaction.raw_data, sort_keys=True),
         ]
-    ).upper()
-    candidates = []
+    )
+    name_searchable = ' '.join(
+        [bank_transaction.description, bank_transaction.reference]
+    )
+    exact_balance_invoices = []
     for invoice in Invoice.objects.filter(
         status=Invoice.Status.ISSUED, number__isnull=False
-    ).prefetch_related('lines', 'payment_matches__transaction'):
+    ).select_related('customer').prefetch_related(
+        'lines', 'payment_matches__transaction'
+    ):
+        if bank_transaction.amount_minor == invoice_outstanding_minor(invoice):
+            exact_balance_invoices.append(invoice)
+
+    invoice_number_candidates = []
+    for invoice in exact_balance_invoices:
         pattern = rf'(?<![A-Z0-9]){re.escape(invoice.number.upper())}(?![A-Z0-9])'
-        if re.search(pattern, searchable):
-            candidates.append(invoice)
-    if len(candidates) != 1:
-        return None
-    invoice = candidates[0]
-    if bank_transaction.amount_minor != invoice_outstanding_minor(invoice):
+        if re.search(pattern, invoice_searchable.upper()):
+            invoice_number_candidates.append(invoice)
+    if len(invoice_number_candidates) == 1:
+        invoice = invoice_number_candidates[0]
+    else:
+        name_candidates = _customer_name_invoice_candidates(
+            name_searchable, exact_balance_invoices
+        )
+        if len(name_candidates) != 1:
+            return None
+        invoice = name_candidates[0]
+
+    if invoice not in exact_balance_invoices:
         return None
     return match_payment(
         bank_transaction,

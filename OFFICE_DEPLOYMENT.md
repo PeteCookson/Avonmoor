@@ -22,8 +22,10 @@ Private invoicing and work-record module for Avonmoor Ltd.
 - Optional read-only Monzo OAuth connection. Only the owner/superuser can
   authorise or disconnect the bank account.
 - Incoming GBP transactions only; spending transactions are not stored.
-- Automatic matching requires both the exact invoice number in the payment
-  data and the exact outstanding invoice balance.
+- Automatic matching requires the exact outstanding invoice balance plus
+  either the invoice number or an unambiguous customer first name, surname or
+  full name. Duplicate names or multiple equal-value invoices remain in the
+  review queue.
 - Amount-only and otherwise ambiguous payments remain in the review queue.
 - Staff can manually match an exact-balance payment, undo a match, or mark a
   payment as **Not Avonmoor** without deleting the bank record.

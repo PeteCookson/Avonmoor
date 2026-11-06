@@ -5,7 +5,7 @@
     <div>
         <p class="eyebrow">PAYMENT TRACKING</p>
         <h1>Payments</h1>
-        <p class="lede">Incoming payments are matched only when both the invoice number and exact outstanding amount agree.</p>
+        <p class="lede">Incoming payments are matched only when the exact outstanding amount agrees and the invoice number or customer name identifies one invoice.</p>
     </div>
     {% if connection.active %}
     <form method="post" action="{% url 'office:monzo-sync' %}">{% csrf_token %}<button class="button button-primary" type="submit">Sync now</button></form>

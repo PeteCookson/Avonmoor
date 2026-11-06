@@ -82,9 +82,59 @@ class PaymentMatchingTests(BankingFixtureMixin, TestCase):
         self.assertEqual(invoice.status, Invoice.Status.PAID)
         self.assertIsNotNone(invoice.paid_at)
 
-    def test_matching_amount_without_invoice_reference_stays_in_review(self):
+    def test_matching_amount_without_invoice_or_customer_name_stays_in_review(self):
         invoice = self.issued_invoice()
-        bank_transaction = self.bank_transaction(reference='Garden work')
+        bank_transaction = self.bank_transaction(
+            reference='Garden work', description='Unknown payer'
+        )
+
+        self.assertIsNone(auto_match_transaction(bank_transaction))
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, Invoice.Status.ISSUED)
+        self.assertFalse(PaymentMatch.objects.exists())
+
+    def test_exact_balance_and_full_customer_name_match_automatically(self):
+        invoice = self.issued_invoice()
+        bank_transaction = self.bank_transaction(
+            reference='Garden work', description='Paul Ream'
+        )
+
+        payment_match = auto_match_transaction(bank_transaction)
+
+        self.assertIsNotNone(payment_match)
+        self.assertEqual(payment_match.invoice, invoice)
+
+    def test_exact_balance_and_unique_surname_match_automatically(self):
+        invoice = self.issued_invoice()
+        bank_transaction = self.bank_transaction(
+            reference='REAM', description='Incoming transfer'
+        )
+
+        payment_match = auto_match_transaction(bank_transaction)
+
+        self.assertIsNotNone(payment_match)
+        self.assertEqual(payment_match.invoice, invoice)
+
+    def test_same_customer_with_two_equal_invoices_stays_in_review(self):
+        self.issued_invoice()
+        self.issued_invoice()
+        bank_transaction = self.bank_transaction(
+            reference='Paul Ream', description='Incoming transfer'
+        )
+
+        self.assertIsNone(auto_match_transaction(bank_transaction))
+        self.assertFalse(PaymentMatch.objects.exists())
+
+    def test_shared_surname_stays_in_review(self):
+        invoice = self.issued_invoice()
+        Customer.objects.create(
+            display_name='Sarah Ream',
+            billing_address_1='2 Test Lane',
+            postcode='TQ10 9AA',
+        )
+        bank_transaction = self.bank_transaction(
+            reference='Ream', description='Incoming transfer'
+        )
 
         self.assertIsNone(auto_match_transaction(bank_transaction))
         invoice.refresh_from_db()
