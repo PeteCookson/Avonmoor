@@ -1,4 +1,4 @@
-# Avonmoor Office: Stage 1
+# Avonmoor Office: Stages 1 and 1B
 
 Private invoicing and work-record module for Avonmoor Ltd.
 
@@ -16,6 +16,35 @@ Private invoicing and work-record module for Avonmoor Ltd.
 - Customer and invoice CSV exports for the accountant.
 - No automated invoice email and no bank connection in Stage 1. A staff user
   must review and confirm each invoice email before it is sent.
+
+## Stage 1B payment tracking
+
+- Optional read-only Monzo OAuth connection. Only the owner/superuser can
+  authorise or disconnect the bank account.
+- Incoming GBP transactions only; spending transactions are not stored.
+- Automatic matching requires both the exact invoice number in the payment
+  data and the exact outstanding invoice balance.
+- Amount-only and otherwise ambiguous payments remain in the review queue.
+- Staff can manually match an exact-balance payment, undo a match, or mark a
+  payment as **Not Avonmoor** without deleting the bank record.
+- Duplicate-safe Monzo CSV import remains available when OAuth is not
+  configured or a manual fallback is needed.
+- The integration cannot make transfers, move money or modify bank
+  transactions.
+- OAuth access and refresh tokens are encrypted before database storage.
+
+### Monzo setup
+
+Create a confidential client in Monzo developer tools and configure these
+Render environment variables:
+
+- `MONZO_CLIENT_ID`
+- `MONZO_CLIENT_SECRET`
+- `MONZO_REDIRECT_URI=https://www.avonmoor.co.uk/office/payments/monzo/callback/`
+
+Deploy the environment-variable change, then use **Office → Payments → Connect
+Monzo**. Select only the Avonmoor account. The application registers a webhook
+for live transaction updates and also provides a manual **Sync now** action.
 
 ## Release steps
 

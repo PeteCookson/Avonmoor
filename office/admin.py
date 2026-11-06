@@ -1,11 +1,14 @@
 from django.contrib import admin
 
 from .models import (
+    BankConnection,
+    BankTransaction,
     Customer,
     Invoice,
     InvoiceEmail,
     InvoiceLine,
     InvoiceSequence,
+    PaymentMatch,
     Property,
     WorkEntry,
 )
@@ -97,6 +100,71 @@ class InvoiceEmailAdmin(admin.ModelAdmin):
     list_display = ('invoice', 'recipient', 'sent_at', 'sent_by')
     search_fields = ('invoice__number', 'recipient', 'subject')
     readonly_fields = ('invoice', 'recipient', 'subject', 'body', 'sent_by', 'sent_at')
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(BankConnection)
+class BankConnectionAdmin(admin.ModelAdmin):
+    list_display = ('provider', 'account_name', 'active', 'last_synced_at')
+    readonly_fields = (
+        'provider',
+        'account_id',
+        'account_name',
+        'access_token_encrypted',
+        'refresh_token_encrypted',
+        'token_expires_at',
+        'webhook_id',
+        'active',
+        'connected_by',
+        'last_synced_at',
+        'created_at',
+        'updated_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(BankTransaction)
+class BankTransactionAdmin(admin.ModelAdmin):
+    list_display = (
+        'transaction_at',
+        'description',
+        'amount',
+        'source',
+        'review_status',
+    )
+    list_filter = ('source', 'currency', 'ignored_at')
+    search_fields = ('external_id', 'description', 'reference')
+    readonly_fields = (
+        'source',
+        'external_id',
+        'account_id',
+        'amount_minor',
+        'currency',
+        'transaction_at',
+        'settled_at',
+        'description',
+        'reference',
+        'raw_data',
+        'ignored_at',
+        'ignored_by',
+        'imported_at',
+        'updated_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
+
+
+@admin.register(PaymentMatch)
+class PaymentMatchAdmin(admin.ModelAdmin):
+    list_display = ('transaction', 'invoice', 'method', 'matched_at', 'matched_by')
+    readonly_fields = (
+        'transaction', 'invoice', 'method', 'matched_at', 'matched_by'
+    )
 
     def has_add_permission(self, request):
         return False

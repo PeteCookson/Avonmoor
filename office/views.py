@@ -458,7 +458,9 @@ class InvoiceDetailView(BranchContextMixin, OfficeAccessMixin, DetailView):
 
     def get_queryset(self):
         return Invoice.objects.filter(branch=self.branch).select_related('customer', 'property').prefetch_related(
-            'lines', 'email_history__sent_by'
+            'lines',
+            'email_history__sent_by',
+            'payment_matches__transaction',
         )
 
 

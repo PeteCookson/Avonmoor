@@ -24,6 +24,14 @@
 {% if invoice.status == 'issued' or invoice.status == 'paid' %}<form method="post" action="{% url 'office:invoice-cancel' branch invoice.pk %}" onsubmit="return confirm('Cancel this invoice? The record will be retained.');">{% csrf_token %}<button class="button button-danger" type="submit">Cancel invoice</button></form>{% endif %}
 {% endif %}
 </div>
+{% if invoice.payment_matches.all %}
+<section class="panel payment-history">
+    <div class="section-heading"><h2>Bank payment</h2></div>
+    {% for payment in invoice.payment_matches.all %}
+    <p><b>£{{ payment.transaction.amount|floatformat:2 }}</b> received {{ payment.transaction.transaction_at|date:'d M Y' }} · {{ payment.get_method_display }} match</p>
+    {% endfor %}
+</section>
+{% endif %}
 {% if invoice.email_history.all %}
 <section class="panel email-history">
     <div class="section-heading"><h2>Email history</h2></div>

@@ -1,0 +1,20 @@
+{% extends 'office/base.html' %}
+{% block title %}Match payment | Avonmoor Office{% endblock %}
+{% block content %}
+<a class="back-link" href="{% url 'office:payments' %}">← Payments</a>
+<div class="form-panel">
+    <p class="eyebrow">MANUAL REVIEW</p>
+    <h1>Match payment</h1>
+    <div class="payment-summary">
+        <strong>£{{ bank_transaction.amount|floatformat:2 }}</strong>
+        <span>{{ bank_transaction.description|default:'Incoming payment' }} · {{ bank_transaction.transaction_at|date:'d M Y' }}</span>
+        {% if bank_transaction.reference %}<small>Reference: {{ bank_transaction.reference }}</small>{% endif %}
+    </div>
+    <form method="post" class="stacked-form">
+        {% csrf_token %}
+        {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
+        <div class="field">{{ form.invoice.label_tag }}{{ form.invoice }}{{ form.invoice.errors }}<small>Only issued invoices with this exact outstanding amount are listed.</small></div>
+        <div class="button-row form-actions"><button class="button button-primary" type="submit">Confirm match</button><a class="button button-quiet" href="{% url 'office:payments' %}">Cancel</a></div>
+    </form>
+</div>
+{% endblock %}

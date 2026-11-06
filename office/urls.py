@@ -1,6 +1,6 @@
 from django.urls import path, register_converter
 
-from . import views
+from . import banking_views, views
 
 app_name = 'office'
 
@@ -19,6 +19,62 @@ register_converter(BranchConverter, 'branch')
 
 urlpatterns = [
     path('', views.OfficeDashboardView.as_view(), name='dashboard'),
+    path('payments/', banking_views.PaymentsView.as_view(), name='payments'),
+    path(
+        'payments/import/',
+        banking_views.BankCSVImportView.as_view(),
+        name='payment-import',
+    ),
+    path(
+        'payments/<int:pk>/match/',
+        banking_views.PaymentMatchView.as_view(),
+        name='payment-match',
+    ),
+    path(
+        'payments/<int:pk>/ignore/',
+        banking_views.PaymentIgnoreView.as_view(),
+        name='payment-ignore',
+    ),
+    path(
+        'payments/<int:pk>/restore/',
+        banking_views.PaymentRestoreView.as_view(),
+        name='payment-restore',
+    ),
+    path(
+        'payments/matches/<int:pk>/undo/',
+        banking_views.PaymentUnmatchView.as_view(),
+        name='payment-unmatch',
+    ),
+    path(
+        'payments/monzo/connect/',
+        banking_views.MonzoConnectView.as_view(),
+        name='monzo-connect',
+    ),
+    path(
+        'payments/monzo/callback/',
+        banking_views.MonzoCallbackView.as_view(),
+        name='monzo-callback',
+    ),
+    path(
+        'payments/monzo/account/',
+        banking_views.MonzoAccountView.as_view(),
+        name='monzo-account',
+    ),
+    path(
+        'payments/monzo/sync/',
+        banking_views.MonzoSyncView.as_view(),
+        name='monzo-sync',
+    ),
+    path(
+        'payments/monzo/disconnect/',
+        banking_views.MonzoDisconnectView.as_view(),
+        name='monzo-disconnect',
+    ),
+    path(
+        'payments/monzo/webhook/',
+        banking_views.MonzoWebhookView.as_view(),
+        name='monzo-webhook',
+    ),
     path('<branch:branch>/', views.BranchDashboardView.as_view(), name='branch-dashboard'),
     path('<branch:branch>/customers/', views.CustomerListView.as_view(), name='customer-list'),
     path('<branch:branch>/customers/new/', views.CustomerCreateView.as_view(), name='customer-create'),

@@ -10,6 +10,7 @@ from .models import (
     Property,
     WorkEntry,
 )
+from .banking import invoice_outstanding_minor
 
 
 class DateInput(forms.DateInput):
@@ -288,6 +289,72 @@ class InvoiceEmailForm(forms.Form):
     recipient = forms.EmailField(label='Send to')
     subject = forms.CharField(max_length=255)
     message = forms.CharField(widget=forms.Textarea(attrs={'rows': 8}))
+
+
+class BankCSVImportForm(forms.Form):
+    csv_file = forms.FileField(
+        label='Bank transactions CSV',
+        help_text='Monzo CSV exports are supported. Maximum file size: 2 MB.',
+        widget=forms.ClearableFileInput(attrs={'accept': '.csv,text/csv'}),
+    )
+
+    def clean_csv_file(self):
+        uploaded_file = self.cleaned_data['csv_file']
+        if not uploaded_file.name.lower().endswith('.csv'):
+            raise forms.ValidationError('Select a CSV file.')
+        if uploaded_file.size > 2 * 1024 * 1024:
+            raise forms.ValidationError('The CSV file must be smaller than 2 MB.')
+        return uploaded_file
+
+
+class MonzoAccountForm(forms.Form):
+    account = forms.ChoiceField(label='Avonmoor bank account')
+
+    def __init__(self, *args, accounts=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.accounts = accounts or []
+        self.fields['account'].choices = [
+            (account['id'], account.get('description') or account['id'])
+            for account in self.accounts
+        ]
+
+    def selected_account(self):
+        account_id = self.cleaned_data['account']
+        return next(
+            account for account in self.accounts if account['id'] == account_id
+        )
+
+
+class PaymentMatchForm(forms.Form):
+    invoice = forms.ModelChoiceField(
+        queryset=Invoice.objects.none(),
+        empty_label='Select an invoice',
+    )
+
+    def __init__(self, *args, bank_transaction=None, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.bank_transaction = bank_transaction
+        if bank_transaction and bank_transaction.is_incoming:
+            candidates = []
+            invoices = Invoice.objects.filter(
+                status=Invoice.Status.ISSUED
+            ).select_related('customer').prefetch_related(
+                'lines', 'payment_matches__transaction'
+            )
+            for invoice in invoices:
+                if invoice_outstanding_minor(invoice) == bank_transaction.amount_minor:
+                    candidates.append(invoice.pk)
+            self.fields['invoice'].queryset = Invoice.objects.filter(
+                pk__in=candidates
+            ).select_related('customer')
+            self.fields['invoice'].label_from_instance = self.invoice_label
+
+    @staticmethod
+    def invoice_label(invoice):
+        return (
+            f'{invoice.number} — {invoice.customer.display_name} — '
+            f'£{invoice.total:.2f} ({invoice.get_branch_display()})'
+        )
 
 
 class InvoiceLineForm(forms.ModelForm):

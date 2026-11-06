@@ -676,7 +676,7 @@ class SentMailboxTests(TestCase):
             'hello@avonmoor.co.uk', 'mailbox-password'
         )
         append_args = connection.append.call_args.args
-        self.assertEqual(append_args[0], 'Sent Items')
+        self.assertEqual(append_args[0], '"Sent Items"')
         self.assertEqual(append_args[1], '(\\Seen)')
         self.assertIn(
             b'Subject: Invoice GPM-20261106-001 from Avonmoor Ltd',
@@ -707,4 +707,4 @@ class SentMailboxTests(TestCase):
 
         self.assertEqual(folder, 'Sent')
         connection.list.assert_not_called()
-        self.assertEqual(connection.append.call_args.args[0], 'Sent')
+        self.assertEqual(connection.append.call_args.args[0], '"Sent"')

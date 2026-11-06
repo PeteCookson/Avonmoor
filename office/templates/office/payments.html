@@ -1,0 +1,91 @@
+{% extends 'office/base.html' %}
+{% block title %}Payments | Avonmoor Office{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">PAYMENT TRACKING</p>
+        <h1>Payments</h1>
+        <p class="lede">Incoming payments are matched only when both the invoice number and exact outstanding amount agree.</p>
+    </div>
+    {% if connection.active %}
+    <form method="post" action="{% url 'office:monzo-sync' %}">{% csrf_token %}<button class="button button-primary" type="submit">Sync now</button></form>
+    {% endif %}
+</div>
+
+<section class="panel connection-panel">
+    <div>
+        <h2>Bank connection</h2>
+        {% if connection.active %}
+        <p><b>{{ connection.account_name }}</b> is connected read-only through Monzo.</p>
+        <p class="muted-copy">Last synced: {% if connection.last_synced_at %}{{ connection.last_synced_at|date:'d M Y, H:i' }}{% else %}not yet{% endif %}</p>
+        {% elif monzo_configured %}
+        <p>Monzo is ready to connect. Only the owner can authorise bank access.</p>
+        {% else %}
+        <p>Monzo OAuth credentials have not been added yet. CSV import is available now.</p>
+        {% if user.is_superuser and callback_url %}<p class="muted-copy">Registered callback URL: <code>{{ callback_url }}</code></p>{% endif %}
+        {% endif %}
+    </div>
+    <div class="button-row">
+        {% if user.is_superuser and connection.active %}
+        <form method="post" action="{% url 'office:monzo-disconnect' %}" onsubmit="return confirm('Disconnect Monzo? Imported payment history will be retained.');">{% csrf_token %}<button class="button button-danger" type="submit">Disconnect</button></form>
+        {% elif user.is_superuser and monzo_configured %}
+        <form method="post" action="{% url 'office:monzo-connect' %}">{% csrf_token %}<button class="button button-primary" type="submit">Connect Monzo</button></form>
+        {% endif %}
+    </div>
+</section>
+
+<section class="panel csv-import-panel">
+    <div>
+        <h2>CSV fallback</h2>
+        <p class="muted-copy">Import a Monzo CSV export. Existing transaction IDs are skipped, so the same file can be imported safely.</p>
+    </div>
+    <form method="post" action="{% url 'office:payment-import' %}" enctype="multipart/form-data" class="csv-import-form">
+        {% csrf_token %}
+        {{ csv_form.csv_file }}
+        <button class="button button-secondary" type="submit">Import CSV</button>
+    </form>
+</section>
+
+<div class="filter-row payment-filters">
+    <a{% if status_filter == 'review' %} class="active-filter"{% endif %} href="{% url 'office:payments' %}?status=review">Review <b>{{ review_count }}</b></a>
+    <a{% if status_filter == 'matched' %} class="active-filter"{% endif %} href="{% url 'office:payments' %}?status=matched">Matched <b>{{ matched_count }}</b></a>
+    <a{% if status_filter == 'ignored' %} class="active-filter"{% endif %} href="{% url 'office:payments' %}?status=ignored">Not Avonmoor <b>{{ ignored_count }}</b></a>
+    <a{% if status_filter == 'all' %} class="active-filter"{% endif %} href="{% url 'office:payments' %}?status=all">All</a>
+</div>
+
+<section class="panel table-panel">
+    <div class="table-wrap">
+        <table>
+            <thead><tr><th>Date</th><th>Payer / description</th><th>Reference</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+            <tbody>
+            {% for transaction in transactions %}
+            <tr>
+                <td>{{ transaction.transaction_at|date:'d M Y' }}<small>{{ transaction.get_source_display }}</small></td>
+                <td><b>{{ transaction.description|default:'Incoming payment' }}</b></td>
+                <td>{{ transaction.reference|default:'—' }}</td>
+                <td><b>£{{ transaction.amount|floatformat:2 }}</b></td>
+                <td>
+                    {% if transaction.payment_match %}<span class="status status-paid">{{ transaction.payment_match.invoice.number }}</span>
+                    {% elif transaction.ignored_at %}<span class="status status-cancelled">Not Avonmoor</span>
+                    {% else %}<span class="status status-issued">Review</span>{% endif %}
+                </td>
+                <td>
+                    <div class="table-actions">
+                    {% if transaction.payment_match %}
+                        <a href="{% url 'office:invoice-detail' transaction.payment_match.invoice.branch transaction.payment_match.invoice.pk %}">Open invoice</a>
+                        <form method="post" action="{% url 'office:payment-unmatch' transaction.payment_match.pk %}">{% csrf_token %}<button type="submit">Undo</button></form>
+                    {% elif transaction.ignored_at %}
+                        <form method="post" action="{% url 'office:payment-restore' transaction.pk %}">{% csrf_token %}<button type="submit">Restore</button></form>
+                    {% else %}
+                        <a href="{% url 'office:payment-match' transaction.pk %}">Match</a>
+                        <form method="post" action="{% url 'office:payment-ignore' transaction.pk %}">{% csrf_token %}<button type="submit">Not Avonmoor</button></form>
+                    {% endif %}
+                    </div>
+                </td>
+            </tr>
+            {% empty %}<tr><td colspan="6" class="empty-state">No payments in this view.</td></tr>{% endfor %}
+            </tbody>
+        </table>
+    </div>
+</section>
+{% endblock %}

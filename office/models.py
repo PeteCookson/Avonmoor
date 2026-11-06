@@ -413,3 +413,134 @@ class InvoiceEmail(models.Model):
 
     def __str__(self):
         return f'{self.invoice.display_number} to {self.recipient}'
+
+
+class BankConnection(models.Model):
+    """One encrypted, read-only bank connection for Avonmoor Office."""
+
+    provider = models.CharField(max_length=20, default='monzo', unique=True)
+    account_id = models.CharField(max_length=80, blank=True)
+    account_name = models.CharField(max_length=160, blank=True)
+    access_token_encrypted = models.TextField(blank=True)
+    refresh_token_encrypted = models.TextField(blank=True)
+    token_expires_at = models.DateTimeField(null=True, blank=True)
+    webhook_id = models.CharField(max_length=80, blank=True)
+    active = models.BooleanField(default=False)
+    connected_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='office_bank_connections',
+    )
+    last_synced_at = models.DateTimeField(null=True, blank=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['provider']
+
+    def __str__(self):
+        return self.account_name or self.get_provider_display()
+
+    def get_provider_display(self):
+        return 'Monzo' if self.provider == 'monzo' else self.provider.title()
+
+    def set_tokens(self, access_token, refresh_token=''):
+        from .security import encrypt_secret
+
+        self.access_token_encrypted = encrypt_secret(access_token)
+        self.refresh_token_encrypted = (
+            encrypt_secret(refresh_token) if refresh_token else ''
+        )
+
+    def access_token(self):
+        from .security import decrypt_secret
+
+        return decrypt_secret(self.access_token_encrypted)
+
+    def refresh_token(self):
+        from .security import decrypt_secret
+
+        return decrypt_secret(self.refresh_token_encrypted)
+
+
+class BankTransaction(models.Model):
+    class Source(models.TextChoices):
+        MONZO = 'monzo', 'Monzo'
+        CSV = 'csv', 'CSV import'
+
+    source = models.CharField(max_length=12, choices=Source.choices)
+    external_id = models.CharField(max_length=180, unique=True)
+    account_id = models.CharField(max_length=80, blank=True)
+    amount_minor = models.BigIntegerField()
+    currency = models.CharField(max_length=3, default='GBP')
+    transaction_at = models.DateTimeField()
+    settled_at = models.DateTimeField(null=True, blank=True)
+    description = models.CharField(max_length=300, blank=True)
+    reference = models.CharField(max_length=300, blank=True)
+    raw_data = models.JSONField(default=dict, blank=True)
+    ignored_at = models.DateTimeField(null=True, blank=True)
+    ignored_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='office_ignored_bank_transactions',
+    )
+    imported_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-transaction_at', '-id']
+
+    def __str__(self):
+        return f'{self.transaction_at.date()}: {self.description} ({self.amount})'
+
+    @builtin_property
+    def amount(self):
+        return (Decimal(self.amount_minor) / Decimal('100')).quantize(
+            Decimal('0.01')
+        )
+
+    @builtin_property
+    def is_incoming(self):
+        return self.amount_minor > 0 and self.currency == 'GBP'
+
+    @builtin_property
+    def review_status(self):
+        if hasattr(self, 'payment_match'):
+            return 'matched'
+        if self.ignored_at:
+            return 'ignored'
+        return 'review'
+
+
+class PaymentMatch(models.Model):
+    class Method(models.TextChoices):
+        AUTOMATIC = 'automatic', 'Automatic'
+        MANUAL = 'manual', 'Manual'
+
+    transaction = models.OneToOneField(
+        BankTransaction,
+        on_delete=models.PROTECT,
+        related_name='payment_match',
+    )
+    invoice = models.ForeignKey(
+        Invoice,
+        on_delete=models.PROTECT,
+        related_name='payment_matches',
+    )
+    method = models.CharField(max_length=12, choices=Method.choices)
+    matched_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='office_payment_matches',
+    )
+    matched_at = models.DateTimeField(auto_now_add=True)
+
+    class Meta:
+        ordering = ['-matched_at', '-id']
+
+    def __str__(self):
+        return f'{self.transaction} → {self.invoice.display_number}'

@@ -7,7 +7,7 @@
     <meta name="theme-color" content="#0B4540">
     <title>{% block title %}Avonmoor Office{% endblock %}</title>
     <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
-    <link rel="stylesheet" href="{% static 'office/css/office.css' %}?v=20261104-1">
+    <link rel="stylesheet" href="{% static 'office/css/office.css' %}?v=20261106-2">
 </head>
 <body{% if branch %} class="branch-{{ branch }}"{% endif %}>
     <header class="app-header">
@@ -24,6 +24,7 @@
             <a href="{% url 'office:invoice-list' branch %}">Invoices</a>
             <a href="{% url 'office:dashboard' %}">Switch branch</a>
             {% endif %}
+            <a href="{% url 'office:payments' %}">Payments</a>
             <a href="{% url 'water_survey:survey-list' %}">Surveys</a>
         </nav>
         <form method="post" action="{% url 'logout' %}" class="sign-out">

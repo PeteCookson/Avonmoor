@@ -146,9 +146,23 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
 .invoice-summary .invoice-total { color: var(--green); font-size: 34px; }
 .invoice-actions { margin-top: 20px; }
 .invoice-actions form { margin: 0; }
-.email-history { margin-top: 20px; }
-.email-history p { margin: 0; padding: 11px 0; border-top: 1px solid var(--line); }
-.email-history p:first-of-type { border-top: 0; }
+.email-history, .payment-history { margin-top: 20px; }
+.email-history p, .payment-history p { margin: 0; padding: 11px 0; border-top: 1px solid var(--line); }
+.email-history p:first-of-type, .payment-history p:first-of-type { border-top: 0; }
+.connection-panel, .csv-import-panel { display: flex; align-items: center; justify-content: space-between; gap: 24px; margin-bottom: 18px; }
+.connection-panel h2, .csv-import-panel h2 { margin-bottom: 6px; }
+.connection-panel p, .csv-import-panel p { margin-bottom: 0; }
+.muted-copy { color: var(--muted); font-size: 13px; }
+.csv-import-form { display: flex; flex-wrap: wrap; align-items: center; justify-content: flex-end; gap: 10px; }
+.csv-import-form input[type=file] { max-width: 320px; }
+.payment-filters .active-filter { color: #fff; background: var(--green); border-color: var(--green); }
+.table-actions { display: flex; flex-wrap: wrap; gap: 8px; }
+.table-actions form { margin: 0; }
+.table-actions a, .table-actions button { padding: 0; border: 0; color: var(--leaf); background: transparent; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.payment-summary { display: grid; gap: 4px; margin: 24px 0; padding: 18px; border-radius: 7px; background: var(--pale-green); }
+.payment-summary strong { color: var(--green); font-size: 30px; }
+.payment-summary small { color: var(--muted); }
+code { overflow-wrap: anywhere; }
 .attachment-note { padding: 13px 15px; border-radius: 6px; color: var(--green); background: var(--pale-green); }
 .messages { display: grid; gap: 8px; margin-bottom: 20px; }
 .message { padding: 12px 15px; border-left: 4px solid var(--copper); border-radius: 6px; background: #FFF6EC; }
@@ -173,4 +187,6 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
     .field-description { grid-column: auto; }
     .button-row { width: 100%; }
     .button-row .button, .button-row form, .button-row form .button { width: 100%; }
+    .connection-panel, .csv-import-panel { align-items: stretch; flex-direction: column; }
+    .csv-import-form { align-items: stretch; justify-content: flex-start; }
 }

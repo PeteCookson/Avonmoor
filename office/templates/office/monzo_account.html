@@ -1,0 +1,14 @@
+{% extends 'office/base.html' %}
+{% block title %}Choose Monzo account | Avonmoor Office{% endblock %}
+{% block content %}
+<div class="form-panel">
+    <p class="eyebrow">MONZO CONNECTION</p>
+    <h1>Choose the Avonmoor account</h1>
+    <p class="lede">Only transactions from the account you select here will be imported. Do not select a Hot Pressed or personal account.</p>
+    <form method="post" class="stacked-form">
+        {% csrf_token %}
+        <div class="field">{{ form.account.label_tag }}{{ form.account }}{{ form.account.errors }}</div>
+        <div class="button-row form-actions"><button class="button button-primary" type="submit">Connect this account</button><a class="button button-quiet" href="{% url 'office:payments' %}">Cancel</a></div>
+    </form>
+</div>
+{% endblock %}

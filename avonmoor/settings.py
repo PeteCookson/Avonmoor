@@ -113,6 +113,14 @@ if (
 # Maps JavaScript API in Google Cloud Console.
 GOOGLE_MAPS_API_KEY = config('GOOGLE_MAPS_API_KEY', default='')
 
+# Read-only Monzo connection used by Avonmoor Office payment reconciliation.
+# The credentials belong to a confidential server-side OAuth client.
+MONZO_CLIENT_ID = config('MONZO_CLIENT_ID', default='').strip()
+MONZO_CLIENT_SECRET = config('MONZO_CLIENT_SECRET', default='').strip()
+MONZO_REDIRECT_URI = config('MONZO_REDIRECT_URI', default='').strip()
+MONZO_API_BASE_URL = 'https://api.monzo.com'
+MONZO_AUTHORIZE_URL = 'https://auth.monzo.com/'
+
 
 # Password validation
 # https://docs.djangoproject.com/en/5.0/ref/settings/#auth-password-validators
