@@ -25,6 +25,7 @@ from django.views.generic import (
 
 from .forms import (
     CustomerForm,
+    ExpenseForm,
     InvoiceCreateForm,
     InvoiceEmailForm,
     InvoiceForm,
@@ -35,6 +36,7 @@ from .forms import (
 from .models import (
     BusinessBranch,
     Customer,
+    Expense,
     Invoice,
     InvoiceEmail,
     InvoiceLine,
@@ -183,6 +185,11 @@ class BranchDashboardView(BranchContextMixin, OfficeAccessMixin, View):
                 branch=self.branch, status=Invoice.Status.DRAFT
             ).count(),
             outstanding=outstanding,
+            expense_total=Expense.objects.filter(
+                branch=self.branch,
+                voided_at__isnull=True,
+                expense_date__year=timezone.localdate().year,
+            ).aggregate(total=Sum('amount'))['total'] or Decimal('0.00'),
             recent_invoices=Invoice.objects.filter(branch=self.branch)
             .select_related('customer')[:8],
             recent_work=WorkEntry.objects.filter(
@@ -433,6 +440,109 @@ class WorkEntryUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
         context = super().get_context_data(**kwargs)
         context.update(page_title='Edit work entry', submit_label='Save changes')
         return context
+
+
+class ExpenseListView(BranchContextMixin, OfficeAccessMixin, ListView):
+    model = Expense
+    template_name = 'office/expense_list.html'
+    context_object_name = 'expenses'
+    paginate_by = 40
+
+    def get_queryset(self):
+        queryset = Expense.objects.filter(branch=self.branch).select_related(
+            'property', 'property__customer', 'created_by', 'voided_by'
+        )
+        status = self.request.GET.get('status', 'active')
+        if status == 'void':
+            queryset = queryset.filter(voided_at__isnull=False)
+        elif status != 'all':
+            queryset = queryset.filter(voided_at__isnull=True)
+        category = self.request.GET.get('category', '')
+        if category in Expense.Category.values:
+            queryset = queryset.filter(category=category)
+        return queryset
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        filtered = self.get_queryset()
+        context.update(
+            expense_total=filtered.aggregate(total=Sum('amount'))['total']
+            or Decimal('0.00'),
+            selected_status=self.request.GET.get('status', 'active'),
+            selected_category=self.request.GET.get('category', ''),
+            expense_categories=Expense.Category.choices,
+        )
+        return context
+
+
+class ExpenseCreateView(BranchContextMixin, OfficeAccessMixin, CreateView):
+    model = Expense
+    form_class = ExpenseForm
+    template_name = 'office/form.html'
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['branch'] = self.branch
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.branch = self.branch
+        form.instance.created_by = self.request.user
+        form.instance.updated_by = self.request.user
+        messages.success(self.request, 'Expense saved.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(page_title='Record expense', submit_label='Save expense')
+        return context
+
+    def get_success_url(self):
+        return self.branch_reverse('expense-list')
+
+
+class ExpenseUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
+    model = Expense
+    form_class = ExpenseForm
+    template_name = 'office/form.html'
+
+    def get_queryset(self):
+        return Expense.objects.filter(branch=self.branch, voided_at__isnull=True)
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['branch'] = self.branch
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.updated_by = self.request.user
+        messages.success(self.request, 'Expense updated.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(page_title='Edit expense', submit_label='Save changes')
+        return context
+
+    def get_success_url(self):
+        return self.branch_reverse('expense-list')
+
+
+class ExpenseVoidView(BranchContextMixin, OwnerOnlyMixin, View):
+    def post(self, request, branch, pk):
+        expense = get_object_or_404(
+            Expense, pk=pk, branch=self.branch, voided_at__isnull=True
+        )
+        try:
+            expense.void(request.user)
+        except ValidationError as error:
+            messages.error(request, '; '.join(error.messages))
+        else:
+            messages.success(
+                request,
+                'Expense voided. It remains in the audit trail and CSV export.',
+            )
+        return redirect('office:expense-list', branch=self.branch)
 
 
 class InvoiceListView(BranchContextMixin, OfficeAccessMixin, ListView):
@@ -781,6 +891,62 @@ class CustomerExportView(BranchContextMixin, OfficeAccessMixin, View):
                     customer.county,
                     customer.postcode,
                     'Yes' if customer.active else 'No',
+                ]
+            )
+        return response
+
+
+class ExpenseExportView(BranchContextMixin, OfficeAccessMixin, View):
+    def get(self, request, branch):
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = (
+            f'attachment; filename="avonmoor-{self.branch}-expenses.csv"'
+        )
+        writer = csv.writer(response)
+        writer.writerow(
+            [
+                'Date',
+                'Supplier',
+                'Category',
+                'Description',
+                'Customer',
+                'Property',
+                'Amount',
+                'Payment method',
+                'Reference',
+                'Notes',
+                'Status',
+                'Created by',
+                'Created at',
+                'Voided by',
+                'Voided at',
+            ]
+        )
+        expenses = Expense.objects.filter(branch=self.branch).select_related(
+            'property', 'property__customer', 'created_by', 'voided_by'
+        )
+        for expense in expenses:
+            writer.writerow(
+                [
+                    expense.expense_date.isoformat(),
+                    expense.supplier,
+                    expense.get_category_display(),
+                    expense.description,
+                    expense.property.customer.display_name
+                    if expense.property_id
+                    else '',
+                    str(expense.property) if expense.property_id else '',
+                    f'{expense.amount:.2f}',
+                    expense.get_payment_method_display(),
+                    expense.reference,
+                    expense.notes,
+                    'Void' if expense.is_void else 'Active',
+                    expense.created_by.get_username(),
+                    expense.created_at.isoformat(),
+                    expense.voided_by.get_username()
+                    if expense.voided_by_id
+                    else '',
+                    expense.voided_at.isoformat() if expense.voided_at else '',
                 ]
             )
         return response

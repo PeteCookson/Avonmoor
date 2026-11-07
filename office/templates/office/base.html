@@ -21,6 +21,7 @@
             {% if branch %}
             <a href="{% url 'office:customer-list' branch %}">Customers</a>
             <a href="{% url 'office:work-list' branch %}">{{ branch_meta.work_label }}</a>
+            <a href="{% url 'office:expense-list' branch %}">Expenses</a>
             <a href="{% url 'office:invoice-list' branch %}">Invoices</a>
             {% if branch == 'rainwater' %}<a href="{% url 'water_survey:survey-list' %}">Surveys</a>{% endif %}
             <a href="{% url 'office:dashboard' %}">Switch branch</a>

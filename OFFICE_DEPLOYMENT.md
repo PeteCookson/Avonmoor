@@ -1,4 +1,4 @@
-# Avonmoor Office: Stages 1 and 1B
+# Avonmoor Office: Stages 1, 1B and 1C
 
 Private invoicing and work-record module for Avonmoor Ltd.
 
@@ -34,6 +34,18 @@ Private invoicing and work-record module for Avonmoor Ltd.
 - The integration cannot make transfers, move money or modify bank
   transactions.
 - OAuth access and refresh tokens are encrypted before database storage.
+
+## Stage 1C expense tracking
+
+- Garden & Property and Rainwater Harvesting keep separate expense registers.
+- Staff can record and edit a dated supplier cost, category, description,
+  optional property/job, amount paid, payment method and reference.
+- The amount is the full amount paid; the application does not calculate VAT.
+- The accountant can review, edit and export expenses as CSV.
+- Only the owner/superuser can void an expense. Voiding preserves the original
+  record, user and timestamps for the audit trail instead of deleting it.
+- Outgoing Monzo transactions are not imported. The bank connection remains
+  read-only and limited to incoming payment reconciliation.
 
 ### Monzo setup
 

@@ -5,6 +5,7 @@ from django.forms import inlineformset_factory
 from .models import (
     BusinessBranch,
     Customer,
+    Expense,
     Invoice,
     InvoiceLine,
     Property,
@@ -181,6 +182,52 @@ class WorkEntryForm(forms.ModelForm):
                 customer__branch=branch,
             )
         self.fields['property'].queryset = properties.select_related('customer')
+
+
+class ExpenseForm(forms.ModelForm):
+    class Meta:
+        model = Expense
+        fields = [
+            'expense_date',
+            'supplier',
+            'category',
+            'description',
+            'property',
+            'amount',
+            'payment_method',
+            'reference',
+            'notes',
+        ]
+        widgets = {
+            'expense_date': DateInput(),
+            'notes': forms.Textarea(attrs={'rows': 3}),
+        }
+        help_texts = {
+            'property': 'Optional: link the cost to a specific customer property or job.',
+            'amount': 'Enter the full amount paid.',
+            'reference': 'Optional receipt, order or bank reference.',
+        }
+
+    def __init__(self, *args, branch=BusinessBranch.GARDEN, **kwargs):
+        super().__init__(*args, **kwargs)
+        self.branch = branch
+        current_property_id = getattr(self.instance, 'property_id', None)
+        properties = Property.objects.filter(
+            active=True, customer__branch=branch
+        )
+        if current_property_id:
+            properties = Property.objects.filter(
+                Q(active=True) | Q(pk=current_property_id),
+                customer__branch=branch,
+            )
+        self.fields['property'].queryset = properties.select_related('customer')
+
+    def clean(self):
+        cleaned = super().clean()
+        property_record = cleaned.get('property')
+        if property_record and property_record.customer.branch != self.branch:
+            self.add_error('property', 'Select a property from this branch.')
+        return cleaned
 
 
 class InvoiceCreateForm(forms.ModelForm):

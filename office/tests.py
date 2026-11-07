@@ -13,6 +13,7 @@ from .forms import InvoiceForm
 from .models import (
     BusinessBranch,
     Customer,
+    Expense,
     Invoice,
     InvoiceEmail,
     InvoiceLine,
@@ -243,6 +244,183 @@ class PropertyWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertNotContains(garden_response, rainwater_customer.display_name)
         self.assertContains(rainwater_response, rainwater_customer.display_name)
         self.assertNotContains(rainwater_response, self.customer.display_name)
+
+
+class ExpenseWorkflowTests(OfficeFixtureMixin, TestCase):
+    def expense_data(self, **overrides):
+        data = {
+            'expense_date': '2026-11-07',
+            'supplier': 'Devon Garden Supplies',
+            'category': Expense.Category.MATERIALS,
+            'description': 'Compost and stakes',
+            'property': self.property.pk,
+            'amount': '42.50',
+            'payment_method': Expense.PaymentMethod.CARD,
+            'reference': 'RCPT-1042',
+            'notes': 'For autumn maintenance',
+        }
+        data.update(overrides)
+        return data
+
+    def make_expense(self, **overrides):
+        values = {
+            'branch': BusinessBranch.GARDEN,
+            'expense_date': date(2026, 11, 7),
+            'supplier': 'Devon Garden Supplies',
+            'category': Expense.Category.MATERIALS,
+            'description': 'Compost and stakes',
+            'property': self.property,
+            'amount': Decimal('42.50'),
+            'payment_method': Expense.PaymentMethod.CARD,
+            'reference': 'RCPT-1042',
+            'created_by': self.staff,
+            'updated_by': self.staff,
+        }
+        values.update(overrides)
+        return Expense.objects.create(**values)
+
+    def test_accountant_can_record_and_edit_expense(self):
+        self.client.force_login(self.accountant)
+        response = self.client.post(
+            reverse('office:expense-create', args=[BusinessBranch.GARDEN]),
+            self.expense_data(),
+        )
+        self.assertRedirects(
+            response,
+            reverse('office:expense-list', args=[BusinessBranch.GARDEN]),
+        )
+        expense = Expense.objects.get()
+        self.assertEqual(expense.created_by, self.accountant)
+        self.assertEqual(expense.branch, BusinessBranch.GARDEN)
+
+        response = self.client.post(
+            reverse(
+                'office:expense-edit',
+                args=[BusinessBranch.GARDEN, expense.pk],
+            ),
+            self.expense_data(amount='45.00'),
+        )
+        self.assertEqual(response.status_code, 302)
+        expense.refresh_from_db()
+        self.assertEqual(expense.amount, Decimal('45.00'))
+        self.assertEqual(expense.updated_by, self.accountant)
+
+    def test_expense_register_is_separate_by_branch(self):
+        garden_expense = self.make_expense()
+        rainwater_customer = Customer.objects.create(
+            branch=BusinessBranch.RAINWATER,
+            display_name='Rainwater Customer',
+            billing_address_1='2 Water Lane',
+            postcode='TQ10 9RW',
+        )
+        rainwater_property = Property.objects.create(
+            customer=rainwater_customer,
+            name='Tank site',
+            address_line_1='2 Water Lane',
+            postcode='TQ10 9RW',
+        )
+        rainwater_expense = self.make_expense(
+            branch=BusinessBranch.RAINWATER,
+            supplier='Tank Supplier',
+            property=rainwater_property,
+        )
+        self.client.force_login(self.staff)
+
+        garden = self.client.get(
+            reverse('office:expense-list', args=[BusinessBranch.GARDEN])
+        )
+        rainwater = self.client.get(
+            reverse('office:expense-list', args=[BusinessBranch.RAINWATER])
+        )
+        self.assertContains(garden, garden_expense.supplier)
+        self.assertNotContains(garden, rainwater_expense.supplier)
+        self.assertContains(rainwater, rainwater_expense.supplier)
+        self.assertNotContains(rainwater, garden_expense.supplier)
+
+    def test_cross_branch_property_is_rejected(self):
+        rainwater_customer = Customer.objects.create(
+            branch=BusinessBranch.RAINWATER,
+            display_name='Rainwater Customer',
+            billing_address_1='2 Water Lane',
+            postcode='TQ10 9RW',
+        )
+        rainwater_property = Property.objects.create(
+            customer=rainwater_customer,
+            address_line_1='2 Water Lane',
+            postcode='TQ10 9RW',
+        )
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse('office:expense-create', args=[BusinessBranch.GARDEN]),
+            self.expense_data(property=rainwater_property.pk),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertFalse(Expense.objects.exists())
+
+    def test_accountant_cannot_void_expense(self):
+        expense = self.make_expense()
+        self.client.force_login(self.accountant)
+        response = self.client.post(
+            reverse(
+                'office:expense-void',
+                args=[BusinessBranch.GARDEN, expense.pk],
+            )
+        )
+        self.assertEqual(response.status_code, 403)
+        expense.refresh_from_db()
+        self.assertIsNone(expense.voided_at)
+
+    def test_owner_voids_without_deleting_audit_record(self):
+        expense = self.make_expense()
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse(
+                'office:expense-void',
+                args=[BusinessBranch.GARDEN, expense.pk],
+            )
+        )
+        self.assertEqual(response.status_code, 302)
+        expense.refresh_from_db()
+        self.assertIsNotNone(expense.voided_at)
+        self.assertEqual(expense.voided_by, self.staff)
+        self.assertTrue(Expense.objects.filter(pk=expense.pk).exists())
+
+        active = self.client.get(
+            reverse('office:expense-list', args=[BusinessBranch.GARDEN])
+        )
+        all_entries = self.client.get(
+            reverse('office:expense-list', args=[BusinessBranch.GARDEN]),
+            {'status': 'all'},
+        )
+        self.assertNotContains(active, expense.supplier)
+        self.assertContains(all_entries, expense.supplier)
+        self.assertContains(all_entries, 'Void')
+
+    def test_expense_export_includes_void_status_and_audit_fields(self):
+        expense = self.make_expense()
+        expense.void(self.staff)
+        self.client.force_login(self.accountant)
+        response = self.client.get(
+            reverse('office:expense-export', args=[BusinessBranch.GARDEN])
+        )
+        self.assertEqual(response.status_code, 200)
+        content = response.content.decode()
+        self.assertIn('Devon Garden Supplies', content)
+        self.assertIn('42.50', content)
+        self.assertIn('Void', content)
+        self.assertIn('Voided by', content)
+
+    def test_dashboard_total_excludes_void_expenses(self):
+        self.make_expense(amount=Decimal('42.50'))
+        void_expense = self.make_expense(
+            supplier='Voided Supplier', amount=Decimal('10.00')
+        )
+        void_expense.void(self.staff)
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse('office:branch-dashboard', args=[BusinessBranch.GARDEN])
+        )
+        self.assertContains(response, '£42.50')
 
 
 class InvoiceModelTests(OfficeFixtureMixin, TestCase):

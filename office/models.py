@@ -176,6 +176,102 @@ class WorkEntry(models.Model):
             raise ValidationError(errors)
 
 
+class Expense(models.Model):
+    """An auditable business expense kept separate by trading branch."""
+
+    class Category(models.TextChoices):
+        MATERIALS = 'materials', 'Materials and supplies'
+        TOOLS = 'tools', 'Tools and equipment'
+        FUEL = 'fuel', 'Fuel and travel'
+        WASTE = 'waste', 'Waste disposal'
+        SUBCONTRACTOR = 'subcontractor', 'Subcontractors'
+        INSURANCE = 'insurance', 'Insurance and professional fees'
+        OFFICE = 'office', 'Office and administration'
+        OTHER = 'other', 'Other'
+
+    class PaymentMethod(models.TextChoices):
+        BANK = 'bank', 'Bank transfer'
+        CARD = 'card', 'Business card'
+        CASH = 'cash', 'Cash'
+        OTHER = 'other', 'Other'
+
+    branch = models.CharField(
+        max_length=12,
+        choices=BusinessBranch.choices,
+        default=BusinessBranch.GARDEN,
+        db_index=True,
+    )
+    expense_date = models.DateField(default=timezone.localdate, db_index=True)
+    supplier = models.CharField(max_length=160)
+    category = models.CharField(
+        max_length=20, choices=Category.choices, default=Category.MATERIALS
+    )
+    description = models.CharField(max_length=300)
+    property = models.ForeignKey(
+        Property,
+        on_delete=models.PROTECT,
+        related_name='expenses',
+        null=True,
+        blank=True,
+    )
+    amount = models.DecimalField(max_digits=10, decimal_places=2)
+    payment_method = models.CharField(
+        max_length=12,
+        choices=PaymentMethod.choices,
+        default=PaymentMethod.CARD,
+    )
+    reference = models.CharField(max_length=160, blank=True)
+    notes = models.TextField(blank=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='office_expenses_created',
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='office_expenses_updated',
+        null=True,
+        blank=True,
+    )
+    voided_at = models.DateTimeField(null=True, blank=True)
+    voided_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='office_expenses_voided',
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['-expense_date', '-id']
+
+    def __str__(self):
+        return f'{self.expense_date}: {self.supplier} ({self.amount})'
+
+    @builtin_property
+    def is_void(self):
+        return self.voided_at is not None
+
+    def clean(self):
+        errors = {}
+        if self.amount is not None and self.amount <= 0:
+            errors['amount'] = 'Amount must be greater than zero.'
+        if self.property_id and self.property.customer.branch != self.branch:
+            errors['property'] = 'The property must belong to this expense branch.'
+        if errors:
+            raise ValidationError(errors)
+
+    def void(self, user):
+        if self.voided_at:
+            raise ValidationError('This expense is already void.')
+        self.voided_at = timezone.now()
+        self.voided_by = user
+        self.save(update_fields=['voided_at', 'voided_by', 'updated_at'])
+
+
 class InvoiceSequence(models.Model):
     branch = models.CharField(
         max_length=12,

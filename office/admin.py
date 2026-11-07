@@ -4,6 +4,7 @@ from .models import (
     BankConnection,
     BankTransaction,
     Customer,
+    Expense,
     Invoice,
     InvoiceEmail,
     InvoiceLine,
@@ -46,6 +47,46 @@ class WorkEntryAdmin(admin.ModelAdmin):
     )
     list_filter = ('property__customer__branch', 'category', 'service_date')
     search_fields = ('description', 'property__customer__display_name')
+
+
+@admin.register(Expense)
+class ExpenseAdmin(admin.ModelAdmin):
+    list_display = (
+        'expense_date',
+        'branch',
+        'supplier',
+        'category',
+        'amount',
+        'voided_at',
+    )
+    list_filter = ('branch', 'category', 'payment_method', 'voided_at')
+    search_fields = (
+        'supplier',
+        'description',
+        'reference',
+        'property__customer__display_name',
+    )
+    readonly_fields = (
+        'branch',
+        'expense_date',
+        'supplier',
+        'category',
+        'description',
+        'property',
+        'amount',
+        'payment_method',
+        'reference',
+        'notes',
+        'created_by',
+        'updated_by',
+        'voided_at',
+        'voided_by',
+        'created_at',
+        'updated_at',
+    )
+
+    def has_add_permission(self, request):
+        return False
 
 
 class InvoiceLineInline(admin.TabularInline):

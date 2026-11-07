@@ -110,6 +110,18 @@ urlpatterns = [
         views.WorkEntryUpdateView.as_view(),
         name='work-edit',
     ),
+    path('<branch:branch>/expenses/', views.ExpenseListView.as_view(), name='expense-list'),
+    path('<branch:branch>/expenses/new/', views.ExpenseCreateView.as_view(), name='expense-create'),
+    path(
+        '<branch:branch>/expenses/<int:pk>/edit/',
+        views.ExpenseUpdateView.as_view(),
+        name='expense-edit',
+    ),
+    path(
+        '<branch:branch>/expenses/<int:pk>/void/',
+        views.ExpenseVoidView.as_view(),
+        name='expense-void',
+    ),
     path('<branch:branch>/invoices/', views.InvoiceListView.as_view(), name='invoice-list'),
     path(
         '<branch:branch>/exports/customers.csv',
@@ -120,6 +132,11 @@ urlpatterns = [
         '<branch:branch>/exports/invoices.csv',
         views.InvoiceExportView.as_view(),
         name='invoice-export',
+    ),
+    path(
+        '<branch:branch>/exports/expenses.csv',
+        views.ExpenseExportView.as_view(),
+        name='expense-export',
     ),
     path('<branch:branch>/invoices/new/', views.InvoiceCreateView.as_view(), name='invoice-create'),
     path(

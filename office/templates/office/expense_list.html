@@ -1,0 +1,58 @@
+{% extends 'office/base.html' %}
+{% block title %}Expenses | Avonmoor Office{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">{{ branch_meta.label|upper }}</p>
+        <h1>Expense register</h1>
+        <p class="lede">Record business costs for this branch. Void entries stay in the audit trail.</p>
+    </div>
+    <div class="button-row">
+        <a class="button button-secondary" href="{% url 'office:expense-export' branch %}">Export CSV</a>
+        <a class="button button-primary" href="{% url 'office:expense-create' branch %}">Record expense</a>
+    </div>
+</div>
+
+<form method="get" class="filter-row">
+    <label for="expense-status">Status</label>
+    <select id="expense-status" name="status">
+        <option value="active"{% if selected_status == 'active' %} selected{% endif %}>Active</option>
+        <option value="void"{% if selected_status == 'void' %} selected{% endif %}>Void</option>
+        <option value="all"{% if selected_status == 'all' %} selected{% endif %}>All</option>
+    </select>
+    <label for="expense-category">Category</label>
+    <select id="expense-category" name="category">
+        <option value="">All categories</option>
+        {% for value, label in expense_categories %}<option value="{{ value }}"{% if selected_category == value %} selected{% endif %}>{{ label }}</option>{% endfor %}
+    </select>
+    <button class="button button-quiet" type="submit">Filter</button>
+    <strong class="filter-total">Displayed total £{{ expense_total|floatformat:2 }}</strong>
+</form>
+
+<section class="panel table-panel">
+{% if expenses %}
+<div class="table-wrap"><table>
+    <thead><tr><th>Date</th><th>Supplier / description</th><th>Category</th><th>Property / job</th><th>Method</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+    <tbody>
+    {% for expense in expenses %}
+    <tr>
+        <td>{{ expense.expense_date|date:'d M Y' }}</td>
+        <td><b>{{ expense.supplier }}</b><small>{{ expense.description }}{% if expense.reference %} · {{ expense.reference }}{% endif %}</small></td>
+        <td>{{ expense.get_category_display }}</td>
+        <td>{% if expense.property %}{{ expense.property.customer.display_name }}<small>{{ expense.property }}</small>{% else %}—{% endif %}</td>
+        <td>{{ expense.get_payment_method_display }}</td>
+        <td><b>£{{ expense.amount|floatformat:2 }}</b></td>
+        <td>{% if expense.is_void %}<span class="status status-cancelled">Void</span>{% else %}<span class="status status-paid">Active</span>{% endif %}</td>
+        <td>
+            {% if not expense.is_void %}<a href="{% url 'office:expense-edit' branch expense.pk %}">Edit</a>{% endif %}
+            {% if request.user.is_superuser and not expense.is_void %}
+            <form method="post" action="{% url 'office:expense-void' branch expense.pk %}" class="inline-form" onsubmit="return confirm('Void this expense? It will remain in the audit trail.');">{% csrf_token %}<button type="submit" class="link-button danger-link">Void</button></form>
+            {% endif %}
+        </td>
+    </tr>
+    {% endfor %}
+    </tbody>
+</table></div>
+{% else %}<div class="empty-state"><h2>No expenses found</h2><p>Record the first business cost for this branch.</p></div>{% endif %}
+</section>
+{% endblock %}
