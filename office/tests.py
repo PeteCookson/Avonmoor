@@ -114,6 +114,26 @@ class OfficeAccessTests(OfficeFixtureMixin, TestCase):
             reverse('office:branch-dashboard', args=[BusinessBranch.RAINWATER]),
         )
 
+    def test_surveys_navigation_only_appears_in_rainwater_branch(self):
+        self.client.force_login(self.staff)
+        surveys_url = reverse('water_survey:survey-list')
+
+        office_home = self.client.get(reverse('office:dashboard'))
+        garden = self.client.get(
+            reverse(
+                'office:branch-dashboard', args=[BusinessBranch.GARDEN]
+            )
+        )
+        rainwater = self.client.get(
+            reverse(
+                'office:branch-dashboard', args=[BusinessBranch.RAINWATER]
+            )
+        )
+
+        self.assertNotContains(office_home, f'href="{surveys_url}"')
+        self.assertNotContains(garden, f'href="{surveys_url}"')
+        self.assertContains(rainwater, f'href="{surveys_url}"')
+
     def test_staff_login_without_next_redirects_to_office(self):
         response = self.client.post(
             reverse('login'),
