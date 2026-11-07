@@ -19,6 +19,7 @@ register_converter(BranchConverter, 'branch')
 
 urlpatterns = [
     path('', views.OfficeDashboardView.as_view(), name='dashboard'),
+    path('accounting/', views.AccountingReportView.as_view(), name='accounting'),
     path('payments/', banking_views.PaymentsView.as_view(), name='payments'),
     path(
         'payments/import/',

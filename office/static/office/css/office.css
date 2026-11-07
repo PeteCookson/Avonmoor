@@ -136,6 +136,16 @@ tfoot th { color: #fff; background: var(--green); font-size: 16px; }
 .inline-form { display: inline; margin-left: 8px; }
 .link-button { border: 0; padding: 0; background: transparent; color: var(--leaf); font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
 .danger-link { color: var(--danger); }
+.report-filter { display: grid; grid-template-columns: 1fr 1fr 1.2fr auto; align-items: end; gap: 14px; margin-bottom: 22px; padding: 18px; }
+.report-filter .field { margin: 0; }
+.accounting-metrics .metric-card small { color: var(--muted); font-size: 11px; line-height: 1.35; }
+.accounting-grid { grid-template-columns: minmax(0, 1.6fr) minmax(260px, .7fr); }
+.accounting-section { margin-top: 20px; }
+.age-list > div { display: flex; justify-content: space-between; gap: 15px; padding: 13px 0; border-top: 1px solid var(--line); }
+.age-list > div:first-child { border-top: 0; }
+.age-list strong { color: var(--green); font-variant-numeric: tabular-nums; }
+.negative-money { color: var(--danger) !important; }
+.report-disclaimer { max-width: 900px; margin: 20px auto 0; color: var(--muted); font-size: 12px; text-align: center; }
 address { font-style: normal; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr 180px; gap: 16px; margin-bottom: 20px; }
@@ -179,6 +189,8 @@ code { overflow-wrap: anywhere; }
     .main-nav { order: 3; width: 100%; overflow-x: auto; margin-left: 0; }
     .sign-out { margin-left: auto; }
     .metric-grid { grid-template-columns: 1fr 1fr; }
+    .report-filter { grid-template-columns: 1fr 1fr; }
+    .accounting-grid { grid-template-columns: 1fr; }
     .line-item { grid-template-columns: 1fr 1fr; }
     .field-description { grid-column: 1 / -1; }
 }
@@ -186,6 +198,7 @@ code { overflow-wrap: anywhere; }
     .app-main { padding-top: 24px; }
     .page-heading, .section-heading { align-items: flex-start; flex-direction: column; }
     .metric-grid, .dashboard-grid, .branch-grid, .form-grid, .invoice-summary { grid-template-columns: 1fr; }
+    .report-filter { grid-template-columns: 1fr; }
     .metric-card { min-height: 105px; }
     .search-form { grid-template-columns: 1fr; }
     .line-item { grid-template-columns: 1fr; }

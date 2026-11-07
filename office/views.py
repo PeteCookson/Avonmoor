@@ -1,5 +1,6 @@
 import csv
 import logging
+from datetime import date
 from decimal import Decimal
 
 from django.conf import settings
@@ -63,6 +64,162 @@ BRANCH_META = {
         'record_label': 'Record job',
     },
 }
+
+
+def _money_total(records, attribute='total'):
+    return sum(
+        (getattr(record, attribute) for record in records), Decimal('0.00')
+    ).quantize(Decimal('0.01'))
+
+
+def _month_sequence(start_date, end_date):
+    current = start_date.replace(day=1)
+    final = end_date.replace(day=1)
+    while current <= final:
+        yield current
+        current = (
+            date(current.year + 1, 1, 1)
+            if current.month == 12
+            else date(current.year, current.month + 1, 1)
+        )
+
+
+def build_accounting_report(start_date, end_date, branch='all'):
+    """Build an operational cash and invoice summary for Office."""
+
+    branch_filter = {} if branch == 'all' else {'branch': branch}
+    sales_invoices = list(
+        Invoice.objects.filter(
+            **branch_filter,
+            issue_date__range=(start_date, end_date),
+            status__in=(Invoice.Status.ISSUED, Invoice.Status.PAID),
+        )
+        .select_related('customer')
+        .prefetch_related('lines')
+    )
+    paid_invoices = list(
+        Invoice.objects.filter(
+            **branch_filter,
+            paid_at__date__range=(start_date, end_date),
+            status=Invoice.Status.PAID,
+        )
+        .select_related('customer')
+        .prefetch_related('lines')
+    )
+    expenses = list(
+        Expense.objects.filter(
+            **branch_filter,
+            expense_date__range=(start_date, end_date),
+            voided_at__isnull=True,
+        ).select_related('property', 'property__customer')
+    )
+    outstanding_invoices = list(
+        Invoice.objects.filter(
+            **branch_filter, status=Invoice.Status.ISSUED
+        )
+        .select_related('customer')
+        .prefetch_related('lines')
+    )
+
+    invoiced_sales = _money_total(sales_invoices)
+    recorded_payments = _money_total(paid_invoices)
+    expense_total = _money_total(expenses, 'amount')
+    current_outstanding = _money_total(outstanding_invoices)
+
+    months = []
+    for month in _month_sequence(start_date, end_date):
+        monthly_sales = _money_total(
+            invoice
+            for invoice in sales_invoices
+            if invoice.issue_date.year == month.year
+            and invoice.issue_date.month == month.month
+        )
+        monthly_payments = _money_total(
+            invoice
+            for invoice in paid_invoices
+            if invoice.paid_at.date().year == month.year
+            and invoice.paid_at.date().month == month.month
+        )
+        monthly_expenses = _money_total(
+            (
+                expense
+                for expense in expenses
+                if expense.expense_date.year == month.year
+                and expense.expense_date.month == month.month
+            ),
+            'amount',
+        )
+        months.append(
+            {
+                'month': month,
+                'sales': monthly_sales,
+                'payments': monthly_payments,
+                'expenses': monthly_expenses,
+                'position': monthly_payments - monthly_expenses,
+            }
+        )
+
+    branch_rows = []
+    if branch == 'all':
+        for value, label in BusinessBranch.choices:
+            branch_sales = _money_total(
+                invoice for invoice in sales_invoices if invoice.branch == value
+            )
+            branch_payments = _money_total(
+                invoice for invoice in paid_invoices if invoice.branch == value
+            )
+            branch_expenses = _money_total(
+                (expense for expense in expenses if expense.branch == value),
+                'amount',
+            )
+            branch_rows.append(
+                {
+                    'value': value,
+                    'label': label,
+                    'sales': branch_sales,
+                    'payments': branch_payments,
+                    'expenses': branch_expenses,
+                    'position': branch_payments - branch_expenses,
+                }
+            )
+
+    today = timezone.localdate()
+    aged_invoices = []
+    age_buckets = {
+        '0–30 days': Decimal('0.00'),
+        '31–60 days': Decimal('0.00'),
+        '61–90 days': Decimal('0.00'),
+        'Over 90 days': Decimal('0.00'),
+    }
+    for invoice in sorted(outstanding_invoices, key=lambda item: item.issue_date):
+        age_days = max((today - invoice.issue_date).days, 0)
+        if age_days <= 30:
+            bucket = '0–30 days'
+        elif age_days <= 60:
+            bucket = '31–60 days'
+        elif age_days <= 90:
+            bucket = '61–90 days'
+        else:
+            bucket = 'Over 90 days'
+        age_buckets[bucket] += invoice.total
+        aged_invoices.append(
+            {'invoice': invoice, 'age_days': age_days, 'bucket': bucket}
+        )
+
+    return {
+        'invoiced_sales': invoiced_sales,
+        'recorded_payments': recorded_payments,
+        'expense_total': expense_total,
+        'cash_position': recorded_payments - expense_total,
+        'current_outstanding': current_outstanding,
+        'months': months,
+        'branch_rows': branch_rows,
+        'aged_invoices': aged_invoices,
+        'age_buckets': [
+            {'label': label, 'amount': amount}
+            for label, amount in age_buckets.items()
+        ],
+    }
 
 
 def append_work_entries(invoice, work_entries):
@@ -159,6 +316,119 @@ class OfficeDashboardView(OfficeAccessMixin, View):
             request,
             self.template_name,
             {'branches': BRANCH_META},
+        )
+
+
+class AccountingReportView(OfficeAccessMixin, View):
+    template_name = 'office/accounting.html'
+
+    def report_parameters(self, request):
+        today = timezone.localdate()
+        default_start = date(today.year, 1, 1)
+        error = ''
+        try:
+            start_date = date.fromisoformat(
+                request.GET.get('start', default_start.isoformat())
+            )
+            end_date = date.fromisoformat(
+                request.GET.get('end', today.isoformat())
+            )
+        except ValueError:
+            start_date, end_date = default_start, today
+            error = 'Enter valid report dates.'
+        if start_date > end_date:
+            start_date, end_date = default_start, today
+            error = 'The report start date must be before the end date.'
+        if (end_date - start_date).days > 1827:
+            start_date, end_date = default_start, today
+            error = 'Choose a report period of five years or less.'
+
+        branch = request.GET.get('branch', 'all')
+        if branch not in ('all', *BusinessBranch.values):
+            branch = 'all'
+            error = 'Choose a valid business branch.'
+        return start_date, end_date, branch, error
+
+    def csv_response(self, report, start_date, end_date, branch):
+        response = HttpResponse(content_type='text/csv')
+        response['Content-Disposition'] = (
+            'attachment; filename='
+            f'"avonmoor-accounting-{branch}-{start_date}-{end_date}.csv"'
+        )
+        writer = csv.writer(response)
+        writer.writerow(['Avonmoor accounting summary'])
+        writer.writerow(['Period', start_date.isoformat(), end_date.isoformat()])
+        writer.writerow(['Branch', branch])
+        writer.writerow([])
+        writer.writerow(['Metric', 'Amount'])
+        writer.writerow(['Invoiced sales', f'{report["invoiced_sales"]:.2f}'])
+        writer.writerow(['Recorded payments', f'{report["recorded_payments"]:.2f}'])
+        writer.writerow(['Recorded expenses', f'{report["expense_total"]:.2f}'])
+        writer.writerow(['Recorded cash position', f'{report["cash_position"]:.2f}'])
+        writer.writerow(['Current outstanding', f'{report["current_outstanding"]:.2f}'])
+        writer.writerow([])
+        writer.writerow(
+            ['Month', 'Invoiced sales', 'Recorded payments', 'Expenses', 'Cash position']
+        )
+        for row in report['months']:
+            writer.writerow(
+                [
+                    row['month'].strftime('%Y-%m'),
+                    f'{row["sales"]:.2f}',
+                    f'{row["payments"]:.2f}',
+                    f'{row["expenses"]:.2f}',
+                    f'{row["position"]:.2f}',
+                ]
+            )
+        if report['branch_rows']:
+            writer.writerow([])
+            writer.writerow(
+                ['Branch', 'Invoiced sales', 'Recorded payments', 'Expenses', 'Cash position']
+            )
+            for row in report['branch_rows']:
+                writer.writerow(
+                    [
+                        row['label'],
+                        f'{row["sales"]:.2f}',
+                        f'{row["payments"]:.2f}',
+                        f'{row["expenses"]:.2f}',
+                        f'{row["position"]:.2f}',
+                    ]
+                )
+        writer.writerow([])
+        writer.writerow(
+            ['Outstanding invoice', 'Branch', 'Customer', 'Issue date', 'Age days', 'Amount']
+        )
+        for row in report['aged_invoices']:
+            invoice = row['invoice']
+            writer.writerow(
+                [
+                    invoice.display_number,
+                    invoice.get_branch_display(),
+                    invoice.customer.display_name,
+                    invoice.issue_date.isoformat(),
+                    row['age_days'],
+                    f'{invoice.total:.2f}',
+                ]
+            )
+        return response
+
+    def get(self, request):
+        start_date, end_date, branch, error = self.report_parameters(request)
+        report = build_accounting_report(start_date, end_date, branch)
+        if request.GET.get('export') == 'csv':
+            return self.csv_response(report, start_date, end_date, branch)
+        return render(
+            request,
+            self.template_name,
+            {
+                **report,
+                'start_date': start_date,
+                'end_date': end_date,
+                'selected_branch': branch,
+                'branch_choices': [('all', 'All branches'), *BusinessBranch.choices],
+                'report_error': error,
+            },
         )
 
 

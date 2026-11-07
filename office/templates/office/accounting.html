@@ -1,0 +1,69 @@
+{% extends 'office/base.html' %}
+{% block title %}Accounting | Avonmoor Office{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">AVONMOOR LTD</p>
+        <h1>Accounting overview</h1>
+        <p class="lede">Operational sales, payments, expenses and outstanding invoices across both business branches.</p>
+    </div>
+    <div class="button-row">
+        <a class="button button-secondary" href="?start={{ start_date|date:'Y-m-d' }}&amp;end={{ end_date|date:'Y-m-d' }}&amp;branch={{ selected_branch }}&amp;export=csv">Export report CSV</a>
+    </div>
+</div>
+
+{% if report_error %}<div class="message message-error">{{ report_error }}</div>{% endif %}
+
+<form method="get" class="report-filter panel">
+    <div class="field"><label for="report-start">From</label><input id="report-start" type="date" name="start" value="{{ start_date|date:'Y-m-d' }}"></div>
+    <div class="field"><label for="report-end">To</label><input id="report-end" type="date" name="end" value="{{ end_date|date:'Y-m-d' }}"></div>
+    <div class="field"><label for="report-branch">Branch</label><select id="report-branch" name="branch">{% for value, label in branch_choices %}<option value="{{ value }}"{% if selected_branch == value %} selected{% endif %}>{{ label }}</option>{% endfor %}</select></div>
+    <button class="button button-primary" type="submit">Update report</button>
+</form>
+
+<section class="metric-grid accounting-metrics" aria-label="Accounting summary">
+    <div class="metric-card metric-money"><span>Invoiced sales</span><strong>£{{ invoiced_sales|floatformat:2 }}</strong><small>Invoices dated in this period</small></div>
+    <div class="metric-card metric-money"><span>Recorded payments</span><strong>£{{ recorded_payments|floatformat:2 }}</strong><small>Invoices marked paid in this period</small></div>
+    <div class="metric-card metric-money"><span>Recorded expenses</span><strong>£{{ expense_total|floatformat:2 }}</strong><small>Active expenses dated in this period</small></div>
+    <div class="metric-card metric-money"><span>Recorded cash position</span><strong{% if cash_position < 0 %} class="negative-money"{% endif %}>£{{ cash_position|floatformat:2 }}</strong><small>Payments less recorded expenses</small></div>
+    <div class="metric-card metric-money"><span>Current outstanding</span><strong>£{{ current_outstanding|floatformat:2 }}</strong><small>All currently issued invoices</small></div>
+</section>
+
+<div class="dashboard-grid accounting-grid">
+    <section class="panel table-panel">
+        <div class="section-heading"><h2>Monthly breakdown</h2></div>
+        <div class="table-wrap"><table>
+            <thead><tr><th>Month</th><th>Invoiced</th><th>Paid</th><th>Expenses</th><th>Cash position</th></tr></thead>
+            <tbody>{% for row in months %}<tr><td>{{ row.month|date:'M Y' }}</td><td>£{{ row.sales|floatformat:2 }}</td><td>£{{ row.payments|floatformat:2 }}</td><td>£{{ row.expenses|floatformat:2 }}</td><td{% if row.position < 0 %} class="negative-money"{% endif %}>£{{ row.position|floatformat:2 }}</td></tr>{% endfor %}</tbody>
+        </table></div>
+    </section>
+
+    <section class="panel">
+        <div class="section-heading"><h2>Current aged debt</h2></div>
+        <div class="compact-list age-list">
+            {% for bucket in age_buckets %}<div><span>{{ bucket.label }}</span><strong>£{{ bucket.amount|floatformat:2 }}</strong></div>{% endfor %}
+        </div>
+        <p class="empty-copy">Aged from invoice date. This is current debt, not a historical snapshot of the selected period.</p>
+    </section>
+</div>
+
+{% if branch_rows %}
+<section class="panel table-panel accounting-section">
+    <div class="section-heading"><h2>Branch comparison</h2></div>
+    <div class="table-wrap"><table>
+        <thead><tr><th>Branch</th><th>Invoiced</th><th>Paid</th><th>Expenses</th><th>Cash position</th></tr></thead>
+        <tbody>{% for row in branch_rows %}<tr><td><b>{{ row.label }}</b></td><td>£{{ row.sales|floatformat:2 }}</td><td>£{{ row.payments|floatformat:2 }}</td><td>£{{ row.expenses|floatformat:2 }}</td><td{% if row.position < 0 %} class="negative-money"{% endif %}>£{{ row.position|floatformat:2 }}</td></tr>{% endfor %}</tbody>
+    </table></div>
+</section>
+{% endif %}
+
+<section class="panel table-panel accounting-section">
+    <div class="section-heading"><h2>Outstanding invoices</h2><span>{{ aged_invoices|length }} invoice{{ aged_invoices|length|pluralize }}</span></div>
+    {% if aged_invoices %}<div class="table-wrap"><table>
+        <thead><tr><th>Invoice</th><th>Branch</th><th>Customer</th><th>Issued</th><th>Age</th><th>Amount</th></tr></thead>
+        <tbody>{% for row in aged_invoices %}<tr><td><a href="{% url 'office:invoice-detail' row.invoice.branch row.invoice.pk %}">{{ row.invoice.display_number }}</a></td><td>{{ row.invoice.get_branch_display }}</td><td>{{ row.invoice.customer.display_name }}</td><td>{{ row.invoice.issue_date|date:'d M Y' }}</td><td>{{ row.age_days }} day{{ row.age_days|pluralize }}</td><td><b>£{{ row.invoice.total|floatformat:2 }}</b></td></tr>{% endfor %}</tbody>
+    </table></div>{% else %}<p class="empty-copy">No outstanding invoices.</p>{% endif %}
+</section>
+
+<p class="report-disclaimer">This is an operational summary of records entered in Avonmoor Office. It is not a substitute for statutory accounts, corporation-tax calculations or your accountant’s review.</p>
+{% endblock %}

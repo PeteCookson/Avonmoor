@@ -26,6 +26,7 @@
             {% if branch == 'rainwater' %}<a href="{% url 'water_survey:survey-list' %}">Surveys</a>{% endif %}
             <a href="{% url 'office:dashboard' %}">Switch branch</a>
             {% endif %}
+            <a href="{% url 'office:accounting' %}">Accounting</a>
             <a href="{% url 'office:payments' %}">Payments</a>
         </nav>
         <form method="post" action="{% url 'logout' %}" class="sign-out">

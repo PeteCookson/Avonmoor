@@ -47,6 +47,22 @@ Private invoicing and work-record module for Avonmoor Ltd.
 - Outgoing Monzo transactions are not imported. The bank connection remains
   read-only and limited to incoming payment reconciliation.
 
+## Stage 1D operational accounting reports
+
+- The shared **Accounting** page combines both business branches without
+  merging their underlying customer, work, invoice or expense records.
+- Staff can filter reports by date range and by Garden & Property, Rainwater
+  Harvesting or all branches.
+- The summary shows invoiced sales, invoices marked paid, active expenses,
+  recorded cash position and current outstanding invoices.
+- Monthly and branch comparisons use only records in the selected period.
+- Current outstanding invoices include an aged-debt breakdown and direct links
+  back to each invoice.
+- The complete report can be exported as CSV for the accountant.
+- Voided expenses and cancelled invoices are excluded.
+- This is an operational report, not statutory accounts, a corporation-tax
+  calculation, a VAT return or a substitute for accountant review.
+
 ### Monzo setup
 
 Create a confidential client in Monzo developer tools and configure these

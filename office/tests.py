@@ -423,6 +423,127 @@ class ExpenseWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertContains(response, '£42.50')
 
 
+class AccountingReportTests(OfficeFixtureMixin, TestCase):
+    def record_expense(self, amount=Decimal('20.00'), **overrides):
+        values = {
+            'branch': BusinessBranch.GARDEN,
+            'expense_date': date(2026, 11, 5),
+            'supplier': 'Trade Supplier',
+            'category': Expense.Category.MATERIALS,
+            'description': 'Materials',
+            'amount': amount,
+            'payment_method': Expense.PaymentMethod.CARD,
+            'created_by': self.staff,
+            'updated_by': self.staff,
+        }
+        values.update(overrides)
+        return Expense.objects.create(**values)
+
+    def report_url(self, **overrides):
+        params = {
+            'start': '2026-11-01',
+            'end': '2026-11-30',
+            'branch': 'all',
+        }
+        params.update(overrides)
+        return reverse('office:accounting'), params
+
+    def test_accountant_sees_sales_payments_expenses_and_cash_position(self):
+        invoice = self.make_invoice().issue()
+        invoice.mark_paid()
+        self.record_expense()
+        self.client.force_login(self.accountant)
+
+        response = self.client.get(*self.report_url())
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response.context['invoiced_sales'], Decimal('50.00'))
+        self.assertEqual(response.context['recorded_payments'], Decimal('50.00'))
+        self.assertEqual(response.context['expense_total'], Decimal('20.00'))
+        self.assertEqual(response.context['cash_position'], Decimal('30.00'))
+        self.assertContains(response, 'Accounting overview')
+
+    def test_report_filters_branch_records(self):
+        self.make_invoice().issue()
+        self.record_expense()
+        self.client.force_login(self.staff)
+
+        garden = self.client.get(
+            *self.report_url(branch=BusinessBranch.GARDEN)
+        )
+        rainwater = self.client.get(
+            *self.report_url(branch=BusinessBranch.RAINWATER)
+        )
+
+        self.assertEqual(garden.context['invoiced_sales'], Decimal('50.00'))
+        self.assertEqual(garden.context['expense_total'], Decimal('20.00'))
+        self.assertEqual(rainwater.context['invoiced_sales'], Decimal('0.00'))
+        self.assertEqual(rainwater.context['expense_total'], Decimal('0.00'))
+
+    def test_current_outstanding_and_aged_invoice_are_reported(self):
+        invoice = self.make_invoice().issue()
+        self.client.force_login(self.staff)
+
+        response = self.client.get(*self.report_url())
+
+        self.assertEqual(response.context['current_outstanding'], Decimal('50.00'))
+        self.assertEqual(len(response.context['aged_invoices']), 1)
+        self.assertEqual(
+            response.context['aged_invoices'][0]['invoice'], invoice
+        )
+        self.assertContains(response, invoice.number)
+
+    def test_void_expenses_and_cancelled_invoices_are_excluded(self):
+        invoice = self.make_invoice().issue()
+        invoice.cancel()
+        expense = self.record_expense()
+        expense.void(self.staff)
+        self.client.force_login(self.staff)
+
+        response = self.client.get(*self.report_url())
+
+        self.assertEqual(response.context['invoiced_sales'], Decimal('0.00'))
+        self.assertEqual(response.context['expense_total'], Decimal('0.00'))
+        self.assertEqual(response.context['current_outstanding'], Decimal('0.00'))
+
+    def test_accounting_csv_exports_summary_and_aged_debt(self):
+        invoice = self.make_invoice().issue()
+        self.record_expense()
+        self.client.force_login(self.accountant)
+        response = self.client.get(
+            *self.report_url(export='csv')
+        )
+
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(response['Content-Type'], 'text/csv')
+        content = response.content.decode()
+        self.assertIn('Avonmoor accounting summary', content)
+        self.assertIn('Invoiced sales,50.00', content)
+        self.assertIn('Recorded expenses,20.00', content)
+        self.assertIn(invoice.number, content)
+
+    def test_invalid_period_is_rejected_safely(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse('office:accounting'),
+            {'start': '2026-12-01', 'end': '2026-11-01'},
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(
+            response, 'The report start date must be before the end date.'
+        )
+
+    def test_accounting_navigation_is_global(self):
+        self.client.force_login(self.staff)
+        accounting_url = reverse('office:accounting')
+        office_home = self.client.get(reverse('office:dashboard'))
+        garden = self.client.get(
+            reverse('office:branch-dashboard', args=[BusinessBranch.GARDEN])
+        )
+        self.assertContains(office_home, f'href="{accounting_url}"')
+        self.assertContains(garden, f'href="{accounting_url}"')
+
+
 class InvoiceModelTests(OfficeFixtureMixin, TestCase):
     def test_issue_assigns_sequential_number_and_freezes_customer(self):
         invoice = self.make_invoice()
