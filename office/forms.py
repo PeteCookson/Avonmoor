@@ -337,7 +337,7 @@ class PaymentMatchForm(forms.Form):
         if bank_transaction and bank_transaction.is_incoming:
             candidates = []
             invoices = Invoice.objects.filter(
-                status=Invoice.Status.ISSUED
+                status__in=(Invoice.Status.ISSUED, Invoice.Status.PAID)
             ).select_related('customer').prefetch_related(
                 'lines', 'payment_matches__transaction'
             )

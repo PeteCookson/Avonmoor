@@ -15,6 +15,7 @@ from .banking import (
     auto_match_transaction,
     import_bank_csv,
     match_payment,
+    retry_auto_matching,
 )
 from .models import (
     BankConnection,
@@ -145,6 +146,60 @@ class PaymentMatchingTests(BankingFixtureMixin, TestCase):
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, Invoice.Status.ISSUED)
         self.assertFalse(PaymentMatch.objects.exists())
+
+    def test_previously_paid_invoice_can_be_reconciled_by_reference(self):
+        invoice = self.issued_invoice()
+        invoice.mark_paid()
+        original_paid_at = invoice.paid_at
+        bank_transaction = self.bank_transaction(
+            reference=invoice.number, description='Incoming transfer'
+        )
+
+        payment_match = auto_match_transaction(bank_transaction)
+
+        self.assertIsNotNone(payment_match)
+        self.assertEqual(payment_match.invoice, invoice)
+        invoice.refresh_from_db()
+        self.assertEqual(invoice.status, Invoice.Status.PAID)
+        self.assertEqual(invoice.paid_at, original_paid_at)
+
+    def test_retry_matching_reconciles_existing_review_payment(self):
+        bank_transaction = self.bank_transaction(
+            amount_minor=10000,
+            reference='Meikle',
+            description='Meikle',
+        )
+        meikle = Customer.objects.create(
+            display_name='Alex Meikle',
+            billing_address_1='2 Test Lane',
+            postcode='TQ10 9AA',
+        )
+        invoice = Invoice.objects.create(
+            customer=meikle,
+            issue_date=date(2026, 11, 4),
+            created_by=self.owner,
+        )
+        InvoiceLine.objects.create(
+            invoice=invoice,
+            service_date=date(2026, 11, 4),
+            description='Garden maintenance',
+            quantity=Decimal('4.00'),
+            unit_price=Decimal('25.00'),
+        )
+        invoice.issue()
+
+        self.assertEqual(retry_auto_matching(), 1)
+        payment_match = PaymentMatch.objects.get(transaction=bank_transaction)
+        self.assertEqual(payment_match.invoice, invoice)
+
+    def test_paid_invoice_with_bank_match_cannot_receive_duplicate_match(self):
+        invoice = self.issued_invoice()
+        first = self.bank_transaction(reference=invoice.number)
+        self.assertIsNotNone(auto_match_transaction(first))
+        duplicate = self.bank_transaction(reference=invoice.number)
+
+        self.assertIsNone(auto_match_transaction(duplicate))
+        self.assertEqual(PaymentMatch.objects.filter(invoice=invoice).count(), 1)
 
     def test_reference_with_wrong_amount_stays_in_review(self):
         invoice = self.issued_invoice()

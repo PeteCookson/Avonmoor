@@ -215,8 +215,10 @@ def match_payment(bank_transaction, invoice, *, method, user=None):
             raise ValidationError('Restore this transaction before matching it.')
         if not bank_transaction.is_incoming:
             raise ValidationError('Only incoming GBP payments can be matched.')
-        if invoice.status != Invoice.Status.ISSUED:
-            raise ValidationError('Only an issued invoice can receive a bank match.')
+        if invoice.status not in (Invoice.Status.ISSUED, Invoice.Status.PAID):
+            raise ValidationError(
+                'Only an issued or previously paid invoice can receive a bank match.'
+            )
         if bank_transaction.amount_minor != invoice_outstanding_minor(invoice):
             raise ValidationError(
                 'The payment must exactly equal the invoice outstanding balance.'
@@ -227,13 +229,14 @@ def match_payment(bank_transaction, invoice, *, method, user=None):
             method=method,
             matched_by=user,
         )
-        invoice.status = Invoice.Status.PAID
-        invoice.paid_at = (
-            bank_transaction.settled_at
-            or bank_transaction.transaction_at
-            or timezone.now()
-        )
-        invoice.save(update_fields=['status', 'paid_at', 'updated_at'])
+        if invoice.status == Invoice.Status.ISSUED:
+            invoice.status = Invoice.Status.PAID
+            invoice.paid_at = (
+                bank_transaction.settled_at
+                or bank_transaction.transaction_at
+                or timezone.now()
+            )
+            invoice.save(update_fields=['status', 'paid_at', 'updated_at'])
         return payment_match
 
 
@@ -322,7 +325,8 @@ def auto_match_transaction(bank_transaction):
     )
     exact_balance_invoices = []
     for invoice in Invoice.objects.filter(
-        status=Invoice.Status.ISSUED, number__isnull=False
+        status__in=(Invoice.Status.ISSUED, Invoice.Status.PAID),
+        number__isnull=False,
     ).select_related('customer').prefetch_related(
         'lines', 'payment_matches__transaction'
     ):
@@ -351,6 +355,21 @@ def auto_match_transaction(bank_transaction):
         invoice,
         method=PaymentMatch.Method.AUTOMATIC,
     )
+
+
+def retry_auto_matching():
+    """Re-evaluate review payments after invoices or matching rules change."""
+    matched = 0
+    transactions = BankTransaction.objects.filter(
+        amount_minor__gt=0,
+        currency='GBP',
+        ignored_at__isnull=True,
+        payment_match__isnull=True,
+    ).order_by('transaction_at', 'pk')
+    for bank_transaction in transactions:
+        if auto_match_transaction(bank_transaction):
+            matched += 1
+    return matched
 
 
 def sync_monzo_transactions(connection):
@@ -398,6 +417,7 @@ def sync_monzo_transactions(connection):
         cursor = newest + timedelta(microseconds=1)
     connection.last_synced_at = timezone.now()
     connection.save(update_fields=['last_synced_at', 'updated_at'])
+    matched += retry_auto_matching()
     return imported, matched
 
 
