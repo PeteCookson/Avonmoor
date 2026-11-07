@@ -13,14 +13,19 @@ from django.utils import timezone
 from .banking import (
     MonzoAPIError,
     auto_match_transaction,
+    expense_suggestion,
     import_bank_csv,
+    is_fuel_transaction,
     match_payment,
     retry_auto_matching,
+    sync_monzo_transactions,
 )
 from .models import (
     BankConnection,
     BankTransaction,
     Customer,
+    Expense,
+    ExpenseImportRule,
     Invoice,
     InvoiceLine,
     PaymentMatch,
@@ -279,9 +284,9 @@ class BankCSVTests(BankingFixtureMixin, TestCase):
         first = import_bank_csv(SimpleUploadedFile('monzo.csv', content))
         second = import_bank_csv(SimpleUploadedFile('monzo.csv', content))
 
-        self.assertEqual(first, (1, 0, 1))
-        self.assertEqual(second, (0, 1, 0))
-        self.assertEqual(BankTransaction.objects.count(), 1)
+        self.assertEqual(first, (2, 0, 1))
+        self.assertEqual(second, (0, 2, 0))
+        self.assertEqual(BankTransaction.objects.count(), 2)
         invoice.refresh_from_db()
         self.assertEqual(invoice.status, Invoice.Status.PAID)
 
@@ -290,6 +295,180 @@ class BankCSVTests(BankingFixtureMixin, TestCase):
         response = self.client.get(reverse('office:payments'))
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'CSV fallback')
+
+
+class ExpenseInboxTests(BankingFixtureMixin, TestCase):
+    def expense_post_data(self, **overrides):
+        data = {
+            'branch': 'garden',
+            'supplier': 'IONOS',
+            'category': Expense.Category.OFFICE,
+            'description': 'Website and domain hosting',
+            'property': '',
+            'reference': 'Monthly hosting',
+            'notes': '',
+        }
+        data.update(overrides)
+        return data
+
+    def test_accountant_records_actual_outgoing_payment_as_expense(self):
+        outgoing = self.bank_transaction(
+            amount_minor=-1299,
+            description='IONOS SE',
+            reference='Monthly hosting',
+        )
+        self.client.force_login(self.accountant)
+
+        response = self.client.post(
+            reverse('office:expense-bank-review', args=[outgoing.pk]),
+            self.expense_post_data(),
+        )
+
+        self.assertRedirects(response, reverse('office:expense-inbox'))
+        expense = Expense.objects.get()
+        self.assertEqual(expense.bank_transaction, outgoing)
+        self.assertEqual(expense.amount, Decimal('12.99'))
+        self.assertEqual(expense.created_by, self.accountant)
+        self.assertEqual(expense.branch, 'garden')
+
+    def test_one_bank_transaction_cannot_create_two_expenses(self):
+        outgoing = self.bank_transaction(
+            amount_minor=-1299, description='IONOS SE'
+        )
+        self.client.force_login(self.accountant)
+        url = reverse('office:expense-bank-review', args=[outgoing.pk])
+
+        self.client.post(url, self.expense_post_data())
+        second = self.client.post(url, self.expense_post_data())
+
+        self.assertRedirects(second, reverse('office:expense-inbox'))
+        self.assertEqual(Expense.objects.count(), 1)
+
+    def test_fuel_is_excluded_and_cannot_be_recorded(self):
+        fuel = self.bank_transaction(
+            amount_minor=-6500,
+            description='SHELL SOUTH BRENT',
+            reference='Diesel',
+        )
+        self.assertTrue(is_fuel_transaction(fuel))
+        self.client.force_login(self.owner)
+
+        review = self.client.get(reverse('office:expense-inbox'))
+        excluded = self.client.get(
+            reverse('office:expense-inbox'), {'status': 'excluded'}
+        )
+        record = self.client.get(
+            reverse('office:expense-bank-review', args=[fuel.pk])
+        )
+
+        self.assertNotContains(review, 'SHELL SOUTH BRENT')
+        self.assertContains(excluded, 'Fuel excluded')
+        self.assertRedirects(record, reverse('office:expense-inbox'))
+        self.assertFalse(Expense.objects.exists())
+
+    def test_remembered_supplier_prefills_future_payment(self):
+        first = self.bank_transaction(
+            amount_minor=-1299, description='IONOS SE'
+        )
+        self.client.force_login(self.owner)
+        self.client.post(
+            reverse('office:expense-bank-review', args=[first.pk]),
+            self.expense_post_data(remember_supplier='on'),
+        )
+        self.assertEqual(ExpenseImportRule.objects.count(), 1)
+        second = self.bank_transaction(
+            amount_minor=-1499, description='IONOS SE'
+        )
+
+        suggestion = expense_suggestion(second)
+
+        self.assertEqual(suggestion['supplier'], 'IONOS')
+        self.assertEqual(suggestion['branch'], 'garden')
+        self.assertEqual(suggestion['category'], Expense.Category.OFFICE)
+        self.assertEqual(suggestion['description'], 'Website and domain hosting')
+
+    def test_outgoing_can_be_excluded_and_restored(self):
+        outgoing = self.bank_transaction(
+            amount_minor=-5000, description='Personal transfer'
+        )
+        self.client.force_login(self.accountant)
+
+        self.client.post(
+            reverse('office:expense-bank-ignore', args=[outgoing.pk])
+        )
+        outgoing.refresh_from_db()
+        self.assertEqual(outgoing.ignored_by, self.accountant)
+        self.assertIsNotNone(outgoing.ignored_at)
+
+        self.client.post(
+            reverse('office:expense-bank-restore', args=[outgoing.pk])
+        )
+        outgoing.refresh_from_db()
+        self.assertIsNone(outgoing.ignored_at)
+        self.assertIsNone(outgoing.ignored_by)
+
+    def test_incoming_payment_does_not_appear_in_expense_inbox(self):
+        self.bank_transaction(description='Paul Ream')
+        self.client.force_login(self.accountant)
+
+        response = self.client.get(
+            reverse('office:expense-inbox'), {'status': 'all'}
+        )
+
+        self.assertNotContains(response, 'Paul Ream')
+
+    def test_pending_card_payment_waits_until_settled(self):
+        pending = self.bank_transaction(
+            amount_minor=-1299, description='IONOS PENDING'
+        )
+        pending.settled_at = None
+        pending.save(update_fields=['settled_at'])
+        self.client.force_login(self.accountant)
+
+        response = self.client.get(
+            reverse('office:expense-inbox'), {'status': 'all'}
+        )
+
+        self.assertNotContains(response, 'IONOS PENDING')
+
+    @patch('office.banking.connection_token', return_value='access-token')
+    @patch('office.banking._monzo_request')
+    def test_monzo_sync_imports_incoming_and_outgoing(self, request, token):
+        now = timezone.now().isoformat()
+        request.return_value = {
+            'transactions': [
+                {
+                    'id': 'tx_credit',
+                    'account_id': 'acc-avonmoor',
+                    'amount': 5000,
+                    'currency': 'GBP',
+                    'created': now,
+                    'settled': now,
+                    'description': 'Customer',
+                },
+                {
+                    'id': 'tx_debit',
+                    'account_id': 'acc-avonmoor',
+                    'amount': -1299,
+                    'currency': 'GBP',
+                    'created': now,
+                    'settled': now,
+                    'description': 'IONOS SE',
+                },
+            ]
+        }
+        connection = BankConnection.objects.create(
+            connected_by=self.owner,
+            account_id='acc-avonmoor',
+            active=True,
+        )
+
+        imported, matched = sync_monzo_transactions(connection)
+
+        self.assertEqual(imported, 2)
+        self.assertEqual(matched, 0)
+        self.assertEqual(BankTransaction.objects.filter(amount_minor__lt=0).count(), 1)
+        token.assert_called_once_with(connection)
 
 
 class MonzoConnectionTests(BankingFixtureMixin, TestCase):
@@ -447,6 +626,47 @@ class MonzoConnectionTests(BankingFixtureMixin, TestCase):
         self.assertTrue(
             PaymentMatch.objects.filter(invoice=invoice).exists()
         )
+
+    @patch('office.banking_views.fetch_monzo_transaction')
+    def test_webhook_stores_outgoing_transaction_for_expense_review(self, fetch):
+        BankConnection.objects.create(
+            connected_by=self.owner,
+            account_id='acc-avonmoor',
+            account_name='Avonmoor Ltd',
+            active=True,
+        )
+        fetch.return_value = {
+            'id': 'tx_ionos',
+            'account_id': 'acc-avonmoor',
+            'amount': -1299,
+            'currency': 'GBP',
+            'created': timezone.now().isoformat(),
+            'settled': timezone.now().isoformat(),
+            'description': 'IONOS SE',
+            'notes': 'Monthly hosting',
+            'metadata': {},
+        }
+
+        response = self.client.post(
+            reverse('office:monzo-webhook'),
+            data=json.dumps(
+                {
+                    'type': 'transaction.created',
+                    'data': {
+                        'id': 'tx_untrusted',
+                        'account_id': 'acc-avonmoor',
+                    },
+                }
+            ),
+            content_type='application/json',
+        )
+
+        self.assertEqual(response.status_code, 202)
+        bank_transaction = BankTransaction.objects.get(
+            external_id='monzo:tx_ionos'
+        )
+        self.assertEqual(bank_transaction.amount_minor, -1299)
+        self.assertFalse(PaymentMatch.objects.exists())
 
     @patch('office.banking_views.fetch_monzo_transaction')
     def test_webhook_for_unconnected_account_is_ignored(self, fetch):

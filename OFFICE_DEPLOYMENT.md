@@ -63,6 +63,25 @@ Private invoicing and work-record module for Avonmoor Ltd.
 - This is an operational report, not statutory accounts, a corporation-tax
   calculation, a VAT return or a substitute for accountant review.
 
+## Stage 1E Monzo expense inbox
+
+- Monzo and CSV syncs retain settled outgoing GBP transactions as well as
+  incoming customer payments.
+- Incoming transactions remain isolated in Payment Tracking and continue to
+  use exact invoice matching rules.
+- Outgoing payments enter a separate Expense Inbox and do not affect the
+  accounts until a staff user reviews and records them.
+- Recording an outgoing payment uses its actual settled date and amount and
+  links the resulting expense back to the immutable bank transaction ID.
+- A reviewed supplier can be remembered so future matching payments are
+  pre-filled with the chosen branch, supplier, category and description.
+- Users can exclude personal payments and internal transfers without deleting
+  the bank record.
+- Fuel merchants are automatically excluded because the working van is
+  personally owned; vehicle costs are handled through the separate mileage log.
+- Pending card authorisations remain outside the inbox until they settle.
+- Monzo transaction IDs and the expense one-to-one link prevent duplicates.
+
 ### Monzo setup
 
 Create a confidential client in Monzo developer tools and configure these

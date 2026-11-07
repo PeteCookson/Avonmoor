@@ -7,6 +7,7 @@ from urllib.parse import urlencode
 from django.conf import settings
 from django.contrib import messages
 from django.core.exceptions import ValidationError
+from django.db import transaction
 from django.http import HttpResponse, HttpResponseRedirect
 from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
@@ -29,9 +30,21 @@ from .banking import (
     monzo_configured,
     register_monzo_webhook,
     sync_monzo_transactions,
+    is_fuel_transaction,
 )
-from .forms import BankCSVImportForm, MonzoAccountForm, PaymentMatchForm
-from .models import BankConnection, BankTransaction, PaymentMatch
+from .forms import (
+    BankCSVImportForm,
+    BankExpenseReviewForm,
+    MonzoAccountForm,
+    PaymentMatchForm,
+)
+from .models import (
+    BankConnection,
+    BankTransaction,
+    Expense,
+    ExpenseImportRule,
+    PaymentMatch,
+)
 from .views import OfficeAccessMixin, OwnerOnlyMixin
 
 
@@ -80,6 +93,207 @@ class PaymentsView(OfficeAccessMixin, View):
             'csv_form': BankCSVImportForm(),
         }
         return render(request, self.template_name, context)
+
+
+class ExpenseInboxView(OfficeAccessMixin, View):
+    template_name = 'office/expense_inbox.html'
+
+    def get(self, request):
+        outgoing = list(
+            BankTransaction.objects.filter(
+                amount_minor__lt=0,
+                currency='GBP',
+                settled_at__isnull=False,
+            )
+            .select_related('expense_record', 'ignored_by')[:500]
+        )
+        status = request.GET.get('status', 'review')
+        if status not in {'review', 'recorded', 'excluded', 'all'}:
+            status = 'review'
+
+        def transaction_state(bank_transaction):
+            if hasattr(bank_transaction, 'expense_record'):
+                return 'recorded'
+            if bank_transaction.ignored_at or is_fuel_transaction(bank_transaction):
+                return 'excluded'
+            return 'review'
+
+        for bank_transaction in outgoing:
+            bank_transaction.expense_state = transaction_state(bank_transaction)
+            bank_transaction.fuel_excluded = is_fuel_transaction(bank_transaction)
+        counts = {
+            state: sum(
+                transaction.expense_state == state for transaction in outgoing
+            )
+            for state in ('review', 'recorded', 'excluded')
+        }
+        transactions = (
+            outgoing
+            if status == 'all'
+            else [
+                transaction
+                for transaction in outgoing
+                if transaction.expense_state == status
+            ]
+        )
+        return render(
+            request,
+            self.template_name,
+            {
+                'transactions': transactions,
+                'status_filter': status,
+                **{f'{key}_count': value for key, value in counts.items()},
+            },
+        )
+
+
+class BankExpenseReviewView(OfficeAccessMixin, View):
+    template_name = 'office/expense_bank_review.html'
+
+    def get_transaction(self, pk):
+        return get_object_or_404(
+            BankTransaction.objects.select_related('expense_record'),
+            pk=pk,
+            amount_minor__lt=0,
+            currency='GBP',
+            settled_at__isnull=False,
+        )
+
+    def get(self, request, pk):
+        bank_transaction = self.get_transaction(pk)
+        if hasattr(bank_transaction, 'expense_record'):
+            messages.info(request, 'This payment is already recorded as an expense.')
+            return redirect('office:expense-inbox')
+        if bank_transaction.ignored_at or is_fuel_transaction(bank_transaction):
+            messages.warning(request, 'This payment is excluded from expenses.')
+            return redirect('office:expense-inbox')
+        return render(
+            request,
+            self.template_name,
+            {
+                'bank_transaction': bank_transaction,
+                'form': BankExpenseReviewForm(
+                    bank_transaction=bank_transaction
+                ),
+            },
+        )
+
+    def post(self, request, pk):
+        with transaction.atomic():
+            bank_transaction = get_object_or_404(
+                BankTransaction.objects.select_for_update(),
+                pk=pk,
+                amount_minor__lt=0,
+                currency='GBP',
+                settled_at__isnull=False,
+            )
+            if hasattr(bank_transaction, 'expense_record'):
+                messages.info(
+                    request, 'This payment is already recorded as an expense.'
+                )
+                return redirect('office:expense-inbox')
+            form = BankExpenseReviewForm(
+                request.POST, bank_transaction=bank_transaction
+            )
+            if form.is_valid():
+                expense = Expense(
+                    branch=form.cleaned_data['branch'],
+                    expense_date=(
+                        bank_transaction.settled_at
+                        or bank_transaction.transaction_at
+                    ).date(),
+                    supplier=form.cleaned_data['supplier'],
+                    category=form.cleaned_data['category'],
+                    description=form.cleaned_data['description'],
+                    property=form.cleaned_data['property'],
+                    amount=abs(bank_transaction.amount),
+                    payment_method=Expense.PaymentMethod.BANK,
+                    reference=form.cleaned_data['reference'],
+                    notes=form.cleaned_data['notes'],
+                    bank_transaction=bank_transaction,
+                    created_by=request.user,
+                    updated_by=request.user,
+                )
+                expense.full_clean()
+                expense.save()
+                if form.cleaned_data['remember_supplier']:
+                    match_text = (
+                        bank_transaction.description
+                        or bank_transaction.reference
+                    ).strip()[:160]
+                    if match_text:
+                        rule, created = ExpenseImportRule.objects.get_or_create(
+                            match_text=match_text,
+                            defaults={
+                                'branch': expense.branch,
+                                'supplier': expense.supplier,
+                                'category': expense.category,
+                                'description': expense.description,
+                                'created_by': request.user,
+                                'updated_by': request.user,
+                            },
+                        )
+                        if not created:
+                            rule.branch = expense.branch
+                            rule.supplier = expense.supplier
+                            rule.category = expense.category
+                            rule.description = expense.description
+                            rule.active = True
+                            rule.updated_by = request.user
+                            rule.save()
+                messages.success(
+                    request,
+                    'Expense recorded from Monzo without changing the bank transaction.',
+                )
+                return redirect('office:expense-inbox')
+        return render(
+            request,
+            self.template_name,
+            {'bank_transaction': bank_transaction, 'form': form},
+        )
+
+
+class BankExpenseIgnoreView(OfficeAccessMixin, View):
+    def post(self, request, pk):
+        bank_transaction = get_object_or_404(
+            BankTransaction,
+            pk=pk,
+            amount_minor__lt=0,
+            currency='GBP',
+            settled_at__isnull=False,
+        )
+        if not hasattr(bank_transaction, 'expense_record'):
+            bank_transaction.ignored_at = timezone.now()
+            bank_transaction.ignored_by = request.user
+            bank_transaction.save(
+                update_fields=['ignored_at', 'ignored_by', 'updated_at']
+            )
+            messages.success(request, 'Payment excluded from business expenses.')
+        return redirect('office:expense-inbox')
+
+
+class BankExpenseRestoreView(OfficeAccessMixin, View):
+    def post(self, request, pk):
+        bank_transaction = get_object_or_404(
+            BankTransaction,
+            pk=pk,
+            amount_minor__lt=0,
+            currency='GBP',
+            settled_at__isnull=False,
+        )
+        if is_fuel_transaction(bank_transaction):
+            messages.warning(
+                request,
+                'Fuel remains excluded because the van is personally owned.',
+            )
+        elif not hasattr(bank_transaction, 'expense_record'):
+            bank_transaction.ignored_at = None
+            bank_transaction.ignored_by = None
+            bank_transaction.save(
+                update_fields=['ignored_at', 'ignored_by', 'updated_at']
+            )
+            messages.success(request, 'Payment returned to expense review.')
+        return redirect('office:expense-inbox')
 
 
 class MonzoConnectView(OwnerOnlyMixin, View):
@@ -215,7 +429,7 @@ class MonzoAccountView(OwnerOnlyMixin, View):
         else:
             messages.success(
                 request,
-                f'Monzo connected. Imported {imported} new payment(s); '
+                f'Monzo connected. Imported {imported} new transaction(s); '
                 f'{matched} matched automatically.',
             )
         return redirect('office:payments')
@@ -234,7 +448,7 @@ class MonzoSyncView(OfficeAccessMixin, View):
         else:
             messages.success(
                 request,
-                f'Sync complete: {imported} new payment(s), '
+                f'Sync complete: {imported} new transaction(s), '
                 f'{matched} matched automatically.',
             )
         return redirect('office:payments')
@@ -285,7 +499,7 @@ class BankCSVImportView(OfficeAccessMixin, View):
         else:
             messages.success(
                 request,
-                f'CSV import complete: {imported} new payment(s), '
+                f'CSV import complete: {imported} new transaction(s), '
                 f'{duplicates} duplicate(s), {matched} matched automatically.',
             )
         return redirect('office:payments')
@@ -404,7 +618,7 @@ class MonzoWebhookView(View):
             verified = fetch_monzo_transaction(connection, transaction_id)
             if (
                 verified.get('account_id') != connection.account_id
-                or int(verified.get('amount', 0)) <= 0
+                or int(verified.get('amount', 0)) == 0
                 or (verified.get('currency') or 'GBP').upper() != 'GBP'
             ):
                 return HttpResponse(status=202)

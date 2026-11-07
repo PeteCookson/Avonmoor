@@ -11,7 +11,11 @@ from .models import (
     Property,
     WorkEntry,
 )
-from .banking import invoice_outstanding_minor
+from .banking import (
+    expense_suggestion,
+    invoice_outstanding_minor,
+    is_fuel_transaction,
+)
 
 
 class DateInput(forms.DateInput):
@@ -227,6 +231,58 @@ class ExpenseForm(forms.ModelForm):
         property_record = cleaned.get('property')
         if property_record and property_record.customer.branch != self.branch:
             self.add_error('property', 'Select a property from this branch.')
+        return cleaned
+
+
+class BankExpenseReviewForm(forms.Form):
+    branch = forms.ChoiceField(
+        choices=[('', 'Choose a business branch'), *BusinessBranch.choices]
+    )
+    supplier = forms.CharField(max_length=160)
+    category = forms.ChoiceField(choices=Expense.Category.choices)
+    description = forms.CharField(max_length=300)
+    property = forms.ModelChoiceField(
+        queryset=Property.objects.none(), required=False
+    )
+    reference = forms.CharField(max_length=160, required=False)
+    notes = forms.CharField(
+        required=False, widget=forms.Textarea(attrs={'rows': 3})
+    )
+    remember_supplier = forms.BooleanField(
+        required=False,
+        label='Remember this supplier for future payments',
+        help_text=(
+            'Future matching Monzo payments will be pre-filled with this '
+            'branch, supplier, category and description.'
+        ),
+    )
+
+    def __init__(self, *args, bank_transaction=None, **kwargs):
+        self.bank_transaction = bank_transaction
+        if bank_transaction and not args and 'initial' not in kwargs:
+            suggestion = expense_suggestion(bank_transaction)
+            kwargs['initial'] = {
+                key: value
+                for key, value in suggestion.items()
+                if key != 'rule'
+            }
+        super().__init__(*args, **kwargs)
+        self.fields['property'].queryset = Property.objects.filter(
+            active=True
+        ).select_related('customer')
+
+    def clean(self):
+        cleaned = super().clean()
+        if not self.bank_transaction or not self.bank_transaction.is_outgoing:
+            raise forms.ValidationError('Select an outgoing GBP transaction.')
+        if is_fuel_transaction(self.bank_transaction):
+            raise forms.ValidationError(
+                'Fuel is excluded because the van is personally owned.'
+            )
+        property_record = cleaned.get('property')
+        branch = cleaned.get('branch')
+        if property_record and property_record.customer.branch != branch:
+            self.add_error('property', 'Select a property from the chosen branch.')
         return cleaned
 
 

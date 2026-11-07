@@ -222,6 +222,13 @@ class Expense(models.Model):
     )
     reference = models.CharField(max_length=160, blank=True)
     notes = models.TextField(blank=True)
+    bank_transaction = models.OneToOneField(
+        'BankTransaction',
+        on_delete=models.PROTECT,
+        related_name='expense_record',
+        null=True,
+        blank=True,
+    )
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,
         on_delete=models.PROTECT,
@@ -261,6 +268,11 @@ class Expense(models.Model):
             errors['amount'] = 'Amount must be greater than zero.'
         if self.property_id and self.property.customer.branch != self.branch:
             errors['property'] = 'The property must belong to this expense branch.'
+        if self.bank_transaction_id:
+            if self.bank_transaction.amount_minor >= 0:
+                errors['bank_transaction'] = 'An expense must use an outgoing transaction.'
+            if self.amount != abs(self.bank_transaction.amount):
+                errors['amount'] = 'The expense amount must match the bank transaction.'
         if errors:
             raise ValidationError(errors)
 
@@ -602,12 +614,47 @@ class BankTransaction(models.Model):
         return self.amount_minor > 0 and self.currency == 'GBP'
 
     @builtin_property
+    def is_outgoing(self):
+        return self.amount_minor < 0 and self.currency == 'GBP'
+
+    @builtin_property
     def review_status(self):
         if hasattr(self, 'payment_match'):
             return 'matched'
         if self.ignored_at:
             return 'ignored'
         return 'review'
+
+
+class ExpenseImportRule(models.Model):
+    """Remember how a recurring Monzo supplier should be categorised."""
+
+    match_text = models.CharField(max_length=160, unique=True)
+    branch = models.CharField(max_length=12, choices=BusinessBranch.choices)
+    supplier = models.CharField(max_length=160)
+    category = models.CharField(max_length=20, choices=Expense.Category.choices)
+    description = models.CharField(max_length=300)
+    active = models.BooleanField(default=True)
+    created_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='office_expense_import_rules_created',
+    )
+    updated_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        on_delete=models.PROTECT,
+        related_name='office_expense_import_rules_updated',
+        null=True,
+        blank=True,
+    )
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['supplier', 'match_text']
+
+    def __str__(self):
+        return f'{self.match_text} → {self.supplier}'
 
 
 class PaymentMatch(models.Model):

@@ -1184,6 +1184,7 @@ class ExpenseExportView(BranchContextMixin, OfficeAccessMixin, View):
                 'Amount',
                 'Payment method',
                 'Reference',
+                'Bank transaction ID',
                 'Notes',
                 'Status',
                 'Created by',
@@ -1193,7 +1194,11 @@ class ExpenseExportView(BranchContextMixin, OfficeAccessMixin, View):
             ]
         )
         expenses = Expense.objects.filter(branch=self.branch).select_related(
-            'property', 'property__customer', 'created_by', 'voided_by'
+            'property',
+            'property__customer',
+            'created_by',
+            'voided_by',
+            'bank_transaction',
         )
         for expense in expenses:
             writer.writerow(
@@ -1209,6 +1214,9 @@ class ExpenseExportView(BranchContextMixin, OfficeAccessMixin, View):
                     f'{expense.amount:.2f}',
                     expense.get_payment_method_display(),
                     expense.reference,
+                    expense.bank_transaction.external_id
+                    if expense.bank_transaction_id
+                    else '',
                     expense.notes,
                     'Void' if expense.is_void else 'Active',
                     expense.created_by.get_username(),

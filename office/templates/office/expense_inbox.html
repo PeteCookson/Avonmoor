@@ -1,0 +1,53 @@
+{% extends 'office/base.html' %}
+{% block title %}Expense inbox | Avonmoor Office{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">MONZO EXPENSE REVIEW</p>
+        <h1>Expense inbox</h1>
+        <p class="lede">Review actual outgoing Monzo payments before they enter the expense register. Fuel is kept out because the van is personally owned.</p>
+    </div>
+    <a class="button button-secondary" href="{% url 'office:payments' %}">Sync Monzo</a>
+</div>
+
+<div class="filter-row payment-filters">
+    <a{% if status_filter == 'review' %} class="active-filter"{% endif %} href="{% url 'office:expense-inbox' %}?status=review">Review <b>{{ review_count }}</b></a>
+    <a{% if status_filter == 'recorded' %} class="active-filter"{% endif %} href="{% url 'office:expense-inbox' %}?status=recorded">Recorded <b>{{ recorded_count }}</b></a>
+    <a{% if status_filter == 'excluded' %} class="active-filter"{% endif %} href="{% url 'office:expense-inbox' %}?status=excluded">Excluded <b>{{ excluded_count }}</b></a>
+    <a{% if status_filter == 'all' %} class="active-filter"{% endif %} href="{% url 'office:expense-inbox' %}?status=all">All</a>
+</div>
+
+<section class="panel table-panel">
+    <div class="table-wrap"><table>
+        <thead><tr><th>Date</th><th>Supplier / description</th><th>Reference</th><th>Amount</th><th>Status</th><th>Action</th></tr></thead>
+        <tbody>
+        {% for transaction in transactions %}
+        <tr>
+            <td>{{ transaction.transaction_at|date:'d M Y' }}<small>{{ transaction.get_source_display }}</small></td>
+            <td><b>{{ transaction.description|default:'Outgoing payment' }}</b></td>
+            <td>{{ transaction.reference|default:'—' }}</td>
+            <td><b>£{{ transaction.amount|floatformat:2|cut:'-' }}</b></td>
+            <td>
+                {% if transaction.expense_state == 'recorded' %}<span class="status status-paid">Recorded</span>
+                {% elif transaction.fuel_excluded %}<span class="status status-cancelled">Fuel excluded</span>
+                {% elif transaction.expense_state == 'excluded' %}<span class="status status-cancelled">Not business</span>
+                {% else %}<span class="status status-issued">Review</span>{% endif %}
+            </td>
+            <td><div class="table-actions">
+                {% if transaction.expense_state == 'recorded' %}
+                    <a href="{% url 'office:expense-edit' transaction.expense_record.branch transaction.expense_record.pk %}">Open expense</a>
+                {% elif transaction.fuel_excluded %}
+                    <span class="muted-copy">Mileage log only</span>
+                {% elif transaction.expense_state == 'excluded' %}
+                    <form method="post" action="{% url 'office:expense-bank-restore' transaction.pk %}">{% csrf_token %}<button type="submit">Restore</button></form>
+                {% else %}
+                    <a href="{% url 'office:expense-bank-review' transaction.pk %}">Review</a>
+                    <form method="post" action="{% url 'office:expense-bank-ignore' transaction.pk %}">{% csrf_token %}<button type="submit">Not business</button></form>
+                {% endif %}
+            </div></td>
+        </tr>
+        {% empty %}<tr><td colspan="6" class="empty-state">No outgoing payments in this view.</td></tr>{% endfor %}
+        </tbody>
+    </table></div>
+</section>
+{% endblock %}

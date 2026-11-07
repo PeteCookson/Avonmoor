@@ -13,7 +13,15 @@ from django.db import transaction as db_transaction
 from django.utils import timezone
 from django.utils.dateparse import parse_datetime
 
-from .models import BankConnection, BankTransaction, Customer, Invoice, PaymentMatch
+from .models import (
+    BankConnection,
+    BankTransaction,
+    Customer,
+    Expense,
+    ExpenseImportRule,
+    Invoice,
+    PaymentMatch,
+)
 
 
 class MonzoAPIError(RuntimeError):
@@ -193,6 +201,56 @@ def import_monzo_transaction(payload, account_id=''):
     return BankTransaction.objects.update_or_create(
         external_id=f'monzo:{external_source_id}', defaults=defaults
     )
+
+
+FUEL_TRANSACTION_PATTERN = re.compile(
+    r'\b(?:bp|esso|fuel|gulf|jet|petrol|shell|texaco|diesel)\b',
+    re.IGNORECASE,
+)
+
+
+def is_fuel_transaction(bank_transaction):
+    """Keep personally owned vehicle fuel outside company expenses."""
+
+    if not bank_transaction.is_outgoing:
+        return False
+    text = ' '.join(
+        [
+            bank_transaction.description or '',
+            bank_transaction.reference or '',
+            str((bank_transaction.raw_data or {}).get('merchant', '')),
+        ]
+    )
+    return bool(FUEL_TRANSACTION_PATTERN.search(text))
+
+
+def expense_rule_for_transaction(bank_transaction):
+    """Return the most specific active recurring-supplier rule."""
+
+    text = ' '.join(
+        [bank_transaction.description or '', bank_transaction.reference or '']
+    ).casefold()
+    matches = [
+        rule
+        for rule in ExpenseImportRule.objects.filter(active=True)
+        if rule.match_text.casefold() in text
+    ]
+    return max(matches, key=lambda rule: len(rule.match_text), default=None)
+
+
+def expense_suggestion(bank_transaction):
+    """Suggest editable expense fields without posting to the ledger."""
+
+    rule = expense_rule_for_transaction(bank_transaction)
+    supplier = (bank_transaction.description or 'Monzo payment').strip()[:160]
+    return {
+        'rule': rule,
+        'branch': rule.branch if rule else '',
+        'supplier': rule.supplier if rule else supplier,
+        'category': rule.category if rule else Expense.Category.OTHER,
+        'description': rule.description if rule else supplier,
+        'reference': (bank_transaction.reference or '')[:160],
+    }
 
 
 def invoice_outstanding_minor(invoice):
@@ -375,7 +433,7 @@ def retry_auto_matching():
 def sync_monzo_transactions(connection):
     token = connection_token(connection)
     since = (
-        connection.last_synced_at - timedelta(minutes=5)
+        connection.last_synced_at - timedelta(days=7)
         if connection.last_synced_at
         else timezone.now() - timedelta(days=90)
     )
@@ -399,7 +457,7 @@ def sync_monzo_transactions(connection):
         rows.sort(key=lambda item: item.get('created', ''))
         for row in rows:
             if (
-                int(row.get('amount', 0)) <= 0
+                int(row.get('amount', 0)) == 0
                 or (row.get('currency') or 'GBP').upper() != 'GBP'
             ):
                 continue
@@ -482,7 +540,7 @@ def import_bank_csv(uploaded_file):
                 f'Row {row_number} has an invalid amount.'
             ) from error
         currency = (_csv_value(row, 'Currency') or 'GBP').upper()
-        if amount_minor <= 0 or currency != 'GBP':
+        if amount_minor == 0 or currency != 'GBP':
             continue
         transaction_at = _csv_datetime(
             date_value, _csv_value(row, 'Time')

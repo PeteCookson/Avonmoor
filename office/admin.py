@@ -5,6 +5,7 @@ from .models import (
     BankTransaction,
     Customer,
     Expense,
+    ExpenseImportRule,
     Invoice,
     InvoiceEmail,
     InvoiceLine,
@@ -77,6 +78,7 @@ class ExpenseAdmin(admin.ModelAdmin):
         'payment_method',
         'reference',
         'notes',
+        'bank_transaction',
         'created_by',
         'updated_by',
         'voided_at',
@@ -87,6 +89,13 @@ class ExpenseAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+@admin.register(ExpenseImportRule)
+class ExpenseImportRuleAdmin(admin.ModelAdmin):
+    list_display = ('match_text', 'supplier', 'branch', 'category', 'active')
+    list_filter = ('branch', 'category', 'active')
+    search_fields = ('match_text', 'supplier', 'description')
 
 
 class InvoiceLineInline(admin.TabularInline):

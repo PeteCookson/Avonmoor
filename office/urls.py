@@ -22,6 +22,26 @@ urlpatterns = [
     path('accounting/', views.AccountingReportView.as_view(), name='accounting'),
     path('payments/', banking_views.PaymentsView.as_view(), name='payments'),
     path(
+        'expenses/inbox/',
+        banking_views.ExpenseInboxView.as_view(),
+        name='expense-inbox',
+    ),
+    path(
+        'expenses/inbox/<int:pk>/review/',
+        banking_views.BankExpenseReviewView.as_view(),
+        name='expense-bank-review',
+    ),
+    path(
+        'expenses/inbox/<int:pk>/exclude/',
+        banking_views.BankExpenseIgnoreView.as_view(),
+        name='expense-bank-ignore',
+    ),
+    path(
+        'expenses/inbox/<int:pk>/restore/',
+        banking_views.BankExpenseRestoreView.as_view(),
+        name='expense-bank-restore',
+    ),
+    path(
         'payments/import/',
         banking_views.BankCSVImportView.as_view(),
         name='payment-import',

@@ -146,6 +146,10 @@ tfoot th { color: #fff; background: var(--green); font-size: 16px; }
 .age-list strong { color: var(--green); font-variant-numeric: tabular-nums; }
 .negative-money { color: var(--danger) !important; }
 .report-disclaimer { max-width: 900px; margin: 20px auto 0; color: var(--muted); font-size: 12px; text-align: center; }
+.bank-transaction-summary { display: grid; grid-template-columns: 160px 1fr 160px; gap: 18px; margin-bottom: 20px; }
+.bank-transaction-summary div { display: flex; flex-direction: column; gap: 6px; }
+.bank-transaction-summary span { color: var(--muted); font-size: 12px; font-weight: 700; text-transform: uppercase; letter-spacing: .05em; }
+.bank-transaction-summary strong { color: var(--green); font-size: 18px; overflow-wrap: anywhere; }
 address { font-style: normal; }
 hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
 .form-grid { display: grid; grid-template-columns: 1fr 1fr 180px; gap: 16px; margin-bottom: 20px; }
@@ -207,4 +211,5 @@ code { overflow-wrap: anywhere; }
     .button-row .button, .button-row form, .button-row form .button { width: 100%; }
     .connection-panel, .csv-import-panel { align-items: stretch; flex-direction: column; }
     .csv-import-form { align-items: stretch; justify-content: flex-start; }
+    .bank-transaction-summary { grid-template-columns: 1fr; }
 }
