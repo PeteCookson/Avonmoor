@@ -63,6 +63,11 @@ class PaymentsView(OfficeAccessMixin, View):
         base = BankTransaction.objects.filter(amount_minor__gt=0, currency='GBP')
         context = {
             'connection': connection,
+            'connection_pending': bool(
+                connection
+                and not connection.active
+                and connection.access_token_encrypted
+            ),
             'monzo_configured': monzo_configured(),
             'callback_url': settings.MONZO_REDIRECT_URI,
             'transactions': transactions[:150],
@@ -130,7 +135,12 @@ class MonzoCallbackView(OwnerOnlyMixin, View):
             seconds=payload.get('expires_in', 21600)
         )
         connection.save()
-        return redirect('office:monzo-account')
+        messages.info(
+            request,
+            'Email confirmed. Approve Avonmoor Office in the Monzo app, '
+            'then select Continue setup.',
+        )
+        return redirect('office:payments')
 
 
 class MonzoAccountView(OwnerOnlyMixin, View):
@@ -143,7 +153,14 @@ class MonzoAccountView(OwnerOnlyMixin, View):
         try:
             return list_monzo_accounts(connection)
         except MonzoAPIError as error:
-            messages.error(request, str(error))
+            if error.status_code in {401, 403}:
+                messages.warning(
+                    request,
+                    'Monzo approval is still required. Open the Monzo app, '
+                    'approve Avonmoor Office, then select Continue setup.',
+                )
+            else:
+                messages.error(request, str(error))
             return None
 
     def get(self, request):

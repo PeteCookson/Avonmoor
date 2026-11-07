@@ -10,7 +10,12 @@ from django.test import TestCase, override_settings
 from django.urls import reverse
 from django.utils import timezone
 
-from .banking import auto_match_transaction, import_bank_csv, match_payment
+from .banking import (
+    MonzoAPIError,
+    auto_match_transaction,
+    import_bank_csv,
+    match_payment,
+)
 from .models import (
     BankConnection,
     BankTransaction,
@@ -291,7 +296,7 @@ class MonzoConnectionTests(BankingFixtureMixin, TestCase):
         MONZO_REDIRECT_URI='https://www.avonmoor.co.uk/office/payments/monzo/callback/',
     )
     @patch('office.banking_views.exchange_authorization_code')
-    def test_valid_callback_stores_encrypted_tokens_then_requests_account(
+    def test_valid_callback_stores_encrypted_tokens_then_waits_for_app_approval(
         self, exchange
     ):
         exchange.return_value = {
@@ -310,12 +315,41 @@ class MonzoConnectionTests(BankingFixtureMixin, TestCase):
         )
 
         self.assertEqual(response.status_code, 302)
-        self.assertEqual(response.url, reverse('office:monzo-account'))
+        self.assertEqual(response.url, reverse('office:payments'))
         connection = BankConnection.objects.get(provider='monzo')
         self.assertFalse(connection.active)
         self.assertNotIn('access-secret', connection.access_token_encrypted)
         self.assertEqual(connection.access_token(), 'access-secret')
         self.assertEqual(connection.refresh_token(), 'refresh-secret')
+
+        response = self.client.get(reverse('office:payments'))
+        self.assertContains(response, 'Monzo is awaiting approval.')
+        self.assertContains(response, 'Continue setup')
+        self.assertNotContains(response, 'Connect Monzo')
+
+    @override_settings(SECRET_KEY='oauth-encryption-test-key')
+    @patch('office.banking_views.list_monzo_accounts')
+    def test_account_selection_explains_pending_monzo_app_approval(
+        self, list_accounts
+    ):
+        connection = BankConnection.objects.create(
+            provider='monzo', connected_by=self.owner
+        )
+        connection.set_tokens('access-secret', 'refresh-secret')
+        connection.save()
+        list_accounts.side_effect = MonzoAPIError(
+            'Access forbidden due to insufficient permissions',
+            status_code=403,
+        )
+        self.client.force_login(self.owner)
+
+        response = self.client.get(reverse('office:monzo-account'), follow=True)
+
+        self.assertRedirects(response, reverse('office:payments'))
+        self.assertContains(response, 'Monzo approval is still required.')
+        self.assertNotContains(
+            response, 'Access forbidden due to insufficient permissions'
+        )
 
     @patch('office.banking_views.fetch_monzo_transaction')
     def test_webhook_fetches_transaction_from_monzo_before_matching(self, fetch):

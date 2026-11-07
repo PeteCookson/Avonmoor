@@ -17,7 +17,9 @@ from .models import BankConnection, BankTransaction, Customer, Invoice, PaymentM
 
 
 class MonzoAPIError(RuntimeError):
-    pass
+    def __init__(self, message, *, status_code=None):
+        super().__init__(message)
+        self.status_code = status_code
 
 
 def monzo_configured():
@@ -44,12 +46,17 @@ def _monzo_request(method, path, *, token='', data=None, params=None):
         response.raise_for_status()
     except requests.RequestException as error:
         detail = ''
+        status_code = None
         if getattr(error, 'response', None) is not None:
+            status_code = error.response.status_code
             try:
                 detail = error.response.json().get('message', '')
             except (ValueError, AttributeError):
                 detail = ''
-        raise MonzoAPIError(detail or 'Monzo could not complete the request.') from error
+        raise MonzoAPIError(
+            detail or 'Monzo could not complete the request.',
+            status_code=status_code,
+        ) from error
     if not response.content:
         return {}
     try:

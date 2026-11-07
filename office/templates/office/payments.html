@@ -18,6 +18,8 @@
         {% if connection.active %}
         <p><b>{{ connection.account_name }}</b> is connected read-only through Monzo.</p>
         <p class="muted-copy">Last synced: {% if connection.last_synced_at %}{{ connection.last_synced_at|date:'d M Y, H:i' }}{% else %}not yet{% endif %}</p>
+        {% elif connection_pending %}
+        <p><b>Monzo is awaiting approval.</b> Approve Avonmoor Office in the Monzo app, then continue setup.</p>
         {% elif monzo_configured %}
         <p>Monzo is ready to connect. Only the owner can authorise bank access.</p>
         {% else %}
@@ -28,6 +30,8 @@
     <div class="button-row">
         {% if user.is_superuser and connection.active %}
         <form method="post" action="{% url 'office:monzo-disconnect' %}" onsubmit="return confirm('Disconnect Monzo? Imported payment history will be retained.');">{% csrf_token %}<button class="button button-danger" type="submit">Disconnect</button></form>
+        {% elif user.is_superuser and connection_pending %}
+        <a class="button button-primary" href="{% url 'office:monzo-account' %}">Continue setup</a>
         {% elif user.is_superuser and monzo_configured %}
         <form method="post" action="{% url 'office:monzo-connect' %}">{% csrf_token %}<button class="button button-primary" type="submit">Connect Monzo</button></form>
         {% endif %}
