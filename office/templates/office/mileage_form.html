@@ -4,7 +4,7 @@
 {% if daily %}
 <a class="back-link" href="{% url 'office:mileage-list' branch %}">← Mileage log</a>
 <section class="form-panel">
-<p class="eyebrow">PERSONAL FORD TRANSIT CONNECT</p><h1>Daily mileage</h1>
+<p class="eyebrow">FORD TRANSIT CONNECT NJ04 ZRP</p><h1>Daily mileage</h1>
 <p>Start the day with one reading. Add the end reading here when finished. No separate entries for each visit.</p>
 <form method="post" class="stacked-form" id="daily-mileage-form">
 {% csrf_token %}{{ form.non_field_errors }}
