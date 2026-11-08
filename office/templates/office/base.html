@@ -7,7 +7,8 @@
     <meta name="theme-color" content="#0B4540">
     <title>{% block title %}Avonmoor Office{% endblock %}</title>
     <link rel="icon" href="{% static 'img/favicon.ico' %}" sizes="any">
-    <link rel="stylesheet" href="{% static 'office/css/office.css' %}?v=20261107-3">
+    <link rel="stylesheet" href="{% static 'office/css/office.css' %}?v=20261108-1">
+    <script src="{% static 'office/js/navigation.js' %}?v=20261108-1" defer></script>
 </head>
 <body{% if branch %} class="branch-{{ branch }}"{% endif %}>
     <header class="app-header">
@@ -19,17 +20,83 @@
         </div>
         <nav class="main-nav" aria-label="Office navigation">
             {% if branch %}
-            <a href="{% url 'office:customer-list' branch %}">Customers</a>
-            <a href="{% url 'office:work-list' branch %}">{{ branch_meta.work_label }}</a>
-            <a href="{% url 'office:expense-list' branch %}">Expenses</a>
-            <a href="{% url 'office:mileage-list' branch %}">Mileage</a>
-            <a href="{% url 'office:invoice-list' branch %}">Invoices</a>
-            {% if branch == 'rainwater' %}<a href="{% url 'water_survey:survey-list' %}">Surveys</a>{% endif %}
-            <a href="{% url 'office:dashboard' %}">Switch branch</a>
+            <details class="nav-menu{% if request.resolver_match.url_name == 'customer-list' or request.resolver_match.url_name == 'customer-create' or request.resolver_match.url_name == 'customer-detail' or request.resolver_match.url_name == 'property-create' or request.resolver_match.url_name == 'property-edit' or request.resolver_match.url_name == 'work-list' or request.resolver_match.url_name == 'work-create' or request.resolver_match.url_name == 'work-edit' or request.resolver_match.namespace == 'water_survey' %} nav-menu-active{% endif %}">
+                <summary>Work</summary>
+                <div class="nav-submenu">
+                    <a href="{% url 'office:customer-list' branch %}">
+                        <strong>Customers</strong>
+                        <small>People and properties</small>
+                    </a>
+                    <a href="{% url 'office:work-list' branch %}">
+                        <strong>{{ branch_meta.work_label }}</strong>
+                        <small>Completed and billable work</small>
+                    </a>
+                    {% if branch == 'rainwater' %}
+                    <a href="{% url 'water_survey:survey-list' %}">
+                        <strong>Surveys</strong>
+                        <small>Rainwater site assessments</small>
+                    </a>
+                    {% endif %}
+                </div>
+            </details>
+
+            <details class="nav-menu{% if request.resolver_match.url_name == 'invoice-list' or request.resolver_match.url_name == 'invoice-create' or request.resolver_match.url_name == 'invoice-edit' or request.resolver_match.url_name == 'invoice-detail' or request.resolver_match.url_name == 'invoice-email' or request.resolver_match.url_name == 'invoice-pdf' or request.resolver_match.url_name == 'payment-create' or request.resolver_match.url_name == 'payments' %} nav-menu-active{% endif %}">
+                <summary>Billing</summary>
+                <div class="nav-submenu">
+                    <a href="{% url 'office:invoice-list' branch %}">
+                        <strong>Invoices</strong>
+                        <small>Create, send and track invoices</small>
+                    </a>
+                    <a href="{% url 'office:payments' %}">
+                        <strong>Payments</strong>
+                        <small>Match customer payments</small>
+                    </a>
+                </div>
+            </details>
+
+            <details class="nav-menu nav-menu-accounts{% if request.resolver_match.url_name == 'accounting' or request.resolver_match.url_name == 'accounting-export' or request.resolver_match.url_name == 'expense-list' or request.resolver_match.url_name == 'expense-create' or request.resolver_match.url_name == 'expense-edit' or request.resolver_match.url_name == 'expense-inbox' or request.resolver_match.url_name == 'expense-bank-review' or request.resolver_match.url_name == 'mileage-list' or request.resolver_match.url_name == 'mileage-create' or request.resolver_match.url_name == 'mileage-edit' or request.resolver_match.url_name == 'mileage-claim' %} nav-menu-active{% endif %}">
+                <summary>Accounts</summary>
+                <div class="nav-submenu">
+                    <a href="{% url 'office:accounting' %}">
+                        <strong>Overview</strong>
+                        <small>Income, costs and reports</small>
+                    </a>
+                    <a href="{% url 'office:expense-inbox' %}">
+                        <strong>Expense inbox</strong>
+                        <small>Review Monzo spending</small>
+                    </a>
+                    <a href="{% url 'office:expense-list' branch %}">
+                        <strong>Expenses</strong>
+                        <small>Recorded business costs</small>
+                    </a>
+                    <a href="{% url 'office:mileage-list' branch %}">
+                        <strong>Mileage</strong>
+                        <small>Journeys and reimbursement claims</small>
+                    </a>
+                </div>
+            </details>
+
+            <a class="nav-direct" href="{% url 'office:dashboard' %}">Switch branch</a>
+            {% else %}
+            <details class="nav-menu nav-menu-accounts nav-menu-active">
+                <summary>Accounts</summary>
+                <div class="nav-submenu">
+                    <a href="{% url 'office:accounting' %}">
+                        <strong>Overview</strong>
+                        <small>Income, costs and reports</small>
+                    </a>
+                    <a href="{% url 'office:expense-inbox' %}">
+                        <strong>Expense inbox</strong>
+                        <small>Review Monzo spending</small>
+                    </a>
+                    <a href="{% url 'office:payments' %}">
+                        <strong>Payments</strong>
+                        <small>Match customer payments</small>
+                    </a>
+                </div>
+            </details>
+            <a class="nav-direct" href="{% url 'office:dashboard' %}">Choose branch</a>
             {% endif %}
-            <a href="{% url 'office:accounting' %}">Accounting</a>
-            <a href="{% url 'office:expense-inbox' %}">Expense inbox</a>
-            <a href="{% url 'office:payments' %}">Payments</a>
         </nav>
         <form method="post" action="{% url 'logout' %}" class="sign-out">
             {% csrf_token %}

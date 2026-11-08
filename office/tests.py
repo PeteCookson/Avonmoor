@@ -135,6 +135,30 @@ class OfficeAccessTests(OfficeFixtureMixin, TestCase):
         self.assertNotContains(garden, f'href="{surveys_url}"')
         self.assertContains(rainwater, f'href="{surveys_url}"')
 
+    def test_branch_navigation_is_grouped_by_task(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(
+            reverse('office:branch-dashboard', args=[BusinessBranch.GARDEN])
+        )
+
+        self.assertContains(response, '<summary>Work</summary>', html=True)
+        self.assertContains(response, '<summary>Billing</summary>', html=True)
+        self.assertContains(response, '<summary>Accounts</summary>', html=True)
+        self.assertContains(response, 'People and properties')
+        self.assertContains(response, 'Create, send and track invoices')
+        self.assertContains(response, 'Review Monzo spending')
+        self.assertContains(response, 'Journeys and reimbursement claims')
+        self.assertContains(response, 'Switch branch')
+
+    def test_global_accounts_pages_keep_navigation_grouped(self):
+        self.client.force_login(self.staff)
+        response = self.client.get(reverse('office:accounting'))
+
+        self.assertContains(response, '<summary>Accounts</summary>', html=True)
+        self.assertContains(response, 'Review Monzo spending')
+        self.assertContains(response, 'Match customer payments')
+        self.assertContains(response, 'Choose branch')
+
     def test_staff_login_without_next_redirects_to_office(self):
         response = self.client.post(
             reverse('login'),

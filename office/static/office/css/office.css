@@ -38,8 +38,20 @@ button, input, select, textarea { font: inherit; }
 .brand-logo img { display: block; width: 100%; height: auto; }
 .workspace-name { padding-left: 12px; border-left: 1px solid rgba(255,255,255,.4); color: #fff; text-decoration: none; font-size: 18px; }
 .main-nav { display: flex; align-items: center; gap: 4px; margin-left: auto; }
-.main-nav a, .sign-out button { min-height: 44px; display: inline-flex; align-items: center; padding: 8px 11px; border: 1px solid transparent; border-radius: 6px; color: #fff; background: transparent; text-decoration: none; cursor: pointer; }
-.main-nav a:hover, .sign-out button:hover { border-color: rgba(255,255,255,.45); }
+.main-nav > a, .nav-menu > summary, .sign-out button { min-height: 44px; display: inline-flex; align-items: center; padding: 8px 11px; border: 1px solid transparent; border-radius: 6px; color: #fff; background: transparent; text-decoration: none; cursor: pointer; }
+.main-nav > a:hover, .nav-menu > summary:hover, .nav-menu[open] > summary, .sign-out button:hover { border-color: rgba(255,255,255,.45); background: rgba(255,255,255,.07); }
+.nav-menu { position: relative; }
+.nav-menu > summary { gap: 7px; list-style: none; }
+.nav-menu > summary::-webkit-details-marker { display: none; }
+.nav-menu > summary::after { content: ""; width: 7px; height: 7px; margin-top: -4px; border-right: 2px solid currentColor; border-bottom: 2px solid currentColor; transform: rotate(45deg); transition: transform .15s ease; }
+.nav-menu[open] > summary::after { margin-top: 4px; transform: rotate(225deg); }
+.nav-menu-active > summary { box-shadow: inset 0 -3px 0 var(--copper); }
+.nav-submenu { position: absolute; z-index: 20; top: calc(100% + 8px); left: 0; width: 270px; padding: 8px; border: 1px solid var(--line); border-radius: 8px; background: #fff; box-shadow: 0 16px 36px rgba(7,54,50,.22); }
+.nav-menu-accounts .nav-submenu { right: 0; left: auto; }
+.nav-submenu a { display: grid; gap: 1px; padding: 10px 12px; border-radius: 6px; color: var(--ink); text-decoration: none; }
+.nav-submenu a:hover, .nav-submenu a:focus-visible { background: var(--pale-green); }
+.nav-submenu strong { color: var(--green); font-size: 14px; }
+.nav-submenu small { color: var(--muted); font-size: 12px; }
 .sign-out { margin: 0; }
 .app-main { width: min(1180px, 100%); margin: 0 auto; padding: 34px clamp(16px, 4vw, 44px) 70px; }
 h1, h2, h3, p { margin-top: 0; }
@@ -190,7 +202,7 @@ code { overflow-wrap: anywhere; }
 .sr-only { position: absolute; width: 1px; height: 1px; padding: 0; margin: -1px; overflow: hidden; clip: rect(0,0,0,0); white-space: nowrap; border: 0; }
 @media (max-width: 980px) {
     .app-header { flex-wrap: wrap; }
-    .main-nav { order: 3; width: 100%; overflow-x: auto; margin-left: 0; }
+    .main-nav { order: 3; width: 100%; flex-wrap: wrap; margin-left: 0; }
     .sign-out { margin-left: auto; }
     .metric-grid { grid-template-columns: 1fr 1fr; }
     .report-filter { grid-template-columns: 1fr 1fr; }
@@ -199,6 +211,14 @@ code { overflow-wrap: anywhere; }
     .field-description { grid-column: 1 / -1; }
 }
 @media (max-width: 680px) {
+    .app-header { gap: 10px; }
+    .brand { min-width: 0; }
+    .brand-logo { width: 145px; }
+    .workspace-name { font-size: 16px; }
+    .main-nav { display: grid; grid-template-columns: 1fr; align-items: stretch; }
+    .main-nav > a, .nav-menu > summary { width: 100%; justify-content: space-between; }
+    .nav-menu { position: static; }
+    .nav-submenu, .nav-menu-accounts .nav-submenu { position: static; width: 100%; margin: 3px 0 8px; box-shadow: none; }
     .app-main { padding-top: 24px; }
     .page-heading, .section-heading { align-items: flex-start; flex-direction: column; }
     .metric-grid, .dashboard-grid, .branch-grid, .form-grid, .invoice-summary { grid-template-columns: 1fr; }
