@@ -44,8 +44,8 @@
         <td><b>£{{ expense.amount|floatformat:2 }}</b></td>
         <td>{% if expense.is_void %}<span class="status status-cancelled">Void</span>{% else %}<span class="status status-paid">Active</span>{% endif %}</td>
         <td>
-            {% if not expense.is_void %}<a href="{% url 'office:expense-edit' branch expense.pk %}">Edit</a>{% endif %}
-            {% if request.user.is_superuser and not expense.is_void %}
+            {% if expense.mileage_claim %}<a href="{% url 'office:mileage-claim' branch expense.mileage_claim.pk %}">Mileage claim · {{ expense.mileage_claim.get_status_display }}</a>{% elif not expense.is_void %}<a href="{% url 'office:expense-edit' branch expense.pk %}">Edit</a>{% endif %}
+            {% if request.user.is_superuser and not expense.is_void and not expense.mileage_claim %}
             <form method="post" action="{% url 'office:expense-void' branch expense.pk %}" class="inline-form" onsubmit="return confirm('Void this expense? It will remain in the audit trail.');">{% csrf_token %}<button type="submit" class="link-button danger-link">Void</button></form>
             {% endif %}
         </td>

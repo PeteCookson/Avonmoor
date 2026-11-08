@@ -215,6 +215,7 @@ class ExpenseForm(forms.ModelForm):
     def __init__(self, *args, branch=BusinessBranch.GARDEN, **kwargs):
         super().__init__(*args, **kwargs)
         self.branch = branch
+        self.fields['category'].choices = [(value, label) for value, label in Expense.Category.choices if value not in [Expense.Category.MILEAGE, Expense.Category.FUEL]]
         current_property_id = getattr(self.instance, 'property_id', None)
         properties = Property.objects.filter(
             active=True, customer__branch=branch
@@ -267,6 +268,7 @@ class BankExpenseReviewForm(forms.Form):
                 if key != 'rule'
             }
         super().__init__(*args, **kwargs)
+        self.fields['category'].choices = [(value, label) for value, label in Expense.Category.choices if value not in [Expense.Category.MILEAGE, Expense.Category.FUEL]]
         self.fields['property'].queryset = Property.objects.filter(
             active=True
         ).select_related('customer')
@@ -279,6 +281,15 @@ class BankExpenseReviewForm(forms.Form):
             raise forms.ValidationError(
                 'Fuel is excluded because the van is personally owned.'
             )
+        # Reimbursement settles the existing mileage expense; it is not a second cost.
+        from .models import MileageClaim
+        reference = (self.bank_transaction.reference or '').strip().casefold()
+        bank_id = self.bank_transaction.external_id.casefold()
+        text = f'{self.bank_transaction.description} {reference}'.casefold()
+        for claim in MileageClaim.objects.filter(status__in=['approved', 'paid']):
+            payment_ref = claim.payment_reference.strip().casefold()
+            if claim.number.casefold() in text or (payment_ref and payment_ref in [reference, bank_id]):
+                raise forms.ValidationError('This payment reimburses an existing mileage claim. Mark it paid through Mileage; do not create another expense.')
         property_record = cleaned.get('property')
         branch = cleaned.get('branch')
         if property_record and property_record.customer.branch != branch:

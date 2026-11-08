@@ -116,3 +116,60 @@ example `INV-20261102-001`.
 Before issuing a live invoice, import the highest existing invoice number for
 that year or update the `Invoice sequence` record in Django admin. This prevents
 duplicate numbering when historical invoices already exist.
+
+## Mileage log and personal vehicle reimbursements
+
+- Office → choose branch → Mileage. The ledger is Pete Cookson's personally
+  owned 2004 Ford Transit Connect, not a company vehicle.
+- Enter actual journey date, origin, destination, business purpose and miles;
+  optional customer/property/work links must belong to the selected branch.
+- Return doubles manual one-way miles. A pair of odometer readings overrides
+  manual miles and represents the complete trip, without doubling.
+- Staff (including the accountant) can enter/edit draft journeys, approve
+  completed journeys and build a monthly branch claim. Approval locks journey
+  evidence. Owner-only void actions retain the evidence.
+- The tax year starts on 6 April. The first 10,000 approved business miles are
+  shared across branches: 45p before 6 April 2026; 55p from that date; 25p above
+  the threshold. Journeys are ordered by date then ID. Each journey is rounded
+  to pence using decimal half-up rounding, with split-rate evidence retained.
+- Record all earlier business mileage in the tax year before finalizing claims.
+  An approval or void that would alter a later finalized claim's mileage
+  allocation is rejected. Void affected unpaid claims, latest first, to correct
+  earlier evidence. Paid claims remain locked and require accountant review
+  outside the application for corrections; they cannot be deleted or voided.
+- Build/update a monthly draft to reserve approved, unclaimed journeys. A
+  database constraint prevents a journey having two active claim lines.
+  The claim is always branch-specific; April can contain two tax years.
+- Only an active staff superuser (owner) can approve a claim, create its linked
+  mileage expense, mark it paid with a bank reference, or void an unpaid claim
+  with a reason. Accountants cannot bypass owner approval through Django admin.
+- Approval creates one expense under the dedicated mileage category, payable
+  to Pete Cookson. No fuel expense is created. Manual fuel and mileage-category
+  expenses are disabled; incoming-only Monzo matching is unchanged.
+- Accounting expenses include approved claims; cash position includes mileage
+  only when marked paid. The payment date is the date it is marked paid.
+  Voiding preserves the original claim, lines and voided expense, then releases
+  the journeys for a replacement claim. Repeated approval cannot create a
+  second expense. Generated expenses are edited/voided only through claims.
+- Mileage CSV contains journey evidence, vehicle ownership, branch, tax year,
+  rate splits, cumulative mileage, claim/expense IDs, review/approval/payment
+  audit details and void history. Formula-leading text is escaped for Excel.
+- Ledger mutations use a common PostgreSQL row lock to serialize journey review,
+  edits, draft generation and claim transitions. Read-only claim previews do not
+  write to the ledger.
+- Release uses the existing GitHub branch and `build-render.sh`, including
+  migrations 0007/0008 and static collection. Both migrations add data/tables;
+  they do not rewrite existing invoices, bank transactions or expenses.
+
+### Full regression test command
+
+```bash
+DJANGO_SECRET_KEY=test EMAIL_HOST_USER=hello@example.com \
+SECURE_SSL_REDIRECT=False \
+STATICFILES_STORAGE=django.contrib.staticfiles.storage.StaticFilesStorage \
+python manage.py test --noinput
+```
+
+The simple static storage keeps existing asset-path assertions independent of
+production hashed filenames. Tests use Django's in-memory email backend; the
+placeholder sender enables existing notification tests without live SMTP.

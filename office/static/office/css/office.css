@@ -213,3 +213,10 @@ code { overflow-wrap: anywhere; }
     .csv-import-form { align-items: stretch; justify-content: flex-start; }
     .bank-transaction-summary { grid-template-columns: 1fr; }
 }
+
+.mileage-cards { display: grid; gap: 1rem; grid-template-columns: repeat(auto-fit, minmax(min(100%, 320px), 1fr)); }
+.mileage-card { border: 1px solid var(--border, #dce4df); border-radius: 12px; padding: 1rem; overflow-wrap: anywhere; }
+.mileage-card h3 { margin: 0; }
+.mileage-card .button-row form { margin: 0; }
+.mileage-card button, .mileage-card .button { min-height: 44px; }
+@media (max-width: 600px) { .stacked-form input, .stacked-form select, .stacked-form textarea { font-size: 16px; } }

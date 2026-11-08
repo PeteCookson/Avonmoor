@@ -19,6 +19,7 @@
     <a href="{% url 'office:invoice-list' branch %}?status=draft" class="metric-card"><span>Draft invoices</span><strong>{{ draft_count }}</strong></a>
     <a href="{% url 'office:invoice-list' branch %}?status=issued" class="metric-card metric-money"><span>Outstanding</span><strong>£{{ outstanding|floatformat:2 }}</strong></a>
     <a href="{% url 'office:expense-list' branch %}" class="metric-card metric-money"><span>{% now "Y" %} expenses</span><strong>£{{ expense_total|floatformat:2 }}</strong></a>
+    <a href="{% url 'office:mileage-list' branch %}" class="metric-card metric-money"><span>Mileage awaiting payment</span><strong>£{{ mileage_owed|floatformat:2 }}</strong></a>
 </section>
 
 <div class="dashboard-grid">

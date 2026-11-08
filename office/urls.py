@@ -1,6 +1,6 @@
 from django.urls import path, register_converter
 
-from . import banking_views, views
+from . import banking_views, views, mileage_views
 
 app_name = 'office'
 
@@ -18,6 +18,13 @@ class BranchConverter:
 register_converter(BranchConverter, 'branch')
 
 urlpatterns = [
+    path('<branch:branch>/mileage/', mileage_views.MileageListView.as_view(), name='mileage-list'),
+    path('<branch:branch>/mileage/new/', mileage_views.MileageEntryView.as_view(), name='mileage-create'),
+    path('<branch:branch>/mileage/<int:pk>/edit/', mileage_views.MileageEntryView.as_view(), name='mileage-edit'),
+    path('<branch:branch>/mileage/<int:pk>/<str:action>/', mileage_views.MileageReviewView.as_view(), name='mileage-review'),
+    path('<branch:branch>/mileage/claims/generate/', mileage_views.MileageGenerateView.as_view(), name='mileage-generate'),
+    path('<branch:branch>/mileage/claims/<int:pk>/', mileage_views.MileageClaimView.as_view(), name='mileage-claim'),
+    path('<branch:branch>/exports/mileage.csv', mileage_views.MileageExportView.as_view(), name='mileage-export'),
     path('', views.OfficeDashboardView.as_view(), name='dashboard'),
     path('accounting/', views.AccountingReportView.as_view(), name='accounting'),
     path('payments/', banking_views.PaymentsView.as_view(), name='payments'),

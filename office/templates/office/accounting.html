@@ -1,6 +1,7 @@
 {% extends 'office/base.html' %}
 {% block title %}Accounting | Avonmoor Office{% endblock %}
 {% block content %}
+<section class="panel"><h2>Mileage reimbursements</h2><p>Approved mileage expenses in period: <b>£{{ mileage_expense_total|floatformat:2 }}</b>. Awaiting payment across all dates: <b>£{{ mileage_owed|floatformat:2 }}</b>.</p><p>Cash position includes mileage only when marked paid. Recorded expenses include owner-approved claims before reimbursement.</p><div class="button-row"><a href="{% url 'office:mileage-list' 'garden' %}">Garden &amp; Property mileage</a><a href="{% url 'office:mileage-list' 'rainwater' %}">Rainwater Harvesting mileage</a></div></section>
 <div class="page-heading">
     <div>
         <p class="eyebrow">AVONMOOR LTD</p>

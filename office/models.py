@@ -183,6 +183,7 @@ class Expense(models.Model):
         MATERIALS = 'materials', 'Materials and supplies'
         TOOLS = 'tools', 'Tools and equipment'
         FUEL = 'fuel', 'Fuel and travel'
+        MILEAGE = 'mileage', 'Personal vehicle mileage reimbursement'
         WASTE = 'waste', 'Waste disposal'
         SUBCONTRACTOR = 'subcontractor', 'Subcontractors'
         INSURANCE = 'insurance', 'Insurance and professional fees'
@@ -687,3 +688,6 @@ class PaymentMatch(models.Model):
 
     def __str__(self):
         return f'{self.transaction} → {self.invoice.display_number}'
+
+# Imported after core models to keep mileage isolated without a second app.
+from .mileage_models import MileageLedger, MileageJourney, MileageClaim, MileageClaimLine  # noqa: E402,F401

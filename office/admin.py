@@ -52,6 +52,9 @@ class WorkEntryAdmin(admin.ModelAdmin):
 
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
+    def has_delete_permission(self, request, obj=None):
+        return False
+
     list_display = (
         'expense_date',
         'branch',
@@ -218,3 +221,22 @@ class PaymentMatchAdmin(admin.ModelAdmin):
 
     def has_add_permission(self, request):
         return False
+
+
+from .models import MileageLedger, MileageJourney, MileageClaim, MileageClaimLine
+
+
+class MileageEvidenceAdmin(admin.ModelAdmin):
+    """Evidence is managed through the transactional Office workflow only."""
+    def has_add_permission(self, request):
+        return False
+
+    def has_change_permission(self, request, obj=None):
+        return False
+
+    def has_delete_permission(self, request, obj=None):
+        return False
+
+
+for mileage_model in (MileageLedger, MileageJourney, MileageClaim, MileageClaimLine):
+    admin.site.register(mileage_model, MileageEvidenceAdmin)

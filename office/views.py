@@ -43,6 +43,7 @@ from .models import (
     InvoiceLine,
     Property,
     WorkEntry,
+    MileageClaim,
 )
 from .mailbox import append_message_to_sent
 from .pdf import build_invoice_pdf
@@ -124,6 +125,11 @@ def build_accounting_report(start_date, end_date, branch='all'):
     invoiced_sales = _money_total(sales_invoices)
     recorded_payments = _money_total(paid_invoices)
     expense_total = _money_total(expenses, 'amount')
+    mileage_claims = list(MileageClaim.objects.filter(**branch_filter, status__in=['approved', 'paid']))
+    cash_expenses = [expense for expense in expenses if expense.category != Expense.Category.MILEAGE]
+    paid_mileage = [claim for claim in mileage_claims if claim.status == 'paid' and start_date <= timezone.localdate(claim.paid_at) <= end_date]
+    cash_expense_total = _money_total(cash_expenses, 'amount') + _money_total(paid_mileage)
+    mileage_owed = _money_total((claim for claim in mileage_claims if claim.status == 'approved'))
     current_outstanding = _money_total(outstanding_invoices)
 
     months = []
@@ -149,13 +155,14 @@ def build_accounting_report(start_date, end_date, branch='all'):
             ),
             'amount',
         )
+        monthly_cash_expenses = _money_total((expense for expense in cash_expenses if expense.expense_date.year == month.year and expense.expense_date.month == month.month), 'amount') + _money_total((claim for claim in paid_mileage if timezone.localdate(claim.paid_at).replace(day=1) == month))
         months.append(
             {
                 'month': month,
                 'sales': monthly_sales,
                 'payments': monthly_payments,
                 'expenses': monthly_expenses,
-                'position': monthly_payments - monthly_expenses,
+                'position': monthly_payments - monthly_cash_expenses,
             }
         )
 
@@ -179,7 +186,7 @@ def build_accounting_report(start_date, end_date, branch='all'):
                     'sales': branch_sales,
                     'payments': branch_payments,
                     'expenses': branch_expenses,
-                    'position': branch_payments - branch_expenses,
+                    'position': branch_payments - _money_total((expense for expense in cash_expenses if expense.branch == value), 'amount') - _money_total((claim for claim in paid_mileage if claim.branch == value)),
                 }
             )
 
@@ -210,7 +217,10 @@ def build_accounting_report(start_date, end_date, branch='all'):
         'invoiced_sales': invoiced_sales,
         'recorded_payments': recorded_payments,
         'expense_total': expense_total,
-        'cash_position': recorded_payments - expense_total,
+        'cash_position': recorded_payments - cash_expense_total,
+        'cash_expense_total': cash_expense_total,
+        'mileage_owed': mileage_owed,
+        'mileage_expense_total': _money_total((expense for expense in expenses if expense.category == Expense.Category.MILEAGE), 'amount'),
         'current_outstanding': current_outstanding,
         'months': months,
         'branch_rows': branch_rows,
@@ -364,6 +374,9 @@ class AccountingReportView(OfficeAccessMixin, View):
         writer.writerow(['Invoiced sales', f'{report["invoiced_sales"]:.2f}'])
         writer.writerow(['Recorded payments', f'{report["recorded_payments"]:.2f}'])
         writer.writerow(['Recorded expenses', f'{report["expense_total"]:.2f}'])
+        writer.writerow(['Mileage expenses (approved)', f'{report["mileage_expense_total"]:.2f}'])
+        writer.writerow(['Mileage awaiting payment (all dates)', f'{report["mileage_owed"]:.2f}'])
+        writer.writerow(['Paid expenses in period', f'{report["cash_expense_total"]:.2f}'])
         writer.writerow(['Recorded cash position', f'{report["cash_position"]:.2f}'])
         writer.writerow(['Current outstanding', f'{report["current_outstanding"]:.2f}'])
         writer.writerow([])
@@ -455,6 +468,7 @@ class BranchDashboardView(BranchContextMixin, OfficeAccessMixin, View):
                 branch=self.branch, status=Invoice.Status.DRAFT
             ).count(),
             outstanding=outstanding,
+            mileage_owed=MileageClaim.objects.filter(branch=self.branch, status='approved').aggregate(total=Sum('total'))['total'] or Decimal('0.00'),
             expense_total=Expense.objects.filter(
                 branch=self.branch,
                 voided_at__isnull=True,
@@ -777,7 +791,7 @@ class ExpenseUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
     template_name = 'office/form.html'
 
     def get_queryset(self):
-        return Expense.objects.filter(branch=self.branch, voided_at__isnull=True)
+        return Expense.objects.filter(branch=self.branch, voided_at__isnull=True, mileage_claim__isnull=True)
 
     def get_form_kwargs(self):
         kwargs = super().get_form_kwargs()
@@ -801,7 +815,7 @@ class ExpenseUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
 class ExpenseVoidView(BranchContextMixin, OwnerOnlyMixin, View):
     def post(self, request, branch, pk):
         expense = get_object_or_404(
-            Expense, pk=pk, branch=self.branch, voided_at__isnull=True
+            Expense, pk=pk, branch=self.branch, voided_at__isnull=True, mileage_claim__isnull=True
         )
         try:
             expense.void(request.user)

@@ -1,0 +1,22 @@
+{% extends 'office/form.html' %}
+{% block title %}Record mileage | Avonmoor Office{% endblock %}
+{% block content %}
+<p class="eyebrow">{{ branch_meta.label }} · Personal Ford Transit Connect</p>
+<p>Enter completed business travel. Exclude private travel and ordinary commuting. With odometer readings, include the entire journey; the return checkbox will not double it.</p>
+{{ block.super }}
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+ const start = document.getElementById('id_odometer_start');
+ const finish = document.getElementById('id_odometer_finish');
+ const miles = document.getElementById('id_miles');
+ const output = document.createElement('p'); output.setAttribute('aria-live', 'polite'); finish.after(output);
+ function update() {
+   const hasReadings = start.value !== '' && finish.value !== '';
+   const distance = Number(finish.value) - Number(start.value);
+   output.textContent = hasReadings && distance > 0 ? `Complete journey distance: ${distance.toFixed(2)} miles` : '';
+   miles.readOnly = hasReadings;
+ }
+ start.addEventListener('input', update); finish.addEventListener('input', update); update();
+});
+</script>
+{% endblock %}
