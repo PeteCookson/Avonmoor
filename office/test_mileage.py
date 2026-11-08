@@ -403,3 +403,14 @@ class DailyMileageTests(TestCase):
         self.assertNotContains(response, 'name="branch"')
         self.assertNotContains(response, 'name="destination"')
         self.assertContains(response, 'name="odometer_start"')
+
+    def test_past_day_form_available_even_after_today_is_recorded(self):
+        from django.utils import timezone
+        self.data['journey_date'] = timezone.localdate().isoformat()
+        self.save_day(odometer_finish='1020', route_description='Client round')
+        day = review_journey(MileageJourney.objects.get().pk, self.owner)
+        self.assertEqual(self.client.get(self.url).status_code, 302)
+        response = self.client.get(self.url + '?new=1')
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Daily mileage')
+        self.assertNotContains(response, 'name="branch"')

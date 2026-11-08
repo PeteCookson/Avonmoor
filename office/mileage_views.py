@@ -47,7 +47,7 @@ class MileageEntryView(BranchContextMixin, OfficeAccessMixin, View):
             ledger = ledger_lock()
             instance = get_object_or_404(MileageJourney, pk=pk, branch=branch, status='draft') if pk else MileageJourney(ledger=ledger, created_by=request.user, branch=branch)
             daily = instance.is_daily or daily
-            if daily and not pk and request.method == 'GET':
+            if daily and not pk and request.method == 'GET' and request.GET.get('new') != '1':
                 existing = MileageJourney.objects.filter(ledger=ledger, is_daily=True, journey_date=timezone.localdate()).exclude(status='void').first()
                 if existing:
                     return redirect('office:mileage-edit' if existing.status == 'draft' else 'office:mileage-list', **({'branch': existing.branch, 'pk': existing.pk} if existing.status == 'draft' else {'branch': existing.branch}))
