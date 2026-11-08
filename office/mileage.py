@@ -63,6 +63,12 @@ def review_journey(pk, user, void=False):
         raise ValidationError('This journey has already been approved.')
     if frozen_after(journey):
         raise ValidationError('A later claim in this tax year is finalized. Review and void affected claims in reverse date order before changing earlier mileage.')
+    if not void and not journey.is_complete:
+        raise ValidationError('Add the end odometer reading before approving this day.')
+    if not void and journey.is_daily:
+        if not journey.route_description and not journey.stops.exists():
+            raise ValidationError('Select properties visited or add a short route description before approving this day.')
+        journey.stops_snapshot = [dict(id=stop.pk, label=f'{stop.customer.display_name} — {stop}') for stop in journey.stops.select_related('customer').all()]
     journey.full_clean()
     if void:
         journey.status, journey.voided_by, journey.voided_at = 'void', user, timezone.now()

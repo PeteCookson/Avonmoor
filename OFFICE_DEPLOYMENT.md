@@ -173,3 +173,24 @@ python manage.py test --noinput
 The simple static storage keeps existing asset-path assertions independent of
 production hashed filenames. Tests use Django's in-memory email backend; the
 placeholder sender enables existing notification tests without live SMTP.
+
+## Daily mileage entry
+
+- The primary **Start / finish day** action opens a simplified daily form with
+  date, start odometer, optional end odometer, optional multiple properties,
+  editable purpose (Garden & property maintenance by default) and private miles
+  defaulting to zero. No branch or return-trip question is shown on that form.
+- Save a morning start reading without an end reading. The mileage list shows
+  **In progress / Finish day**; the same action reopens today's existing draft.
+  Incomplete days cannot be approved, allocated tax rates or included in claims.
+- Finishing calculates `(end odometer − start odometer) − private miles`. Either
+  selected properties or a short business route is needed for completed evidence.
+  Properties are optional; multiple stops do not create multiple mileage claims.
+- A database constraint permits only one active daily record per claimant/date.
+  Individual journey and daily records cannot overlap through the entry forms.
+  Legacy individual journeys and their original calculation remain unchanged.
+- Selected stop labels are snapshotted on review so later customer/property edits
+  cannot change approved claim evidence. Referenced stops prevent destructive
+  property deletion. Daily readings, private miles, stops and route are included
+  in evidence CSV and claim detail. Existing claim approval and payment controls
+  continue to apply.

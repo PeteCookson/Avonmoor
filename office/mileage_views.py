@@ -12,7 +12,7 @@ from django.utils import timezone
 from django.views import View
 from .views import BranchContextMixin, OfficeAccessMixin
 from .models import MileageJourney, MileageClaim, MileageClaimLine
-from .mileage_forms import MileageJourneyForm
+from .mileage_forms import MileageJourneyForm, DailyMileageForm
 from .mileage import ledger_lock, review_journey, generate_claim, transition_claim, allocations, tax_year
 
 
@@ -42,16 +42,22 @@ class MileageListView(BranchContextMixin, OfficeAccessMixin, View):
 
 
 class MileageEntryView(BranchContextMixin, OfficeAccessMixin, View):
-    def handle(self, request, branch, pk=None):
+    def handle(self, request, branch, pk=None, daily=False):
         with transaction.atomic():
             ledger = ledger_lock()
             instance = get_object_or_404(MileageJourney, pk=pk, branch=branch, status='draft') if pk else MileageJourney(ledger=ledger, created_by=request.user, branch=branch)
-            form = MileageJourneyForm(request.POST or None, instance=instance, branch=branch)
+            daily = instance.is_daily or daily
+            if daily and not pk and request.method == 'GET':
+                existing = MileageJourney.objects.filter(ledger=ledger, is_daily=True, journey_date=timezone.localdate()).exclude(status='void').first()
+                if existing:
+                    return redirect('office:mileage-edit' if existing.status == 'draft' else 'office:mileage-list', **({'branch': existing.branch, 'pk': existing.pk} if existing.status == 'draft' else {'branch': existing.branch}))
+            form_class = DailyMileageForm if daily else MileageJourneyForm
+            form = form_class(request.POST or None, instance=instance, branch=branch)
             if request.method == 'POST' and form.is_valid():
                 form.save()
-                messages.success(request, 'Journey saved for review.')
+                messages.success(request, 'Day saved. Add the end reading when finished.' if daily and not form.instance.is_complete else 'Mileage saved for review.')
                 return redirect('office:mileage-list', branch=branch)
-        return render(request, 'office/mileage_form.html', self.branch_context(form=form, page_title='Edit mileage journey' if pk else 'Record mileage journey', submit_label='Save journey for review'))
+        return render(request, 'office/mileage_form.html', self.branch_context(form=form, daily=daily, page_title=('Daily mileage' if daily else 'Record mileage journey'), submit_label=('Save day' if daily else 'Save journey for review')))
 
     get = handle
     post = handle
@@ -110,7 +116,7 @@ class MileageExportView(BranchContextMixin, OfficeAccessMixin, View):
         response['Content-Disposition'] = f'attachment; filename="avonmoor-{branch}-mileage.csv"'
         response.write('\ufeff')
         writer = csv.writer(response)
-        writer.writerow(['Journey ID', 'Claimant', 'Vehicle', 'Ownership', 'Branch', 'Journey date', 'Tax year starts', 'Start', 'Destination', 'Business purpose', 'Entered miles', 'Return journey', 'Start odometer', 'Finish odometer', 'Business miles', 'Customer', 'Property', 'Work entry ID', 'Journey status', 'Recorded by', 'Recorded at', 'Reviewed by', 'Reviewed at', 'Journey voided by', 'Journey voided at', 'Claim', 'Claim month', 'Claim status', 'Active claim line', 'Cumulative miles before', 'Higher rate miles', 'Higher rate GBP', '25p miles', 'Amount GBP', 'Expense ID', 'Claim created by', 'Claim created at', 'Owner approved by', 'Owner approved at', 'Paid by', 'Paid at', 'Payment reference', 'Claim voided by', 'Claim voided at', 'Void reason'])
+        writer.writerow(['Journey ID', 'Claimant', 'Vehicle', 'Ownership', 'Branch', 'Journey date', 'Tax year starts', 'Start', 'Destination', 'Business purpose', 'Entered miles', 'Return journey', 'Start odometer', 'Finish odometer', 'Business miles', 'Customer', 'Property', 'Work entry ID', 'Journey status', 'Recorded by', 'Recorded at', 'Reviewed by', 'Reviewed at', 'Journey voided by', 'Journey voided at', 'Claim', 'Claim month', 'Claim status', 'Active claim line', 'Cumulative miles before', 'Higher rate miles', 'Higher rate GBP', '25p miles', 'Amount GBP', 'Expense ID', 'Claim created by', 'Claim created at', 'Owner approved by', 'Owner approved at', 'Paid by', 'Paid at', 'Payment reference', 'Claim voided by', 'Claim voided at', 'Void reason', 'Entry type', 'Day complete', 'Private miles', 'Properties visited', 'Other stops / route'])
         rates = allocations()
         journeys = MileageJourney.objects.filter(branch=branch).select_related('ledger', 'customer', 'property', 'created_by', 'reviewed_by', 'voided_by').prefetch_related('claim_lines__claim__created_by', 'claim_lines__claim__approved_by', 'claim_lines__claim__paid_by', 'claim_lines__claim__voided_by')
         for j in journeys:
@@ -121,5 +127,6 @@ class MileageExportView(BranchContextMixin, OfficeAccessMixin, View):
                 values += [claim.number if claim else '', claim.month if claim else '', claim.status if claim else '', line.active if line else '']
                 values += [rate.get(field, '') for field in ['cumulative_before', 'higher_rate_miles', 'higher_rate', 'lower_rate_miles', 'amount']]
                 values += [claim.expense_id or '', claim.created_by, claim.created_at, claim.approved_by or '', claim.approved_at or '', claim.paid_by or '', claim.paid_at or '', claim.payment_reference, claim.voided_by or '', claim.voided_at or '', claim.void_reason] if claim else [''] * 11
+                values += ['Daily' if j.is_daily else 'Journey', j.is_complete, j.private_miles, j.stops_display, j.route_description]
                 writer.writerow([safe_cell(value) for value in values])
         return response

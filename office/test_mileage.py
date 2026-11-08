@@ -286,3 +286,120 @@ class MileageTests(TestCase):
             form = BankExpenseReviewForm({**data, 'category':category}, bank_transaction=bank)
             self.assertFalse(form.is_valid())
             self.assertIn('category', form.errors)
+
+
+class DailyMileageTests(TestCase):
+    def setUp(self):
+        self.owner = get_user_model().objects.create_user('owner', is_staff=True, is_superuser=True)
+        self.client.force_login(self.owner)
+        self.ledger = MileageLedger.objects.get(pk=1)
+        self.url = reverse('office:mileage-daily', args=['garden'])
+        self.data = {'journey_date':'2026-10-15', 'odometer_start':'1000', 'purpose':'Garden & property maintenance', 'private_miles':'0'}
+        customer = Customer.objects.create(display_name='Garden customer', billing_address_1='Site', postcode='TQ10 9AA')
+        self.prop = Property.objects.create(customer=customer, address_line_1='First garden', postcode='TQ10 9AA')
+        self.prop2 = Property.objects.create(customer=customer, address_line_1='Second garden', postcode='TQ10 9AB')
+
+    def save_day(self, **data):
+        return self.client.post(self.url, {**self.data, **data})
+
+    def test_morning_start_can_be_saved_and_not_claimed(self):
+        self.assertEqual(self.save_day().status_code, 302)
+        day = MileageJourney.objects.get()
+        self.assertTrue(day.is_daily)
+        self.assertIsNone(day.odometer_finish)
+        self.assertIsNone(day.miles)
+        self.assertEqual(day.total_miles, 0)
+        with self.assertRaises(ValidationError):
+            review_journey(day.pk, self.owner)
+        with self.assertRaises(ValidationError):
+            generate_claim(date(2026,10,1), 'garden', self.owner)
+        response = self.client.get(reverse('office:mileage-list', args=['garden']))
+        self.assertContains(response, 'Finish day')
+        self.assertNotContains(response, 'Approve mileage')
+
+    def test_finish_same_record_with_multiple_optional_properties(self):
+        self.save_day()
+        day = MileageJourney.objects.get()
+        response = self.client.post(reverse('office:mileage-edit', args=['garden', day.pk]), {**self.data, 'odometer_finish':'1042.50', 'stops':[self.prop.pk, self.prop2.pk]})
+        self.assertEqual(response.status_code, 302)
+        day.refresh_from_db()
+        self.assertEqual(MileageJourney.objects.count(), 1)
+        self.assertEqual(day.total_miles, Decimal('42.50'))
+        self.assertEqual(day.stops.count(), 2)
+        review_journey(day.pk, self.owner)
+        claim = generate_claim(date(2026,10,1), 'garden', self.owner)
+        self.assertEqual(claim.total, Decimal('23.38'))
+        self.assertEqual(claim.lines.count(), 1)
+
+    def test_properties_optional_with_route_and_private_miles_default_zero(self):
+        response = self.save_day(odometer_finish='1020', route_description='Base – supplier – client – base', private_miles='')
+        self.assertEqual(response.status_code, 302)
+        day = MileageJourney.objects.get()
+        self.assertEqual(day.private_miles, 0)
+        self.assertEqual(day.total_miles, 20)
+        self.assertEqual(day.stops.count(), 0)
+        review_journey(day.pk, self.owner)
+
+    def test_private_miles_deducted_once_no_return_multiplier(self):
+        self.save_day(odometer_finish='1050', private_miles='7.5', route_description='Business round', return_journey='on')
+        day = MileageJourney.objects.get()
+        self.assertEqual(day.total_miles, Decimal('42.5'))
+        self.assertFalse(day.return_journey)
+
+    def test_invalid_readings_private_mileage_and_missing_route(self):
+        for extra in [{'odometer_start':'-1'}, {'odometer_finish':'999','route_description':'Site'}, {'odometer_finish':'1020','private_miles':'21','route_description':'Site'}, {'private_miles':'-1'}, {'odometer_finish':'1020'}]:
+            with self.subTest(extra=extra):
+                response = self.save_day(**extra)
+                self.assertEqual(response.status_code, 200)
+                self.assertTrue(response.context['form'].errors)
+                self.assertEqual(MileageJourney.objects.count(), 0)
+
+    def test_daily_duplicate_date_rejected_and_today_reopens_same_day(self):
+        from django.utils import timezone
+        self.data['journey_date'] = timezone.localdate().isoformat()
+        self.save_day()
+        day = MileageJourney.objects.get()
+        self.assertRedirects(self.client.get(self.url), reverse('office:mileage-edit', args=['garden',day.pk]))
+        response = self.save_day()
+        self.assertEqual(response.status_code, 200)
+        self.assertEqual(MileageJourney.objects.count(), 1)
+
+    def test_cannot_mix_individual_and_daily_mileage_for_same_date(self):
+        self.save_day()
+        legacy = MileageJourney(ledger=self.ledger, journey_date=date(2026,10,15), miles=10, branch='garden', start='A', destination='B', purpose='Work', created_by=self.owner)
+        with self.assertRaises(ValidationError):
+            legacy.full_clean()
+
+    def test_stops_approval_snapshot_and_export_preserve_evidence(self):
+        self.save_day(odometer_finish='1020', stops=[self.prop.pk])
+        day = review_journey(MileageJourney.objects.get().pk, self.owner)
+        self.prop.address_line_1 = 'Renamed later'
+        self.prop.save()
+        day.refresh_from_db()
+        self.assertIn('First garden', day.stops_display)
+        self.assertNotIn('Renamed later', day.stops_display)
+        self.assertEqual(self.client.get(reverse('office:mileage-edit', args=['garden',day.pk])).status_code, 404)
+        response = self.client.get(reverse('office:mileage-export', args=['garden']))
+        rows = list(csv.reader(io.StringIO(response.content.decode('utf-8-sig'))))
+        evidence = dict(zip(rows[0], rows[1]))
+        self.assertEqual(evidence['Entry type'], 'Daily')
+        self.assertEqual(evidence['Business miles'], '20.00')
+        self.assertIn('First garden', evidence['Properties visited'])
+        from django.db.models.deletion import ProtectedError
+        with self.assertRaises(ProtectedError):
+            self.prop.delete()
+
+    def test_foreign_branch_properties_cannot_be_selected(self):
+        customer = Customer.objects.create(branch='rainwater', display_name='RWH', billing_address_1='Site', postcode='TQ10 9AA')
+        prop = Property.objects.create(customer=customer, address_line_1='Rain site', postcode='TQ10 9AA')
+        response = self.save_day(odometer_finish='1020', stops=[prop.pk])
+        self.assertEqual(response.status_code, 200)
+        self.assertIn('stops', response.context['form'].errors)
+
+    def test_daily_form_is_simple_with_default_purpose(self):
+        response = self.client.get(self.url)
+        self.assertContains(response, 'Garden &amp; property maintenance')
+        self.assertNotContains(response, 'name="return_journey"')
+        self.assertNotContains(response, 'name="branch"')
+        self.assertNotContains(response, 'name="destination"')
+        self.assertContains(response, 'name="odometer_start"')

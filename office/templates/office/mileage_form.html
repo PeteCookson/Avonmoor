@@ -1,6 +1,42 @@
 {% extends 'office/form.html' %}
 {% block title %}Record mileage | Avonmoor Office{% endblock %}
 {% block content %}
+{% if daily %}
+<a class="back-link" href="{% url 'office:mileage-list' branch %}">← Mileage log</a>
+<section class="form-panel">
+<p class="eyebrow">PERSONAL FORD TRANSIT CONNECT</p><h1>Daily mileage</h1>
+<p>Start the day with one reading. Add the end reading here when finished. No separate entries for each visit.</p>
+<form method="post" class="stacked-form" id="daily-mileage-form">
+{% csrf_token %}{{ form.non_field_errors }}
+{% for field in form %}
+{% if field.name == 'stops' %}
+<details class="daily-stops"{% if field.errors or field.value %} open{% endif %}><summary>Properties visited (optional)</summary><p>Select all properties visited today. These record your stops, not separate mileage entries.</p>{{ field }}{{ field.errors }}</details>
+{% elif field.name == 'private_miles' %}
+<details{% if field.errors or form.route_description.errors %} open{% endif %}><summary>Private miles / other stops</summary><div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}<small>{{ field.help_text }}</small>{{ field.errors }}</div>
+<div class="field"><label for="{{ form.route_description.id_for_label }}">{{ form.route_description.label }}</label>{{ form.route_description }}<small>{{ form.route_description.help_text }}</small>{{ form.route_description.errors }}</div></details>
+{% elif field.name != 'route_description' %}
+<div class="field"><label for="{{ field.id_for_label }}">{{ field.label }}</label>{{ field }}{% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}{{ field.errors }}</div>
+{% endif %}{% endfor %}
+<p id="daily-distance" class="daily-distance" aria-live="polite">Add the end reading to calculate business miles.</p>
+<div class="button-row"><button class="button button-primary" type="submit">Save day</button><a class="button button-quiet" href="{% url 'office:mileage-list' branch %}">Cancel</a></div>
+</form></section>
+<script>
+document.addEventListener('DOMContentLoaded', () => {
+ const start = document.getElementById('id_odometer_start');
+ const finish = document.getElementById('id_odometer_finish');
+ const privateMiles = document.getElementById('id_private_miles');
+ const output = document.getElementById('daily-distance');
+ function update() {
+  const complete = start.value !== '' && finish.value !== '';
+  const total = Number(finish.value) - Number(start.value);
+  const business = total - Number(privateMiles.value || 0);
+  output.textContent = complete && total > 0 && business > 0 ? `${business.toFixed(2)} business miles (${total.toFixed(2)} total − ${Number(privateMiles.value || 0).toFixed(2)} private)` : 'Add valid end and start readings to calculate business miles.';
+ }
+ [start, finish, privateMiles].forEach(input => input.addEventListener('input', update)); update();
+});
+</script>
+{% else %}
+
 <p class="eyebrow">{{ branch_meta.label }} · Personal Ford Transit Connect</p>
 <p>Enter completed business travel. Exclude private travel and ordinary commuting. With odometer readings, include the entire journey; the return checkbox will not double it.</p>
 {{ block.super }}
@@ -19,4 +55,5 @@ document.addEventListener('DOMContentLoaded', () => {
  start.addEventListener('input', update); finish.addEventListener('input', update); update();
 });
 </script>
+{% endif %}
 {% endblock %}

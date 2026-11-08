@@ -690,4 +690,4 @@ class PaymentMatch(models.Model):
         return f'{self.transaction} → {self.invoice.display_number}'
 
 # Imported after core models to keep mileage isolated without a second app.
-from .mileage_models import MileageLedger, MileageJourney, MileageClaim, MileageClaimLine  # noqa: E402,F401
+from .mileage_models import MileageLedger, MileageJourney, MileageClaim, MileageClaimLine, MileageStop  # noqa: E402,F401

@@ -18,6 +18,7 @@ class BranchConverter:
 register_converter(BranchConverter, 'branch')
 
 urlpatterns = [
+    path('<branch:branch>/mileage/daily/', mileage_views.MileageEntryView.as_view(), {'daily': True}, name='mileage-daily'),
     path('<branch:branch>/mileage/', mileage_views.MileageListView.as_view(), name='mileage-list'),
     path('<branch:branch>/mileage/new/', mileage_views.MileageEntryView.as_view(), name='mileage-create'),
     path('<branch:branch>/mileage/<int:pk>/edit/', mileage_views.MileageEntryView.as_view(), name='mileage-edit'),

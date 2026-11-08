@@ -240,3 +240,9 @@ code { overflow-wrap: anywhere; }
 .mileage-card .button-row form { margin: 0; }
 .mileage-card button, .mileage-card .button { min-height: 44px; }
 @media (max-width: 600px) { .stacked-form input, .stacked-form select, .stacked-form textarea { font-size: 16px; } }
+
+#daily-mileage-form details { border: 1px solid #dce4df; border-radius: 10px; padding: 12px; }
+#daily-mileage-form summary { cursor: pointer; min-height: 32px; font-weight: 600; }
+#daily-mileage-form .daily-stops label { display: flex; gap: 10px; align-items: center; padding: 10px 0; }
+#daily-mileage-form .daily-stops input[type=checkbox] { width: 22px; height: 22px; flex-shrink: 0; }
+.daily-distance { font-size: 1.1rem; font-weight: 600; color: #0b4540; }
