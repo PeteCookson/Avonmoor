@@ -7,7 +7,7 @@
         <h1>Expense inbox</h1>
         <p class="lede">Review actual outgoing Monzo payments before they enter the expense register. Fuel payments can be recorded at their confirmed business-use percentage. Mileage logs provide supporting evidence; new mileage reimbursement claims are disabled.</p>
     </div>
-    <a class="button button-secondary" href="{% url 'office:payments' %}">Sync Monzo</a>
+    <form method="post" action="{% url 'office:monzo-sync' %}">{% csrf_token %}<input type="hidden" name="return_to" value="expenses"><button class="button button-secondary" type="submit">Sync Monzo</button></form>
 </div>
 
 <div class="filter-row payment-filters">

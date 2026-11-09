@@ -718,3 +718,29 @@ class MonzoConnectionTests(BankingFixtureMixin, TestCase):
         self.assertEqual(response.status_code, 202)
         fetch.assert_not_called()
         self.assertFalse(BankTransaction.objects.exists())
+
+
+class ExpenseInboxSyncTests(BankingFixtureMixin, TestCase):
+    @patch('office.banking_views.sync_monzo_transactions', return_value=(3, 1))
+    def test_inbox_sync_runs_and_returns_to_inbox(self, sync):
+        BankConnection.objects.create(provider='monzo', active=True, connected_by=self.owner)
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse('office:monzo-sync'), {'return_to':'expenses'})
+        self.assertRedirects(response, reverse('office:expense-inbox'), fetch_redirect_response=False)
+        sync.assert_called_once()
+        page = self.client.get(reverse('office:expense-inbox'))
+        self.assertContains(page, 'Sync complete: 3 new transaction(s)')
+        self.assertContains(page, 'name="return_to" value="expenses"')
+
+    @patch('office.banking_views.sync_monzo_transactions', side_effect=MonzoAPIError('Unavailable'))
+    def test_failure_returns_to_inbox_with_error(self, sync):
+        BankConnection.objects.create(provider='monzo', active=True, connected_by=self.owner)
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse('office:monzo-sync'), {'return_to':'expenses'})
+        self.assertRedirects(response, reverse('office:expense-inbox'), fetch_redirect_response=False)
+        self.assertContains(self.client.get(reverse('office:expense-inbox')), 'Monzo sync failed')
+
+    def test_unconnected_sync_goes_to_connection_page(self):
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse('office:monzo-sync'), {'return_to':'expenses'})
+        self.assertRedirects(response, reverse('office:payments'))

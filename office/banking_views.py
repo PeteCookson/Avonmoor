@@ -434,9 +434,10 @@ class MonzoAccountView(OwnerOnlyMixin, View):
 
 class MonzoSyncView(OfficeAccessMixin, View):
     def post(self, request):
-        connection = get_object_or_404(
-            BankConnection, provider='monzo', active=True
-        )
+        connection = BankConnection.objects.filter(provider='monzo', active=True).first()
+        if connection is None:
+            messages.warning(request, 'Connect Monzo before syncing transactions.')
+            return redirect('office:payments')
         try:
             imported, matched = sync_monzo_transactions(connection)
         except (MonzoAPIError, ValidationError) as error:
@@ -448,7 +449,7 @@ class MonzoSyncView(OfficeAccessMixin, View):
                 f'Sync complete: {imported} new transaction(s), '
                 f'{matched} matched automatically.',
             )
-        return redirect('office:payments')
+        return redirect('office:expense-inbox' if request.POST.get('return_to') == 'expenses' else 'office:payments')
 
 
 class MonzoDisconnectView(OwnerOnlyMixin, View):
