@@ -216,6 +216,11 @@ class ExpenseForm(forms.ModelForm):
         super().__init__(*args, **kwargs)
         self.branch = branch
         self.fields['category'].choices = [(value, label) for value, label in Expense.Category.choices if value not in [Expense.Category.MILEAGE, Expense.Category.FUEL]]
+        if self.instance.pk and self.instance.bank_transaction_id and self.instance.category == Expense.Category.FUEL:
+            self.fields['category'].choices = Expense.Category.choices
+            for name in ['expense_date', 'supplier', 'category', 'description', 'amount', 'payment_method', 'reference']:
+                self.fields[name].disabled = True
+            self.fields['amount'].help_text = f'Monzo fuel allocation locked at {self.instance.business_percentage}% business use.'
         current_property_id = getattr(self.instance, 'property_id', None)
         properties = Property.objects.filter(
             active=True, customer__branch=branch
@@ -236,6 +241,7 @@ class ExpenseForm(forms.ModelForm):
 
 
 class BankExpenseReviewForm(forms.Form):
+    business_percentage = forms.DecimalField(label='Business use (%)', min_value=0.01, max_value=100, decimal_places=2, required=False, help_text='For fuel, confirm the business share of this payment. Only that amount enters expenses; retain the receipt.')
     branch = forms.ChoiceField(
         choices=[('', 'Choose a business branch'), *BusinessBranch.choices]
     )
@@ -268,7 +274,7 @@ class BankExpenseReviewForm(forms.Form):
                 if key != 'rule'
             }
         super().__init__(*args, **kwargs)
-        self.fields['category'].choices = [(value, label) for value, label in Expense.Category.choices if value not in [Expense.Category.MILEAGE, Expense.Category.FUEL]]
+        self.fields['category'].choices = [(value, label) for value, label in Expense.Category.choices if value != Expense.Category.MILEAGE]
         self.fields['property'].queryset = Property.objects.filter(
             active=True
         ).select_related('customer')
@@ -277,10 +283,19 @@ class BankExpenseReviewForm(forms.Form):
         cleaned = super().clean()
         if not self.bank_transaction or not self.bank_transaction.is_outgoing:
             raise forms.ValidationError('Select an outgoing GBP transaction.')
-        if is_fuel_transaction(self.bank_transaction):
-            raise forms.ValidationError(
-                'Fuel is excluded because the van is personally owned.'
-            )
+        fuel = is_fuel_transaction(self.bank_transaction) or cleaned.get('category') == Expense.Category.FUEL
+        if fuel:
+            cleaned['category'] = Expense.Category.FUEL
+            if cleaned.get('business_percentage') is None:
+                self.add_error('business_percentage', 'Confirm the business-use percentage for this fuel payment.')
+            from .mileage import tax_year
+            from .models import MileageClaimLine
+            day = (self.bank_transaction.settled_at or self.bank_transaction.transaction_at).date()
+            if MileageClaimLine.objects.filter(active=True, tax_year=tax_year(day), claim__status__in=['approved', 'paid']).exists():
+                raise forms.ValidationError('A finalized mileage claim exists in this tax year. Reconcile it before recording actual vehicle fuel costs.')
+        else:
+            from decimal import Decimal
+            cleaned['business_percentage'] = Decimal('100')
         # Reimbursement settles the existing mileage expense; it is not a second cost.
         from .models import MileageClaim
         reference = (self.bank_transaction.reference or '').strip().casefold()

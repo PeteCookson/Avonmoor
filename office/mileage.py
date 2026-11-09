@@ -1,5 +1,6 @@
 """Atomic mileage workflow. No bank transaction or fuel expense is created here."""
 from calendar import monthrange
+from django.conf import settings
 from datetime import date
 from decimal import Decimal, ROUND_HALF_UP
 from django.core.exceptions import PermissionDenied, ValidationError
@@ -81,6 +82,8 @@ def review_journey(pk, user, void=False):
 @transaction.atomic
 def generate_claim(month, branch, user):
     staff(user)
+    if settings.OFFICE_ACTUAL_FUEL_COSTS:
+        raise ValidationError('Actual fuel costs are enabled. Mileage is recorded as evidence; new reimbursement claims are disabled.')
     ledger = ledger_lock()
     month = month.replace(day=1)
     claim, _ = MileageClaim.objects.get_or_create(
@@ -118,6 +121,8 @@ def transition_claim(pk, action, user, reference=''):
     ledger_lock()
     claim = MileageClaim.objects.select_for_update().get(pk=pk)
     now = timezone.now()
+    if action == 'approve' and settings.OFFICE_ACTUAL_FUEL_COSTS:
+        raise ValidationError('Actual fuel costs are enabled. New mileage reimbursements are disabled to prevent double counting.')
     if action == 'approve' and claim.status == 'draft':
         if not claim.lines.filter(active=True).exists():
             raise ValidationError('Empty claims cannot be approved.')

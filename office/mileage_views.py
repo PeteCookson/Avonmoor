@@ -1,4 +1,5 @@
 import csv
+from django.conf import settings
 from datetime import date
 from decimal import Decimal
 from django.contrib import messages
@@ -36,7 +37,7 @@ class MileageListView(BranchContextMixin, OfficeAccessMixin, View):
         year = tax_year(timezone.localdate())
         year_miles = sum((j.total_miles for j in journeys if j.status == 'approved' and tax_year(j.journey_date) == year), Decimal('0'))
         return render(request, 'office/mileage_list.html', self.branch_context(
-            journeys=journeys, claims=display_claims, month=timezone.localdate().strftime('%Y-%m'), tax_year=year,
+            actual_fuel_costs=settings.OFFICE_ACTUAL_FUEL_COSTS, journeys=journeys, claims=display_claims, month=timezone.localdate().strftime('%Y-%m'), tax_year=year,
             year_miles=year_miles, owed=claims.filter(status='approved').aggregate(t=Sum('total'))['t'] or 0,
             paid=claims.filter(status='paid').aggregate(t=Sum('total'))['t'] or 0))
 

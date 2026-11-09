@@ -172,3 +172,6 @@ DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 LOGIN_URL = 'login'
 LOGIN_REDIRECT_URL = 'office:dashboard'
 LOGOUT_REDIRECT_URL = 'login'
+
+# Actual Monzo fuel costs replace new mileage reimbursement claims.
+OFFICE_ACTUAL_FUEL_COSTS = True

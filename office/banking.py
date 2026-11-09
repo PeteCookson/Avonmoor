@@ -247,7 +247,7 @@ def expense_suggestion(bank_transaction):
         'rule': rule,
         'branch': rule.branch if rule else '',
         'supplier': rule.supplier if rule else supplier,
-        'category': rule.category if rule else Expense.Category.OTHER,
+        'category': Expense.Category.FUEL if is_fuel_transaction(bank_transaction) else (rule.category if rule else Expense.Category.OTHER),
         'description': rule.description if rule else supplier,
         'reference': (bank_transaction.reference or '')[:160],
     }

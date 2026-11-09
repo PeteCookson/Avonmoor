@@ -344,26 +344,61 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertRedirects(second, reverse('office:expense-inbox'))
         self.assertEqual(Expense.objects.count(), 1)
 
-    def test_fuel_is_excluded_and_cannot_be_recorded(self):
-        fuel = self.bank_transaction(
-            amount_minor=-6500,
-            description='SHELL SOUTH BRENT',
-            reference='Diesel',
-        )
-        self.assertTrue(is_fuel_transaction(fuel))
+    def test_fuel_requires_business_share_and_records_linked_actual_cost(self):
+        fuel = self.bank_transaction(amount_minor=-6500, description='SHELL SOUTH BRENT', reference='Diesel')
         self.client.force_login(self.owner)
+        self.assertContains(self.client.get(reverse('office:expense-inbox')), 'SHELL SOUTH BRENT')
+        url = reverse('office:expense-bank-review', args=[fuel.pk])
+        self.assertEqual(self.client.get(url).status_code, 200)
+        response = self.client.post(url, self.expense_post_data())
+        self.assertContains(response, 'Confirm the business-use percentage')
+        self.assertFalse(Expense.objects.exists())
+        response = self.client.post(url, self.expense_post_data(business_percentage='90'))
+        self.assertEqual(response.status_code, 302)
+        expense = Expense.objects.get()
+        self.assertEqual(expense.amount, Decimal('58.50'))
+        self.assertEqual(expense.category, Expense.Category.FUEL)
+        self.assertEqual(expense.business_percentage, Decimal('90'))
+        self.assertEqual(expense.bank_transaction_id, fuel.pk)
+        self.client.post(url, self.expense_post_data(business_percentage='90'))
+        self.assertEqual(Expense.objects.count(), 1)
 
-        review = self.client.get(reverse('office:expense-inbox'))
-        excluded = self.client.get(
-            reverse('office:expense-inbox'), {'status': 'excluded'}
-        )
-        record = self.client.get(
-            reverse('office:expense-bank-review', args=[fuel.pk])
-        )
+    def test_fuel_share_out_of_range_and_restore(self):
+        fuel = self.bank_transaction(amount_minor=-6500, description='SHELL')
+        self.client.force_login(self.owner)
+        url = reverse('office:expense-bank-review', args=[fuel.pk])
+        for share in ['0', '-1', '101']:
+            self.assertEqual(self.client.post(url, self.expense_post_data(business_percentage=share)).status_code, 200)
+            self.assertFalse(Expense.objects.exists())
+        self.client.post(reverse('office:expense-bank-ignore', args=[fuel.pk]))
+        self.client.post(reverse('office:expense-bank-restore', args=[fuel.pk]))
+        fuel.refresh_from_db()
+        self.assertIsNone(fuel.ignored_at)
 
-        self.assertNotContains(review, 'SHELL SOUTH BRENT')
-        self.assertContains(excluded, 'Fuel excluded')
-        self.assertRedirects(record, reverse('office:expense-inbox'))
+    def test_fuel_expense_export_and_edit_preserve_allocation(self):
+        fuel = self.bank_transaction(amount_minor=-6500, description='SHELL')
+        self.client.force_login(self.owner)
+        self.client.post(reverse('office:expense-bank-review', args=[fuel.pk]), self.expense_post_data(business_percentage='90'))
+        expense = Expense.objects.get()
+        from .forms import ExpenseForm
+        form = ExpenseForm(instance=expense, branch='garden')
+        self.assertTrue(form.fields['amount'].disabled)
+        self.assertTrue(form.fields['category'].disabled)
+        response = self.client.get(reverse('office:expense-export', args=['garden']))
+        self.assertContains(response, 'Business use percent')
+        self.assertContains(response, '58.50')
+        self.assertContains(response, '65.00')
+
+    def test_existing_finalized_mileage_blocks_fuel_for_same_tax_year(self):
+        from .models import MileageLedger, MileageClaim, MileageJourney, MileageClaimLine
+        ledger = MileageLedger.objects.get(pk=1)
+        journey = MileageJourney.objects.create(ledger=ledger, journey_date=date(2026,10,1), branch='garden', start='A', destination='B', purpose='Work', miles=20, status='approved', created_by=self.owner)
+        claim = MileageClaim.objects.create(ledger=ledger, branch='garden', month=date(2026,10,1), status='paid', created_by=self.owner)
+        MileageClaimLine.objects.create(journey=journey, claim=claim, tax_year=2026, cumulative_before=0, miles=20, higher_rate_miles=20, higher_rate='.55', lower_rate_miles=0, amount=11)
+        fuel = self.bank_transaction(amount_minor=-6500, description='SHELL')
+        self.client.force_login(self.owner)
+        response = self.client.post(reverse('office:expense-bank-review', args=[fuel.pk]), self.expense_post_data(business_percentage='100'))
+        self.assertContains(response, 'finalized mileage claim exists')
         self.assertFalse(Expense.objects.exists())
 
     def test_remembered_supplier_prefills_future_payment(self):

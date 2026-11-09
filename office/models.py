@@ -1,4 +1,4 @@
-from decimal import Decimal
+from decimal import Decimal, ROUND_HALF_UP
 from builtins import property as builtin_property
 
 from django.conf import settings
@@ -215,6 +215,7 @@ class Expense(models.Model):
         null=True,
         blank=True,
     )
+    business_percentage = models.DecimalField(max_digits=5, decimal_places=2, default=Decimal('100'))
     amount = models.DecimalField(max_digits=10, decimal_places=2)
     payment_method = models.CharField(
         max_length=12,
@@ -272,8 +273,14 @@ class Expense(models.Model):
         if self.bank_transaction_id:
             if self.bank_transaction.amount_minor >= 0:
                 errors['bank_transaction'] = 'An expense must use an outgoing transaction.'
-            if self.amount != abs(self.bank_transaction.amount):
-                errors['amount'] = 'The expense amount must match the bank transaction.'
+            if self.business_percentage is None or not 0 < self.business_percentage <= 100:
+                errors['business_percentage'] = 'Business use must be greater than zero and no more than 100%.'
+            else:
+                expected = (abs(self.bank_transaction.amount) * self.business_percentage / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP)
+                if self.category != self.Category.FUEL and self.business_percentage != 100:
+                    errors['business_percentage'] = 'Partial bank allocations are available for fuel only.'
+                if self.amount != expected:
+                    errors['amount'] = 'The expense amount must match the confirmed business share of the bank transaction.'
         if errors:
             raise ValidationError(errors)
 

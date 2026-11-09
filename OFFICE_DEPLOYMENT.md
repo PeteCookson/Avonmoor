@@ -194,3 +194,23 @@ placeholder sender enables existing notification tests without live SMTP.
   property deletion. Daily readings, private miles, stops and route are included
   in evidence CSV and claim detail. Existing claim approval and payment controls
   continue to apply.
+
+## Actual fuel costs — current policy
+
+This policy supersedes the previous fuel exclusion and mileage reimbursement
+workflow. `OFFICE_ACTUAL_FUEL_COSTS=True` records actual Monzo-linked fuel costs
+for accountant review. Daily mileage remains supporting evidence. New monthly
+mileage claims and approval of existing drafts are disabled in the service layer.
+Approved/paid historical claims and their audit trails remain unchanged.
+
+Fuel now appears in the review inbox, with Fuel suggested as the category. A
+reviewer must explicitly confirm a business-use percentage (no assumed 100%).
+The expense records the business share, rounded half-up to pence; CSV retains
+that percentage, full bank amount and transaction ID. Non-fuel bank expenses
+remain full-value records. Fuel allocations are locked during ordinary expense
+editing; notes and property links can still be updated. Duplicate bank expense
+creation remains prevented by the existing one-to-one bank link. Known mileage
+reimbursements remain blocked from becoming duplicate bank expenses. A finalized
+mileage claim in the fuel transaction's tax year blocks recording that fuel until
+reconciled, to avoid overlap. Retain fuel receipts; this operational record does
+not determine tax deductibility or payroll/benefit treatment.

@@ -5,7 +5,7 @@ import io
 from django.contrib.auth import get_user_model
 from django.core.exceptions import PermissionDenied, ValidationError
 from django.db import IntegrityError, transaction
-from django.test import TestCase
+from django.test import TestCase, override_settings
 from django.urls import reverse
 from .models import MileageJourney, MileageClaim, MileageClaimLine, MileageLedger, Expense, Customer, Property, WorkEntry
 from .mileage import allocation, tax_year, review_journey, generate_claim, transition_claim
@@ -13,6 +13,7 @@ from .mileage_forms import MileageJourneyForm
 from .views import build_accounting_report
 
 
+@override_settings(OFFICE_ACTUAL_FUEL_COSTS=False)
 class MileageTests(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create_user('owner', is_staff=True, is_superuser=True)
@@ -282,12 +283,13 @@ class MileageTests(TestCase):
         self.assertFalse(form.is_valid())
         self.assertIn('existing mileage claim', str(form.errors))
         bank.reference = 'unrelated'
-        for category in ['mileage', 'fuel']:
+        for category in ['mileage']:
             form = BankExpenseReviewForm({**data, 'category':category}, bank_transaction=bank)
             self.assertFalse(form.is_valid())
             self.assertIn('category', form.errors)
 
 
+@override_settings(OFFICE_ACTUAL_FUEL_COSTS=False)
 class DailyMileageTests(TestCase):
     def setUp(self):
         self.owner = get_user_model().objects.create_user('owner', is_staff=True, is_superuser=True)
@@ -414,3 +416,19 @@ class DailyMileageTests(TestCase):
         self.assertEqual(response.status_code, 200)
         self.assertContains(response, 'Daily mileage')
         self.assertNotContains(response, 'name="branch"')
+
+
+class ActualFuelModeTests(TestCase):
+    def test_new_mileage_claims_are_disabled(self):
+        owner = get_user_model().objects.create_user('owner', is_staff=True, is_superuser=True)
+        ledger = MileageLedger.objects.get(pk=1)
+        with self.assertRaises(ValidationError):
+            generate_claim(date(2026,11,1), 'garden', owner)
+        claim = MileageClaim.objects.create(ledger=ledger, branch='garden', month=date(2026,11,1), created_by=owner)
+        with self.assertRaises(ValidationError):
+            transition_claim(claim.pk, 'approve', owner)
+        self.assertFalse(Expense.objects.exists())
+        self.client.force_login(owner)
+        response = self.client.get(reverse('office:mileage-list', args=['garden']))
+        self.assertContains(response, 'supporting evidence')
+        self.assertNotContains(response, 'Build or update draft')

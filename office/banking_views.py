@@ -1,4 +1,5 @@
 import json
+from decimal import Decimal, ROUND_HALF_UP
 import logging
 import secrets
 from datetime import timedelta
@@ -114,13 +115,13 @@ class ExpenseInboxView(OfficeAccessMixin, View):
         def transaction_state(bank_transaction):
             if hasattr(bank_transaction, 'expense_record'):
                 return 'recorded'
-            if bank_transaction.ignored_at or is_fuel_transaction(bank_transaction):
+            if bank_transaction.ignored_at:
                 return 'excluded'
             return 'review'
 
         for bank_transaction in outgoing:
             bank_transaction.expense_state = transaction_state(bank_transaction)
-            bank_transaction.fuel_excluded = is_fuel_transaction(bank_transaction)
+            bank_transaction.fuel_excluded = False
         counts = {
             state: sum(
                 transaction.expense_state == state for transaction in outgoing
@@ -164,7 +165,7 @@ class BankExpenseReviewView(OfficeAccessMixin, View):
         if hasattr(bank_transaction, 'expense_record'):
             messages.info(request, 'This payment is already recorded as an expense.')
             return redirect('office:expense-inbox')
-        if bank_transaction.ignored_at or is_fuel_transaction(bank_transaction):
+        if bank_transaction.ignored_at:
             messages.warning(request, 'This payment is excluded from expenses.')
             return redirect('office:expense-inbox')
         return render(
@@ -206,7 +207,8 @@ class BankExpenseReviewView(OfficeAccessMixin, View):
                     category=form.cleaned_data['category'],
                     description=form.cleaned_data['description'],
                     property=form.cleaned_data['property'],
-                    amount=abs(bank_transaction.amount),
+                    amount=(abs(bank_transaction.amount) * form.cleaned_data['business_percentage'] / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
+                    business_percentage=form.cleaned_data['business_percentage'],
                     payment_method=Expense.PaymentMethod.BANK,
                     reference=form.cleaned_data['reference'],
                     notes=form.cleaned_data['notes'],
@@ -281,12 +283,7 @@ class BankExpenseRestoreView(OfficeAccessMixin, View):
             currency='GBP',
             settled_at__isnull=False,
         )
-        if is_fuel_transaction(bank_transaction):
-            messages.warning(
-                request,
-                'Fuel remains excluded because the van is personally owned.',
-            )
-        elif not hasattr(bank_transaction, 'expense_record'):
+        if not hasattr(bank_transaction, 'expense_record'):
             bank_transaction.ignored_at = None
             bank_transaction.ignored_by = None
             bank_transaction.save(

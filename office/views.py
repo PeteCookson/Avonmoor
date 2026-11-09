@@ -314,6 +314,7 @@ class BranchContextMixin:
         return {
             'branch': self.branch,
             'branch_meta': self.branch_meta,
+            'actual_fuel_costs': settings.OFFICE_ACTUAL_FUEL_COSTS,
             **kwargs,
         }
 
@@ -1205,6 +1206,8 @@ class ExpenseExportView(BranchContextMixin, OfficeAccessMixin, View):
                 'Created at',
                 'Voided by',
                 'Voided at',
+                'Business use percent',
+                'Full bank payment GBP',
             ]
         )
         expenses = Expense.objects.filter(branch=self.branch).select_related(
@@ -1239,6 +1242,8 @@ class ExpenseExportView(BranchContextMixin, OfficeAccessMixin, View):
                     if expense.voided_by_id
                     else '',
                     expense.voided_at.isoformat() if expense.voided_at else '',
+                    expense.business_percentage,
+                    abs(expense.bank_transaction.amount) if expense.bank_transaction_id else '',
                 ]
             )
         return response

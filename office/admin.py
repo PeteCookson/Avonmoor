@@ -82,6 +82,7 @@ class ExpenseAdmin(admin.ModelAdmin):
         'reference',
         'notes',
         'bank_transaction',
+        'business_percentage',
         'created_by',
         'updated_by',
         'voided_at',
