@@ -179,6 +179,11 @@ urlpatterns = [
         name='invoice-edit',
     ),
     path(
+        '<branch:branch>/invoices/<int:pk>/delete/',
+        views.InvoiceDeleteView.as_view(),
+        name='invoice-delete',
+    ),
+    path(
         '<branch:branch>/invoices/<int:pk>/issue/',
         views.InvoiceIssueView.as_view(),
         name='invoice-issue',
@@ -220,6 +225,7 @@ urlpatterns = [
     path('invoices/new/', views.InvoiceCreateView.as_view(), {'branch': 'garden'}, name='invoice-create'),
     path('invoices/<int:pk>/', views.InvoiceDetailView.as_view(), {'branch': 'garden'}, name='invoice-detail'),
     path('invoices/<int:pk>/edit/', views.InvoiceEditView.as_view(), {'branch': 'garden'}, name='invoice-edit'),
+    path('invoices/<int:pk>/delete/', views.InvoiceDeleteView.as_view(), {'branch': 'garden'}, name='invoice-delete'),
     path('invoices/<int:pk>/issue/', views.InvoiceIssueView.as_view(), {'branch': 'garden'}, name='invoice-issue'),
     path('invoices/<int:pk>/pdf/', views.InvoicePdfView.as_view(), {'branch': 'garden'}, name='invoice-pdf'),
     path('invoices/<int:pk>/email/', views.InvoiceEmailView.as_view(), {'branch': 'garden'}, name='invoice-email'),

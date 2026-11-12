@@ -869,6 +869,26 @@ class InvoiceCreateView(BranchContextMixin, OfficeAccessMixin, CreateView):
         kwargs['branch'] = self.branch
         return kwargs
 
+    def get_initial(self):
+        initial = super().get_initial()
+        customer = Customer.objects.filter(
+            pk=self.request.GET.get('customer'),
+            branch=self.branch,
+            active=True,
+        ).first()
+        if not customer:
+            return initial
+
+        initial['customer'] = customer
+        property_record = Property.objects.filter(
+            pk=self.request.GET.get('property'),
+            customer=customer,
+            active=True,
+        ).first()
+        if property_record:
+            initial['property'] = property_record
+        return initial
+
     def form_valid(self, form):
         form.instance.branch = self.branch
         form.instance.created_by = self.request.user
@@ -961,6 +981,34 @@ class InvoiceEditView(BranchContextMixin, OfficeAccessMixin, View):
             self.template_name,
             self.branch_context(invoice=invoice, form=form, formset=formset),
         )
+
+
+class InvoiceDeleteView(BranchContextMixin, OwnerOnlyMixin, View):
+    def post(self, request, branch, pk):
+        with transaction.atomic():
+            invoice = get_object_or_404(
+                Invoice.objects.select_for_update(),
+                pk=pk,
+                branch=self.branch,
+            )
+            if invoice.status != Invoice.Status.DRAFT:
+                messages.error(
+                    request,
+                    'Only draft invoices can be deleted. Issued invoices must remain '
+                    'in the accounting record.',
+                )
+                return redirect(
+                    'office:invoice-detail',
+                    branch=self.branch,
+                    pk=invoice.pk,
+                )
+            invoice.delete()
+
+        messages.success(
+            request,
+            'Draft invoice deleted. Its work entries are available to invoice again.',
+        )
+        return redirect('office:invoice-list', branch=self.branch)
 
 
 class InvoiceIssueView(BranchContextMixin, OfficeAccessMixin, View):

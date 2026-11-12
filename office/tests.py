@@ -682,6 +682,24 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertEqual(invoice.total, Decimal('50.00'))
         self.assertTrue(self.work.is_invoiced)
 
+    def test_create_next_invoice_prefills_existing_customer_and_property(self):
+        invoice = self.make_invoice().issue()
+
+        detail = self.client.get(
+            reverse('office:invoice-detail', args=[invoice.pk])
+        )
+        next_invoice_url = (
+            f'{reverse("office:invoice-create", args=[BusinessBranch.GARDEN])}'
+            f'?customer={self.customer.pk}'
+            f'&property={self.property.pk}'
+        )
+        self.assertContains(detail, 'Create next invoice')
+        self.assertContains(detail, next_invoice_url.replace('&', '&amp;'))
+
+        response = self.client.get(next_invoice_url)
+        self.assertEqual(response.context['form']['customer'].value(), self.customer.pk)
+        self.assertEqual(response.context['form']['property'].value(), self.property.pk)
+
     def test_invoice_forms_expose_customer_ownership_for_safe_filtering(self):
         response = self.client.get(reverse('office:invoice-create'))
         self.assertContains(response, 'data-invoice-form')
@@ -775,6 +793,58 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertEqual(invoice.lines.count(), 2)
         self.assertEqual(invoice.total, Decimal('87.50'))
         self.assertEqual(extra_work.invoice_line.invoice, invoice)
+
+    def test_owner_can_delete_draft_and_release_linked_work(self):
+        invoice = self.make_invoice()
+
+        response = self.client.post(
+            reverse('office:invoice-delete', args=[invoice.pk]),
+            follow=True,
+        )
+
+        self.assertRedirects(response, reverse('office:invoice-list'))
+        self.assertFalse(Invoice.objects.filter(pk=invoice.pk).exists())
+        self.work.refresh_from_db()
+        self.assertFalse(self.work.is_invoiced)
+        self.assertContains(
+            response,
+            'Its work entries are available to invoice again.',
+        )
+
+    def test_issued_invoice_cannot_be_deleted(self):
+        invoice = self.make_invoice().issue()
+
+        response = self.client.post(
+            reverse('office:invoice-delete', args=[invoice.pk]),
+            follow=True,
+        )
+
+        self.assertTrue(Invoice.objects.filter(pk=invoice.pk).exists())
+        self.assertContains(response, 'Only draft invoices can be deleted.')
+
+    def test_accountant_cannot_delete_draft_invoice(self):
+        invoice = self.make_invoice()
+        self.client.force_login(self.accountant)
+
+        response = self.client.post(
+            reverse('office:invoice-delete', args=[invoice.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(Invoice.objects.filter(pk=invoice.pk).exists())
+
+    def test_delete_draft_action_is_owner_only(self):
+        invoice = self.make_invoice()
+        owner_response = self.client.get(
+            reverse('office:invoice-detail', args=[invoice.pk])
+        )
+        self.assertContains(owner_response, 'Delete draft')
+
+        self.client.force_login(self.accountant)
+        accountant_response = self.client.get(
+            reverse('office:invoice-detail', args=[invoice.pk])
+        )
+        self.assertNotContains(accountant_response, 'Delete draft')
 
     def test_edit_draft_rejects_work_from_another_customer(self):
         invoice = self.make_invoice()

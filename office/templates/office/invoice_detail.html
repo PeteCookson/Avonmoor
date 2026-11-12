@@ -17,8 +17,10 @@
 {% if invoice.status == 'draft' %}
 <a class="button button-secondary" href="{% url 'office:invoice-edit' branch invoice.pk %}">Edit draft</a>
 <form method="post" action="{% url 'office:invoice-issue' branch invoice.pk %}" onsubmit="return confirm('Issue and lock this invoice?');">{% csrf_token %}<button class="button button-primary" type="submit">Issue invoice</button></form>
+{% if request.user.is_superuser %}<form method="post" action="{% url 'office:invoice-delete' branch invoice.pk %}" onsubmit="return confirm('Delete this draft invoice? Its linked work will return to the uninvoiced work list.');">{% csrf_token %}<button class="button button-danger" type="submit">Delete draft</button></form>{% endif %}
 {% else %}
 <a class="button button-primary" href="{% url 'office:invoice-pdf' branch invoice.pk %}">Download PDF</a>
+<a class="button button-secondary" href="{% url 'office:invoice-create' branch %}?customer={{ invoice.customer_id }}{% if invoice.property_id %}&amp;property={{ invoice.property_id }}{% endif %}">Create next invoice</a>
 {% if invoice.status == 'issued' or invoice.status == 'paid' %}<a class="button button-secondary" href="{% url 'office:invoice-email' branch invoice.pk %}">Email invoice</a>{% endif %}
 {% if invoice.status == 'issued' %}<form method="post" action="{% url 'office:invoice-paid' branch invoice.pk %}">{% csrf_token %}<button class="button button-secondary" type="submit">Mark paid</button></form>{% endif %}
 {% if invoice.status == 'issued' or invoice.status == 'paid' %}<form method="post" action="{% url 'office:invoice-cancel' branch invoice.pk %}" onsubmit="return confirm('Cancel this invoice? The record will be retained.');">{% csrf_token %}<button class="button button-danger" type="submit">Cancel invoice</button></form>{% endif %}

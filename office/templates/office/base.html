@@ -40,7 +40,7 @@
                 </div>
             </details>
 
-            <details class="nav-menu{% if request.resolver_match.url_name == 'invoice-list' or request.resolver_match.url_name == 'invoice-create' or request.resolver_match.url_name == 'invoice-edit' or request.resolver_match.url_name == 'invoice-detail' or request.resolver_match.url_name == 'invoice-email' or request.resolver_match.url_name == 'invoice-pdf' or request.resolver_match.url_name == 'payment-create' or request.resolver_match.url_name == 'payments' %} nav-menu-active{% endif %}">
+            <details class="nav-menu{% if request.resolver_match.url_name == 'invoice-list' or request.resolver_match.url_name == 'invoice-create' or request.resolver_match.url_name == 'invoice-edit' or request.resolver_match.url_name == 'invoice-detail' or request.resolver_match.url_name == 'invoice-delete' or request.resolver_match.url_name == 'invoice-email' or request.resolver_match.url_name == 'invoice-pdf' or request.resolver_match.url_name == 'payment-create' or request.resolver_match.url_name == 'payments' %} nav-menu-active{% endif %}">
                 <summary>Billing</summary>
                 <div class="nav-submenu">
                     <a href="{% url 'office:invoice-list' branch %}">
