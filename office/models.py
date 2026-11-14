@@ -115,6 +115,29 @@ class Property(models.Model):
         }
 
 
+class Employee(models.Model):
+    """A payroll identity, independent from Office login permissions."""
+
+    display_name = models.CharField(max_length=160)
+    payroll_reference = models.CharField(
+        max_length=80,
+        blank=True,
+        help_text='Optional employee or payroll reference used by Primo.',
+    )
+    notes = models.TextField(blank=True)
+    active = models.BooleanField(default=True)
+    created_at = models.DateTimeField(auto_now_add=True)
+    updated_at = models.DateTimeField(auto_now=True)
+
+    class Meta:
+        ordering = ['display_name', 'id']
+
+    def __str__(self):
+        if self.payroll_reference:
+            return f'{self.display_name} ({self.payroll_reference})'
+        return self.display_name
+
+
 class WorkEntry(models.Model):
     class Category(models.TextChoices):
         LABOUR = 'labour', 'Labour'
@@ -186,6 +209,7 @@ class Expense(models.Model):
         MILEAGE = 'mileage', 'Personal vehicle mileage reimbursement'
         WASTE = 'waste', 'Waste disposal'
         SUBCONTRACTOR = 'subcontractor', 'Subcontractors'
+        PAYROLL = 'payroll', 'Payroll and wages'
         INSURANCE = 'insurance', 'Insurance and professional fees'
         OFFICE = 'office', 'Office and administration'
         OTHER = 'other', 'Other'
@@ -208,6 +232,13 @@ class Expense(models.Model):
         max_length=20, choices=Category.choices, default=Category.MATERIALS
     )
     description = models.CharField(max_length=300)
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.PROTECT,
+        related_name='expenses',
+        null=True,
+        blank=True,
+    )
     property = models.ForeignKey(
         Property,
         on_delete=models.PROTECT,
@@ -270,6 +301,10 @@ class Expense(models.Model):
             errors['amount'] = 'Amount must be greater than zero.'
         if self.property_id and self.property.customer.branch != self.branch:
             errors['property'] = 'The property must belong to this expense branch.'
+        if self.category == self.Category.PAYROLL and not self.employee_id:
+            errors['employee'] = 'Select the employee for a payroll expense.'
+        if self.category != self.Category.PAYROLL and self.employee_id:
+            errors['employee'] = 'Employee is only used for payroll expenses.'
         if self.bank_transaction_id:
             if self.bank_transaction.amount_minor >= 0:
                 errors['bank_transaction'] = 'An expense must use an outgoing transaction.'
@@ -642,6 +677,13 @@ class ExpenseImportRule(models.Model):
     supplier = models.CharField(max_length=160)
     category = models.CharField(max_length=20, choices=Expense.Category.choices)
     description = models.CharField(max_length=300)
+    employee = models.ForeignKey(
+        Employee,
+        on_delete=models.PROTECT,
+        related_name='expense_import_rules',
+        null=True,
+        blank=True,
+    )
     active = models.BooleanField(default=True)
     created_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

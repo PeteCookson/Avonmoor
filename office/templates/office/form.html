@@ -6,11 +6,11 @@
 <section class="form-panel">
     <p class="eyebrow">AVONMOOR OFFICE</p>
     <h1>{{ page_title }}</h1>
-    <form method="post" class="stacked-form"{% if invoice_form %} data-invoice-form{% endif %}>
+    <form method="post" class="stacked-form"{% if invoice_form %} data-invoice-form{% endif %}{% if expense_form %} data-expense-form{% endif %}>
         {% csrf_token %}
         {% if form.non_field_errors %}<div class="form-error">{{ form.non_field_errors }}</div>{% endif %}
         {% for field in form %}
-        <div class="field{% if field.errors %} field-error{% endif %}">
+        <div class="field{% if field.errors %} field-error{% endif %}" data-field-name="{{ field.name }}">
             {% if field.name == 'work_entries' %}
             <fieldset class="work-entry-fieldset">
                 <legend>{{ field.label }}</legend>
@@ -34,4 +34,5 @@
     </form>
 </section>
 {% if invoice_form %}<script src="{% static 'office/js/invoice_form.js' %}?v=20261102-1" defer></script>{% endif %}
+{% if expense_form %}<script src="{% static 'office/js/expense_form.js' %}?v=20261114-1" defer></script>{% endif %}
 {% endblock %}

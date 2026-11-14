@@ -1,4 +1,5 @@
 {% extends 'office/base.html' %}
+{% load static %}
 {% block title %}Review Monzo expense | Avonmoor Office{% endblock %}
 {% block content %}
 <div class="page-heading">
@@ -16,11 +17,11 @@
     <div><span>Actual amount</span><strong>£{{ bank_transaction.amount|floatformat:2|cut:'-' }}</strong></div>
 </section>
 
-<form method="post" class="form-panel">
+<form method="post" class="form-panel" data-expense-form>
     {% csrf_token %}
     {% if form.non_field_errors %}<div class="message message-error">{{ form.non_field_errors }}</div>{% endif %}
     {% for field in form %}
-    <div class="field{% if field.errors %} field-error{% endif %}">
+    <div class="field{% if field.errors %} field-error{% endif %}" data-field-name="{{ field.name }}">
         {{ field.label_tag }}{{ field }}
         {% if field.help_text %}<small>{{ field.help_text }}</small>{% endif %}
         {{ field.errors }}
@@ -31,4 +32,5 @@
         <a class="button button-quiet" href="{% url 'office:expense-inbox' %}">Cancel</a>
     </div>
 </form>
+<script src="{% static 'office/js/expense_form.js' %}?v=20261114-1" defer></script>
 {% endblock %}

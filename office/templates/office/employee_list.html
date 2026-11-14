@@ -1,0 +1,27 @@
+{% extends 'office/base.html' %}
+{% block title %}Employees | Avonmoor Office{% endblock %}
+{% block content %}
+<div class="page-heading">
+    <div>
+        <p class="eyebrow">ACCOUNTS</p>
+        <h1>Employees</h1>
+        <p class="lede">Payroll identities used to label wage expenses. Primo remains the payroll and payslip record.</p>
+    </div>
+    {% if request.user.is_superuser %}<a class="button button-primary" href="{% url 'office:employee-create' %}">Add employee</a>{% endif %}
+</div>
+<section class="panel table-panel">
+{% if employees %}
+<div class="table-wrap"><table>
+    <thead><tr><th>Employee</th><th>Payroll reference</th><th>Status</th><th></th></tr></thead>
+    <tbody>{% for employee in employees %}<tr>
+        <td><b>{{ employee.display_name }}</b></td>
+        <td>{{ employee.payroll_reference|default:'—' }}</td>
+        <td>{% if employee.active %}<span class="status status-paid">Active</span>{% else %}<span class="status status-cancelled">Inactive</span>{% endif %}</td>
+        <td>{% if request.user.is_superuser %}<a href="{% url 'office:employee-edit' employee.pk %}">Edit</a>{% endif %}</td>
+    </tr>{% endfor %}</tbody>
+</table></div>
+{% else %}
+<div class="empty-state"><h2>No employees recorded</h2><p>Add the employee before recording the first payroll expense.</p></div>
+{% endif %}
+</section>
+{% endblock %}

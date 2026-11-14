@@ -26,6 +26,7 @@ from django.views.generic import (
 
 from .forms import (
     CustomerForm,
+    EmployeeForm,
     ExpenseForm,
     InvoiceCreateForm,
     InvoiceEmailForm,
@@ -37,6 +38,7 @@ from .forms import (
 from .models import (
     BusinessBranch,
     Customer,
+    Employee,
     Expense,
     Invoice,
     InvoiceEmail,
@@ -507,6 +509,42 @@ class CustomerListView(BranchContextMixin, OfficeAccessMixin, ListView):
         return queryset
 
 
+class EmployeeListView(OfficeAccessMixin, ListView):
+    model = Employee
+    template_name = 'office/employee_list.html'
+    context_object_name = 'employees'
+
+
+class EmployeeCreateView(OwnerOnlyMixin, CreateView):
+    model = Employee
+    form_class = EmployeeForm
+    template_name = 'office/form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(page_title='New employee', submit_label='Save employee')
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, 'Employee saved.')
+        return reverse('office:employee-list')
+
+
+class EmployeeUpdateView(OwnerOnlyMixin, UpdateView):
+    model = Employee
+    form_class = EmployeeForm
+    template_name = 'office/form.html'
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(page_title='Edit employee', submit_label='Save changes')
+        return context
+
+    def get_success_url(self):
+        messages.success(self.request, 'Employee updated.')
+        return reverse('office:employee-list')
+
+
 class CustomerCreateView(BranchContextMixin, OfficeAccessMixin, CreateView):
     model = Customer
     form_class = CustomerForm
@@ -735,7 +773,7 @@ class ExpenseListView(BranchContextMixin, OfficeAccessMixin, ListView):
 
     def get_queryset(self):
         queryset = Expense.objects.filter(branch=self.branch).select_related(
-            'property', 'property__customer', 'created_by', 'voided_by'
+            'property', 'property__customer', 'employee', 'created_by', 'voided_by'
         )
         status = self.request.GET.get('status', 'active')
         if status == 'void':
@@ -779,7 +817,7 @@ class ExpenseCreateView(BranchContextMixin, OfficeAccessMixin, CreateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(page_title='Record expense', submit_label='Save expense')
+        context.update(page_title='Record expense', submit_label='Save expense', expense_form=True)
         return context
 
     def get_success_url(self):
@@ -806,7 +844,7 @@ class ExpenseUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(page_title='Edit expense', submit_label='Save changes')
+        context.update(page_title='Edit expense', submit_label='Save changes', expense_form=True)
         return context
 
     def get_success_url(self):
@@ -1241,6 +1279,8 @@ class ExpenseExportView(BranchContextMixin, OfficeAccessMixin, View):
                 'Date',
                 'Supplier',
                 'Category',
+                'Employee',
+                'Employee payroll reference',
                 'Description',
                 'Customer',
                 'Property',
@@ -1261,6 +1301,7 @@ class ExpenseExportView(BranchContextMixin, OfficeAccessMixin, View):
         expenses = Expense.objects.filter(branch=self.branch).select_related(
             'property',
             'property__customer',
+            'employee',
             'created_by',
             'voided_by',
             'bank_transaction',
@@ -1271,6 +1312,8 @@ class ExpenseExportView(BranchContextMixin, OfficeAccessMixin, View):
                     expense.expense_date.isoformat(),
                     expense.supplier,
                     expense.get_category_display(),
+                    expense.employee.display_name if expense.employee_id else '',
+                    expense.employee.payroll_reference if expense.employee_id else '',
                     expense.description,
                     expense.property.customer.display_name
                     if expense.property_id

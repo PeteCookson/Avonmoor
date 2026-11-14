@@ -4,6 +4,7 @@ from .models import (
     BankConnection,
     BankTransaction,
     Customer,
+    Employee,
     Expense,
     ExpenseImportRule,
     Invoice,
@@ -50,6 +51,13 @@ class WorkEntryAdmin(admin.ModelAdmin):
     search_fields = ('description', 'property__customer__display_name')
 
 
+@admin.register(Employee)
+class EmployeeAdmin(admin.ModelAdmin):
+    list_display = ('display_name', 'payroll_reference', 'active')
+    list_filter = ('active',)
+    search_fields = ('display_name', 'payroll_reference')
+
+
 @admin.register(Expense)
 class ExpenseAdmin(admin.ModelAdmin):
     def has_delete_permission(self, request, obj=None):
@@ -60,6 +68,7 @@ class ExpenseAdmin(admin.ModelAdmin):
         'branch',
         'supplier',
         'category',
+        'employee',
         'amount',
         'voided_at',
     )
@@ -68,6 +77,8 @@ class ExpenseAdmin(admin.ModelAdmin):
         'supplier',
         'description',
         'reference',
+        'employee__display_name',
+        'employee__payroll_reference',
         'property__customer__display_name',
     )
     readonly_fields = (
@@ -77,6 +88,7 @@ class ExpenseAdmin(admin.ModelAdmin):
         'category',
         'description',
         'property',
+        'employee',
         'amount',
         'payment_method',
         'reference',
@@ -97,7 +109,7 @@ class ExpenseAdmin(admin.ModelAdmin):
 
 @admin.register(ExpenseImportRule)
 class ExpenseImportRuleAdmin(admin.ModelAdmin):
-    list_display = ('match_text', 'supplier', 'branch', 'category', 'active')
+    list_display = ('match_text', 'supplier', 'employee', 'branch', 'category', 'active')
     list_filter = ('branch', 'category', 'active')
     search_fields = ('match_text', 'supplier', 'description')
 

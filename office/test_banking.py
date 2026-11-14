@@ -24,6 +24,7 @@ from .models import (
     BankConnection,
     BankTransaction,
     Customer,
+    Employee,
     Expense,
     ExpenseImportRule,
     Invoice,
@@ -421,6 +422,40 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertEqual(suggestion['branch'], 'garden')
         self.assertEqual(suggestion['category'], Expense.Category.OFFICE)
         self.assertEqual(suggestion['description'], 'Website and domain hosting')
+
+    def test_payroll_payment_records_and_remembers_employee(self):
+        employee = Employee.objects.create(
+            display_name='Pete Cookson', payroll_reference='EMP-001'
+        )
+        first = self.bank_transaction(
+            amount_minor=-24000,
+            description='PETE COOKSON',
+            reference='Weekly payroll',
+        )
+        self.client.force_login(self.owner)
+        response = self.client.post(
+            reverse('office:expense-bank-review', args=[first.pk]),
+            self.expense_post_data(
+                supplier='',
+                category=Expense.Category.PAYROLL,
+                employee=employee.pk,
+                description='Weekly net payroll payment',
+                remember_supplier='on',
+            ),
+        )
+        self.assertRedirects(response, reverse('office:expense-inbox'))
+        expense = Expense.objects.get()
+        self.assertEqual(expense.employee, employee)
+        self.assertEqual(expense.supplier, employee.display_name)
+
+        second = self.bank_transaction(
+            amount_minor=-24000,
+            description='PETE COOKSON',
+            reference='Weekly payroll',
+        )
+        suggestion = expense_suggestion(second)
+        self.assertEqual(suggestion['category'], Expense.Category.PAYROLL)
+        self.assertEqual(suggestion['employee'], employee)
 
     def test_outgoing_can_be_excluded_and_restored(self):
         outgoing = self.bank_transaction(

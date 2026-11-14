@@ -13,6 +13,7 @@ from .forms import InvoiceForm
 from .models import (
     BusinessBranch,
     Customer,
+    Employee,
     Expense,
     Invoice,
     InvoiceEmail,
@@ -329,6 +330,58 @@ class ExpenseWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertEqual(expense.amount, Decimal('45.00'))
         self.assertEqual(expense.updated_by, self.accountant)
 
+    def test_payroll_expense_requires_employee_and_records_reference(self):
+        employee = Employee.objects.create(
+            display_name='Pete Cookson',
+            payroll_reference='EMP-001',
+        )
+        self.client.force_login(self.accountant)
+
+        missing_employee = self.client.post(
+            reverse('office:expense-create', args=[BusinessBranch.GARDEN]),
+            self.expense_data(
+                supplier='',
+                category=Expense.Category.PAYROLL,
+                property='',
+                description='Weekly gross pay from Primo payslip',
+                amount='240.00',
+            ),
+        )
+        self.assertEqual(missing_employee.status_code, 200)
+        self.assertContains(missing_employee, 'Select the employee paid.')
+        self.assertFalse(Expense.objects.exists())
+
+        response = self.client.post(
+            reverse('office:expense-create', args=[BusinessBranch.GARDEN]),
+            self.expense_data(
+                supplier='',
+                category=Expense.Category.PAYROLL,
+                employee=employee.pk,
+                property='',
+                description='Weekly gross pay from Primo payslip',
+                amount='240.00',
+            ),
+        )
+        self.assertRedirects(
+            response,
+            reverse('office:expense-list', args=[BusinessBranch.GARDEN]),
+        )
+        expense = Expense.objects.get()
+        self.assertEqual(expense.employee, employee)
+        self.assertEqual(expense.supplier, employee.display_name)
+        self.assertEqual(expense.category, Expense.Category.PAYROLL)
+
+    def test_employee_cannot_be_attached_to_non_payroll_expense(self):
+        employee = Employee.objects.create(display_name='Pete Cookson')
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse('office:expense-create', args=[BusinessBranch.GARDEN]),
+            self.expense_data(employee=employee.pk),
+        )
+        self.assertEqual(response.status_code, 200)
+        self.assertContains(response, 'Employee is only used for payroll expenses.')
+        self.assertFalse(Expense.objects.exists())
+
     def test_expense_register_is_separate_by_branch(self):
         garden_expense = self.make_expense()
         rainwater_customer = Customer.objects.create(
@@ -434,6 +487,26 @@ class ExpenseWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertIn('Void', content)
         self.assertIn('Voided by', content)
 
+    def test_expense_export_identifies_payroll_employee(self):
+        employee = Employee.objects.create(
+            display_name='Pete Cookson', payroll_reference='EMP-001'
+        )
+        self.make_expense(
+            supplier='Pete Cookson',
+            category=Expense.Category.PAYROLL,
+            employee=employee,
+            property=None,
+            description='Weekly gross pay',
+            amount=Decimal('240.00'),
+        )
+        self.client.force_login(self.accountant)
+        response = self.client.get(
+            reverse('office:expense-export', args=[BusinessBranch.GARDEN])
+        )
+        content = response.content.decode()
+        self.assertIn('Employee', content)
+        self.assertIn('Pete Cookson', content)
+
     def test_dashboard_total_excludes_void_expenses(self):
         self.make_expense(amount=Decimal('42.50'))
         void_expense = self.make_expense(
@@ -446,6 +519,30 @@ class ExpenseWorkflowTests(OfficeFixtureMixin, TestCase):
         )
         self.assertContains(response, '£42.50')
 
+
+class EmployeeWorkflowTests(OfficeFixtureMixin, TestCase):
+    def test_owner_manages_employees_and_accountant_can_view(self):
+        self.client.force_login(self.staff)
+        response = self.client.post(
+            reverse('office:employee-create'),
+            {
+                'display_name': 'Pete Cookson',
+                'payroll_reference': 'EMP-001',
+                'active': 'on',
+                'notes': 'Director payroll',
+            },
+        )
+        self.assertRedirects(response, reverse('office:employee-list'))
+        employee = Employee.objects.get()
+
+        self.client.force_login(self.accountant)
+        listing = self.client.get(reverse('office:employee-list'))
+        self.assertContains(listing, employee.display_name)
+        self.assertContains(listing, employee.payroll_reference)
+        forbidden = self.client.get(
+            reverse('office:employee-edit', args=[employee.pk])
+        )
+        self.assertEqual(forbidden.status_code, 403)
 
 class AccountingReportTests(OfficeFixtureMixin, TestCase):
     def record_expense(self, amount=Decimal('20.00'), **overrides):

@@ -5,6 +5,7 @@ from django.forms import inlineformset_factory
 from .models import (
     BusinessBranch,
     Customer,
+    Employee,
     Expense,
     Invoice,
     InvoiceLine,
@@ -160,6 +161,18 @@ class PropertyForm(forms.ModelForm):
         return cleaned
 
 
+class EmployeeForm(forms.ModelForm):
+    class Meta:
+        model = Employee
+        fields = ['display_name', 'payroll_reference', 'active', 'notes']
+        widgets = {'notes': forms.Textarea(attrs={'rows': 3})}
+        labels = {'display_name': 'Employee name'}
+        help_texts = {
+            'payroll_reference': 'Optional: use the employee reference shown in Primo.',
+            'active': 'Inactive employees remain attached to historical payroll expenses.',
+        }
+
+
 class WorkEntryForm(forms.ModelForm):
     class Meta:
         model = WorkEntry
@@ -195,6 +208,7 @@ class ExpenseForm(forms.ModelForm):
             'expense_date',
             'supplier',
             'category',
+            'employee',
             'description',
             'property',
             'amount',
@@ -207,14 +221,24 @@ class ExpenseForm(forms.ModelForm):
             'notes': forms.Textarea(attrs={'rows': 3}),
         }
         help_texts = {
+            'employee': 'Required for payroll expenses. Manage employees from Accounts.',
             'property': 'Optional: link the cost to a specific customer property or job.',
-            'amount': 'Enter the full amount paid.',
+            'amount': 'Enter the amount paid. For payroll, use Primo as the payslip and PAYE record.',
             'reference': 'Optional receipt, order or bank reference.',
         }
 
     def __init__(self, *args, branch=BusinessBranch.GARDEN, **kwargs):
         super().__init__(*args, **kwargs)
         self.branch = branch
+        self.fields['supplier'].required = False
+        self.fields['supplier'].label = 'Supplier / payee'
+        current_employee_id = getattr(self.instance, 'employee_id', None)
+        employees = Employee.objects.filter(active=True)
+        if current_employee_id:
+            employees = Employee.objects.filter(
+                Q(active=True) | Q(pk=current_employee_id)
+            )
+        self.fields['employee'].queryset = employees
         self.fields['category'].choices = [(value, label) for value, label in Expense.Category.choices if value not in [Expense.Category.MILEAGE, Expense.Category.FUEL]]
         if self.instance.pk and self.instance.bank_transaction_id and self.instance.category == Expense.Category.FUEL:
             self.fields['category'].choices = Expense.Category.choices
@@ -234,6 +258,18 @@ class ExpenseForm(forms.ModelForm):
 
     def clean(self):
         cleaned = super().clean()
+        category = cleaned.get('category')
+        employee = cleaned.get('employee')
+        supplier = (cleaned.get('supplier') or '').strip()
+        if category == Expense.Category.PAYROLL:
+            if not employee:
+                self.add_error('employee', 'Select the employee paid.')
+            elif not supplier:
+                cleaned['supplier'] = employee.display_name
+        elif employee:
+            self.add_error('employee', 'Employee is only used for payroll expenses.')
+        if category != Expense.Category.PAYROLL and not supplier:
+            self.add_error('supplier', 'Enter the supplier or payee.')
         property_record = cleaned.get('property')
         if property_record and property_record.customer.branch != self.branch:
             self.add_error('property', 'Select a property from this branch.')
@@ -245,8 +281,13 @@ class BankExpenseReviewForm(forms.Form):
     branch = forms.ChoiceField(
         choices=[('', 'Choose a business branch'), *BusinessBranch.choices]
     )
-    supplier = forms.CharField(max_length=160)
+    supplier = forms.CharField(max_length=160, required=False, label='Supplier / payee')
     category = forms.ChoiceField(choices=Expense.Category.choices)
+    employee = forms.ModelChoiceField(
+        queryset=Employee.objects.none(),
+        required=False,
+        help_text='Required when this payment is payroll.',
+    )
     description = forms.CharField(max_length=300)
     property = forms.ModelChoiceField(
         queryset=Property.objects.none(), required=False
@@ -274,6 +315,7 @@ class BankExpenseReviewForm(forms.Form):
                 if key != 'rule'
             }
         super().__init__(*args, **kwargs)
+        self.fields['employee'].queryset = Employee.objects.filter(active=True)
         self.fields['category'].choices = [(value, label) for value, label in Expense.Category.choices if value != Expense.Category.MILEAGE]
         self.fields['property'].queryset = Property.objects.filter(
             active=True
@@ -283,6 +325,18 @@ class BankExpenseReviewForm(forms.Form):
         cleaned = super().clean()
         if not self.bank_transaction or not self.bank_transaction.is_outgoing:
             raise forms.ValidationError('Select an outgoing GBP transaction.')
+        category = cleaned.get('category')
+        employee = cleaned.get('employee')
+        supplier = (cleaned.get('supplier') or '').strip()
+        if category == Expense.Category.PAYROLL:
+            if not employee:
+                self.add_error('employee', 'Select the employee paid.')
+            elif not supplier:
+                cleaned['supplier'] = employee.display_name
+        elif employee:
+            self.add_error('employee', 'Employee is only used for payroll expenses.')
+        if category != Expense.Category.PAYROLL and not supplier:
+            self.add_error('supplier', 'Enter the supplier or payee.')
         fuel = is_fuel_transaction(self.bank_transaction) or cleaned.get('category') == Expense.Category.FUEL
         if fuel:
             cleaned['category'] = Expense.Category.FUEL

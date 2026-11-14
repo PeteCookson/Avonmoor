@@ -28,6 +28,9 @@ urlpatterns = [
     path('<branch:branch>/exports/mileage.csv', mileage_views.MileageExportView.as_view(), name='mileage-export'),
     path('', views.OfficeDashboardView.as_view(), name='dashboard'),
     path('accounting/', views.AccountingReportView.as_view(), name='accounting'),
+    path('employees/', views.EmployeeListView.as_view(), name='employee-list'),
+    path('employees/new/', views.EmployeeCreateView.as_view(), name='employee-create'),
+    path('employees/<int:pk>/edit/', views.EmployeeUpdateView.as_view(), name='employee-edit'),
     path('payments/', banking_views.PaymentsView.as_view(), name='payments'),
     path(
         'expenses/inbox/',

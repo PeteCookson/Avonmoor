@@ -54,7 +54,7 @@
                 </div>
             </details>
 
-            <details class="nav-menu nav-menu-accounts{% if request.resolver_match.url_name == 'accounting' or request.resolver_match.url_name == 'accounting-export' or request.resolver_match.url_name == 'expense-list' or request.resolver_match.url_name == 'expense-create' or request.resolver_match.url_name == 'expense-edit' or request.resolver_match.url_name == 'expense-inbox' or request.resolver_match.url_name == 'expense-bank-review' or request.resolver_match.url_name == 'mileage-list' or request.resolver_match.url_name == 'mileage-create' or request.resolver_match.url_name == 'mileage-edit' or request.resolver_match.url_name == 'mileage-claim' %} nav-menu-active{% endif %}">
+            <details class="nav-menu nav-menu-accounts{% if request.resolver_match.url_name == 'accounting' or request.resolver_match.url_name == 'accounting-export' or request.resolver_match.url_name == 'employee-list' or request.resolver_match.url_name == 'employee-create' or request.resolver_match.url_name == 'employee-edit' or request.resolver_match.url_name == 'expense-list' or request.resolver_match.url_name == 'expense-create' or request.resolver_match.url_name == 'expense-edit' or request.resolver_match.url_name == 'expense-inbox' or request.resolver_match.url_name == 'expense-bank-review' or request.resolver_match.url_name == 'mileage-list' or request.resolver_match.url_name == 'mileage-create' or request.resolver_match.url_name == 'mileage-edit' or request.resolver_match.url_name == 'mileage-claim' %} nav-menu-active{% endif %}">
                 <summary>Accounts</summary>
                 <div class="nav-submenu">
                     <a href="{% url 'office:accounting' %}">
@@ -68,6 +68,10 @@
                     <a href="{% url 'office:expense-list' branch %}">
                         <strong>Expenses</strong>
                         <small>Recorded business costs</small>
+                    </a>
+                    <a href="{% url 'office:employee-list' %}">
+                        <strong>Employees</strong>
+                        <small>Payroll identities and references</small>
                     </a>
                     <a href="{% url 'office:mileage-list' branch %}">
                         <strong>Mileage</strong>
@@ -88,6 +92,10 @@
                     <a href="{% url 'office:expense-inbox' %}">
                         <strong>Expense inbox</strong>
                         <small>Review Monzo spending</small>
+                    </a>
+                    <a href="{% url 'office:employee-list' %}">
+                        <strong>Employees</strong>
+                        <small>Payroll identities and references</small>
                     </a>
                     <a href="{% url 'office:payments' %}">
                         <strong>Payments</strong>

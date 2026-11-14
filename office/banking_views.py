@@ -205,6 +205,7 @@ class BankExpenseReviewView(OfficeAccessMixin, View):
                     ).date(),
                     supplier=form.cleaned_data['supplier'],
                     category=form.cleaned_data['category'],
+                    employee=form.cleaned_data['employee'],
                     description=form.cleaned_data['description'],
                     property=form.cleaned_data['property'],
                     amount=(abs(bank_transaction.amount) * form.cleaned_data['business_percentage'] / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
@@ -230,6 +231,7 @@ class BankExpenseReviewView(OfficeAccessMixin, View):
                                 'branch': expense.branch,
                                 'supplier': expense.supplier,
                                 'category': expense.category,
+                                'employee': expense.employee,
                                 'description': expense.description,
                                 'created_by': request.user,
                                 'updated_by': request.user,
@@ -239,6 +241,7 @@ class BankExpenseReviewView(OfficeAccessMixin, View):
                             rule.branch = expense.branch
                             rule.supplier = expense.supplier
                             rule.category = expense.category
+                            rule.employee = expense.employee
                             rule.description = expense.description
                             rule.active = True
                             rule.updated_by = request.user

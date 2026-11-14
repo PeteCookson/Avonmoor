@@ -32,13 +32,14 @@
 <section class="panel table-panel">
 {% if expenses %}
 <div class="table-wrap"><table>
-    <thead><tr><th>Date</th><th>Supplier / description</th><th>Category</th><th>Property / job</th><th>Method</th><th>Amount</th><th>Status</th><th></th></tr></thead>
+    <thead><tr><th>Date</th><th>Supplier / description</th><th>Category</th><th>Employee</th><th>Property / job</th><th>Method</th><th>Amount</th><th>Status</th><th></th></tr></thead>
     <tbody>
     {% for expense in expenses %}
     <tr>
         <td>{{ expense.expense_date|date:'d M Y' }}</td>
         <td><b>{{ expense.supplier }}</b><small>{{ expense.description }}{% if expense.reference %} · {{ expense.reference }}{% endif %}</small></td>
         <td>{{ expense.get_category_display }}</td>
+        <td>{% if expense.employee %}<b>{{ expense.employee.display_name }}</b>{% if expense.employee.payroll_reference %}<small>{{ expense.employee.payroll_reference }}</small>{% endif %}{% else %}—{% endif %}</td>
         <td>{% if expense.property %}{{ expense.property.customer.display_name }}<small>{{ expense.property }}</small>{% else %}—{% endif %}</td>
         <td>{{ expense.get_payment_method_display }}</td>
         <td><b>£{{ expense.amount|floatformat:2 }}</b></td>
