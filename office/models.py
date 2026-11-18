@@ -637,6 +637,17 @@ class BankTransaction(models.Model):
     description = models.CharField(max_length=300, blank=True)
     reference = models.CharField(max_length=300, blank=True)
     raw_data = models.JSONField(default=dict, blank=True)
+    receipt_image = models.BinaryField(null=True, blank=True, editable=False)
+    receipt_content_type = models.CharField(max_length=40, blank=True)
+    receipt_filename = models.CharField(max_length=180, blank=True)
+    receipt_uploaded_at = models.DateTimeField(null=True, blank=True)
+    receipt_uploaded_by = models.ForeignKey(
+        settings.AUTH_USER_MODEL,
+        null=True,
+        blank=True,
+        on_delete=models.PROTECT,
+        related_name='office_bank_receipts_uploaded',
+    )
     ignored_at = models.DateTimeField(null=True, blank=True)
     ignored_by = models.ForeignKey(
         settings.AUTH_USER_MODEL,

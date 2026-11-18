@@ -43,6 +43,16 @@ urlpatterns = [
         name='expense-bank-review',
     ),
     path(
+        'expenses/inbox/<int:pk>/receipt/',
+        banking_views.BankExpenseReceiptView.as_view(),
+        name='expense-bank-receipt',
+    ),
+    path(
+        'expenses/inbox/<int:pk>/receipt/upload/',
+        banking_views.BankExpenseReceiptUploadView.as_view(),
+        name='expense-bank-receipt-upload',
+    ),
+    path(
         'expenses/inbox/<int:pk>/exclude/',
         banking_views.BankExpenseIgnoreView.as_view(),
         name='expense-bank-ignore',

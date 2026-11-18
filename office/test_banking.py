@@ -423,6 +423,71 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertRedirects(second, reverse('office:expense-inbox'))
         self.assertEqual(Expense.objects.count(), 1)
 
+    def test_mobile_receipt_photo_is_saved_to_transaction_and_viewable(self):
+        outgoing = self.bank_transaction(
+            amount_minor=-1320,
+            description='IONOS CLOUD LTD',
+        )
+        self.client.force_login(self.owner)
+        inbox = self.client.get(reverse('office:expense-inbox'))
+        self.assertContains(inbox, 'capture="environment"')
+        self.assertContains(inbox, 'Photograph receipt')
+
+        jpeg = b'\xff\xd8\xff\xe0' + b'test-receipt-image'
+        response = self.client.post(
+            reverse('office:expense-bank-receipt-upload', args=[outgoing.pk]),
+            {
+                'status': 'review',
+                'receipt': SimpleUploadedFile(
+                    'receipt.jpg', jpeg, content_type='image/jpeg'
+                ),
+            },
+        )
+
+        self.assertRedirects(
+            response,
+            f'{reverse("office:expense-inbox")}?status=review',
+        )
+        outgoing.refresh_from_db()
+        self.assertEqual(bytes(outgoing.receipt_image), jpeg)
+        self.assertEqual(outgoing.receipt_content_type, 'image/jpeg')
+        self.assertEqual(outgoing.receipt_filename, 'receipt.jpg')
+        self.assertEqual(outgoing.receipt_uploaded_by, self.owner)
+        self.assertIsNotNone(outgoing.receipt_uploaded_at)
+
+        receipt = self.client.get(
+            reverse('office:expense-bank-receipt', args=[outgoing.pk])
+        )
+        self.assertEqual(receipt.status_code, 200)
+        self.assertEqual(receipt.content, jpeg)
+        self.assertEqual(receipt['Content-Type'], 'image/jpeg')
+        self.assertEqual(receipt['Cache-Control'], 'private, no-store')
+
+        recorded_inbox = self.client.get(reverse('office:expense-inbox'))
+        self.assertContains(recorded_inbox, 'Replace receipt')
+        self.assertContains(recorded_inbox, 'View receipt')
+
+    def test_receipt_upload_rejects_non_image_content(self):
+        outgoing = self.bank_transaction(
+            amount_minor=-1320,
+            description='IONOS CLOUD LTD',
+        )
+        self.client.force_login(self.accountant)
+
+        response = self.client.post(
+            reverse('office:expense-bank-receipt-upload', args=[outgoing.pk]),
+            {
+                'receipt': SimpleUploadedFile(
+                    'receipt.txt', b'not an image', content_type='image/jpeg'
+                )
+            },
+            follow=True,
+        )
+
+        self.assertContains(response, 'Use a JPEG, PNG, WebP or HEIC receipt image.')
+        outgoing.refresh_from_db()
+        self.assertIsNone(outgoing.receipt_image)
+
     def test_fuel_records_full_linked_actual_cost_without_business_share(self):
         fuel = self.bank_transaction(amount_minor=-6500, description='SHELL SOUTH BRENT', reference='Diesel')
         self.client.force_login(self.owner)

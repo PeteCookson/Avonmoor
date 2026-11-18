@@ -2,6 +2,7 @@ import json
 import logging
 import secrets
 from datetime import timedelta
+from pathlib import Path
 from urllib.parse import urlencode
 
 from django.conf import settings
@@ -13,6 +14,7 @@ from django.shortcuts import get_object_or_404, redirect, render
 from django.urls import reverse
 from django.utils import timezone
 from django.utils.decorators import method_decorator
+from django.utils.text import get_valid_filename
 from django.views import View
 from django.views.decorators.csrf import csrf_exempt
 
@@ -50,6 +52,32 @@ from .views import OfficeAccessMixin, OwnerOnlyMixin
 
 
 logger = logging.getLogger(__name__)
+
+MAX_RECEIPT_BYTES = 8 * 1024 * 1024
+
+
+def receipt_content_type(content):
+    """Detect supported receipt formats from their file signatures."""
+
+    if content.startswith(b'\xff\xd8\xff'):
+        return 'image/jpeg'
+    if content.startswith(b'\x89PNG\r\n\x1a\n'):
+        return 'image/png'
+    if len(content) >= 12 and content[:4] == b'RIFF' and content[8:12] == b'WEBP':
+        return 'image/webp'
+    if (
+        len(content) >= 12
+        and content[4:8] == b'ftyp'
+        and content[8:12] in {b'heic', b'heix', b'hevc', b'hevx', b'mif1'}
+    ):
+        return 'image/heic'
+    return ''
+
+
+def expense_inbox_redirect(status):
+    if status not in {'review', 'recorded', 'excluded', 'all'}:
+        status = 'review'
+    return redirect(f'{reverse("office:expense-inbox")}?status={status}')
 
 
 class PaymentsView(OfficeAccessMixin, View):
@@ -106,6 +134,7 @@ class ExpenseInboxView(OfficeAccessMixin, View):
                 currency='GBP',
                 settled_at__isnull=False,
             )
+            .defer('receipt_image')
             .select_related('expense_record', 'ignored_by')[:500]
         )
         status = request.GET.get('status', 'review')
@@ -254,6 +283,72 @@ class BankExpenseReviewView(OfficeAccessMixin, View):
             self.template_name,
             {'bank_transaction': bank_transaction, 'form': form},
         )
+
+
+class BankExpenseReceiptUploadView(OfficeAccessMixin, View):
+    def post(self, request, pk):
+        bank_transaction = get_object_or_404(
+            BankTransaction,
+            pk=pk,
+            amount_minor__lt=0,
+            currency='GBP',
+            settled_at__isnull=False,
+        )
+        uploaded = request.FILES.get('receipt')
+        if not uploaded:
+            messages.error(request, 'Choose or photograph a receipt first.')
+            return expense_inbox_redirect(request.POST.get('status'))
+        if uploaded.size > MAX_RECEIPT_BYTES:
+            messages.error(request, 'Receipt images must be no larger than 8 MB.')
+            return expense_inbox_redirect(request.POST.get('status'))
+        content = uploaded.read()
+        detected_type = receipt_content_type(content)
+        if not detected_type:
+            messages.error(
+                request,
+                'Use a JPEG, PNG, WebP or HEIC receipt image.',
+            )
+            return expense_inbox_redirect(request.POST.get('status'))
+        bank_transaction.receipt_image = content
+        bank_transaction.receipt_content_type = detected_type
+        bank_transaction.receipt_filename = get_valid_filename(
+            Path(uploaded.name).name
+        )[:180]
+        bank_transaction.receipt_uploaded_at = timezone.now()
+        bank_transaction.receipt_uploaded_by = request.user
+        bank_transaction.save(
+            update_fields=[
+                'receipt_image',
+                'receipt_content_type',
+                'receipt_filename',
+                'receipt_uploaded_at',
+                'receipt_uploaded_by',
+                'updated_at',
+            ]
+        )
+        messages.success(request, 'Receipt saved to this bank transaction.')
+        return expense_inbox_redirect(request.POST.get('status'))
+
+
+class BankExpenseReceiptView(OfficeAccessMixin, View):
+    def get(self, request, pk):
+        bank_transaction = get_object_or_404(
+            BankTransaction,
+            pk=pk,
+            amount_minor__lt=0,
+            currency='GBP',
+            receipt_image__isnull=False,
+        )
+        response = HttpResponse(
+            bytes(bank_transaction.receipt_image),
+            content_type=bank_transaction.receipt_content_type,
+        )
+        filename = bank_transaction.receipt_filename or f'receipt-{pk}'
+        safe_filename = filename.replace('"', '')
+        response['Content-Disposition'] = f'inline; filename="{safe_filename}"'
+        response['X-Content-Type-Options'] = 'nosniff'
+        response['Cache-Control'] = 'private, no-store'
+        return response
 
 
 class BankExpenseIgnoreView(OfficeAccessMixin, View):

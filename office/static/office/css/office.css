@@ -189,7 +189,8 @@ hr { border: 0; border-top: 1px solid var(--line); margin: 20px 0; }
 .payment-filters .active-filter { color: #fff; background: var(--green); border-color: var(--green); }
 .table-actions { display: flex; flex-wrap: wrap; gap: 8px; }
 .table-actions form { margin: 0; }
-.table-actions a, .table-actions button { padding: 0; border: 0; color: var(--leaf); background: transparent; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.table-actions a, .table-actions button, .receipt-upload-label { padding: 0; border: 0; color: var(--leaf); background: transparent; font: inherit; font-weight: 700; text-decoration: underline; cursor: pointer; }
+.receipt-file-input { position: absolute; width: 1px; height: 1px; overflow: hidden; clip: rect(0, 0, 0, 0); white-space: nowrap; }
 .payment-summary { display: grid; gap: 4px; margin: 24px 0; padding: 18px; border-radius: 7px; background: var(--pale-green); }
 .payment-summary strong { color: var(--green); font-size: 30px; }
 .payment-summary small { color: var(--muted); }
