@@ -250,7 +250,10 @@ def expense_suggestion(bank_transaction):
         'category': Expense.Category.FUEL if is_fuel_transaction(bank_transaction) else (rule.category if rule else Expense.Category.OTHER),
         'employee': rule.employee if rule else None,
         'description': rule.description if rule else supplier,
-        'reference': (bank_transaction.reference or '')[:160],
+        # Monzo's stored reference includes raw audit metadata and is often far
+        # too noisy for an accounting description. The source transaction keeps
+        # that evidence; this field is for an optional receipt/invoice reference.
+        'reference': '',
     }
 
 

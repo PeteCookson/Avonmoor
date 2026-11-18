@@ -170,7 +170,7 @@ def build_accounting_report(start_date, end_date, branch='all'):
 
     branch_rows = []
     if branch == 'all':
-        for value, label in BusinessBranch.choices:
+        for value, label in Expense.Branch.choices:
             branch_sales = _money_total(
                 invoice for invoice in sales_invoices if invoice.branch == value
             )
@@ -357,7 +357,7 @@ class AccountingReportView(OfficeAccessMixin, View):
             error = 'Choose a report period of five years or less.'
 
         branch = request.GET.get('branch', 'all')
-        if branch not in ('all', *BusinessBranch.values):
+        if branch not in ('all', *Expense.Branch.values):
             branch = 'all'
             error = 'Choose a valid business branch.'
         return start_date, end_date, branch, error
@@ -442,7 +442,7 @@ class AccountingReportView(OfficeAccessMixin, View):
                 'start_date': start_date,
                 'end_date': end_date,
                 'selected_branch': branch,
-                'branch_choices': [('all', 'All branches'), *BusinessBranch.choices],
+                'branch_choices': [('all', 'All branches'), *Expense.Branch.choices],
                 'report_error': error,
             },
         )
@@ -849,6 +849,41 @@ class ExpenseUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
 
     def get_success_url(self):
         return self.branch_reverse('expense-list')
+
+
+class SharedExpenseUpdateView(OfficeAccessMixin, UpdateView):
+    model = Expense
+    form_class = ExpenseForm
+    template_name = 'office/form.html'
+
+    def get_queryset(self):
+        return Expense.objects.filter(
+            branch=Expense.Branch.SHARED,
+            voided_at__isnull=True,
+            mileage_claim__isnull=True,
+        )
+
+    def get_form_kwargs(self):
+        kwargs = super().get_form_kwargs()
+        kwargs['branch'] = Expense.Branch.SHARED
+        return kwargs
+
+    def form_valid(self, form):
+        form.instance.updated_by = self.request.user
+        messages.success(self.request, 'Shared expense updated.')
+        return super().form_valid(form)
+
+    def get_context_data(self, **kwargs):
+        context = super().get_context_data(**kwargs)
+        context.update(
+            page_title='Edit shared expense',
+            submit_label='Save changes',
+            expense_form=True,
+        )
+        return context
+
+    def get_success_url(self):
+        return f'{reverse("office:expense-inbox")}?status=recorded'
 
 
 class ExpenseVoidView(BranchContextMixin, OwnerOnlyMixin, View):

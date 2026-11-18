@@ -332,6 +332,66 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertEqual(expense.created_by, self.accountant)
         self.assertEqual(expense.branch, 'garden')
 
+    def test_review_form_is_simplified_and_records_shared_company_cost(self):
+        outgoing = self.bank_transaction(
+            amount_minor=-1320,
+            description='IONOS CLOUD LTD',
+            reference='Raw Monzo metadata that should not prefill the form',
+        )
+        self.client.force_login(self.owner)
+        url = reverse('office:expense-bank-review', args=[outgoing.pk])
+
+        response = self.client.get(url)
+
+        self.assertEqual(
+            list(response.context['form'].fields),
+            [
+                'branch',
+                'category',
+                'business_percentage',
+                'employee',
+                'description',
+                'reference',
+                'remember_supplier',
+            ],
+        )
+        self.assertEqual(response.context['form']['reference'].value(), '')
+        self.assertContains(response, 'Shared across both branches')
+        self.assertNotContains(response, 'Supplier / payee')
+        self.assertNotContains(response, '<label for="id_property">')
+        self.assertNotContains(response, '<label for="id_notes">')
+
+        response = self.client.post(
+            url,
+            {
+                'branch': Expense.Branch.SHARED,
+                'category': Expense.Category.OFFICE,
+                'description': 'Domain hosting',
+                'reference': 'IONOS November',
+                'remember_supplier': 'on',
+            },
+        )
+
+        self.assertRedirects(response, reverse('office:expense-inbox'))
+        expense = Expense.objects.get()
+        self.assertEqual(expense.branch, Expense.Branch.SHARED)
+        self.assertEqual(expense.supplier, 'IONOS CLOUD LTD')
+        self.assertEqual(expense.description, 'Domain hosting')
+        self.assertEqual(expense.reference, 'IONOS November')
+        self.assertEqual(expense.amount, Decimal('13.20'))
+        self.assertEqual(expense.business_percentage, Decimal('100'))
+        self.assertIsNone(expense.property)
+        rule = ExpenseImportRule.objects.get()
+        self.assertEqual(rule.branch, Expense.Branch.SHARED)
+
+        recorded = self.client.get(
+            f'{reverse("office:expense-inbox")}?status=recorded'
+        )
+        self.assertContains(
+            recorded,
+            reverse('office:shared-expense-edit', args=[expense.pk]),
+        )
+
     def test_one_bank_transaction_cannot_create_two_expenses(self):
         outgoing = self.bank_transaction(
             amount_minor=-1299, description='IONOS SE'
@@ -418,7 +478,7 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
 
         suggestion = expense_suggestion(second)
 
-        self.assertEqual(suggestion['supplier'], 'IONOS')
+        self.assertEqual(suggestion['supplier'], 'IONOS SE')
         self.assertEqual(suggestion['branch'], 'garden')
         self.assertEqual(suggestion['category'], Expense.Category.OFFICE)
         self.assertEqual(suggestion['description'], 'Website and domain hosting')

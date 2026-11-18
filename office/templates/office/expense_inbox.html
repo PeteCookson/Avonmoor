@@ -35,7 +35,7 @@
             </td>
             <td><div class="table-actions">
                 {% if transaction.expense_state == 'recorded' %}
-                    <a href="{% url 'office:expense-edit' transaction.expense_record.branch transaction.expense_record.pk %}">Open expense</a>
+                    {% if transaction.expense_record.branch == 'shared' %}<a href="{% url 'office:shared-expense-edit' transaction.expense_record.pk %}">Open expense</a>{% else %}<a href="{% url 'office:expense-edit' transaction.expense_record.branch transaction.expense_record.pk %}">Open expense</a>{% endif %}
                 {% elif transaction.fuel_excluded %}
                     <span class="muted-copy">Mileage log only</span>
                 {% elif transaction.expense_state == 'excluded' %}

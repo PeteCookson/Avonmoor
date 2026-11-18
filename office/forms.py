@@ -189,16 +189,19 @@ class WorkEntryForm(forms.ModelForm):
 
     def __init__(self, *args, branch=BusinessBranch.GARDEN, **kwargs):
         super().__init__(*args, **kwargs)
-        current_property_id = getattr(self.instance, 'property_id', None)
-        properties = Property.objects.filter(
-            active=True, customer__branch=branch
-        )
-        if current_property_id:
+        if branch == Expense.Branch.SHARED:
+            self.fields.pop('property')
+        else:
+            current_property_id = getattr(self.instance, 'property_id', None)
             properties = Property.objects.filter(
-                Q(active=True) | Q(pk=current_property_id),
-                customer__branch=branch,
+                active=True, customer__branch=branch
             )
-        self.fields['property'].queryset = properties.select_related('customer')
+            if current_property_id:
+                properties = Property.objects.filter(
+                    Q(active=True) | Q(pk=current_property_id),
+                    customer__branch=branch,
+                )
+            self.fields['property'].queryset = properties.select_related('customer')
 
 
 class ExpenseForm(forms.ModelForm):
@@ -277,38 +280,44 @@ class ExpenseForm(forms.ModelForm):
 
 
 class BankExpenseReviewForm(forms.Form):
-    business_percentage = forms.DecimalField(label='Business use (%)', min_value=0.01, max_value=100, decimal_places=2, required=False, help_text='For fuel, confirm the business share of this payment. Only that amount enters expenses; retain the receipt.')
     branch = forms.ChoiceField(
-        choices=[('', 'Choose a business branch'), *BusinessBranch.choices]
+        label='Applies to',
+        choices=[('', 'Choose where this expense belongs'), *Expense.Branch.choices],
     )
-    supplier = forms.CharField(max_length=160, required=False, label='Supplier / payee')
     category = forms.ChoiceField(choices=Expense.Category.choices)
+    business_percentage = forms.DecimalField(
+        label='Business use (%)',
+        min_value=0.01,
+        max_value=100,
+        decimal_places=2,
+        required=False,
+        help_text='Fuel only: enter the business share. The bank payment remains unchanged.',
+    )
     employee = forms.ModelChoiceField(
         queryset=Employee.objects.none(),
         required=False,
-        help_text='Required when this payment is payroll.',
+        help_text='Select the employee paid.',
     )
     description = forms.CharField(max_length=300)
-    property = forms.ModelChoiceField(
-        queryset=Property.objects.none(), required=False
-    )
-    reference = forms.CharField(max_length=160, required=False)
-    notes = forms.CharField(
-        required=False, widget=forms.Textarea(attrs={'rows': 3})
+    reference = forms.CharField(
+        max_length=160,
+        required=False,
+        label='Receipt / invoice reference',
     )
     remember_supplier = forms.BooleanField(
         required=False,
-        label='Remember this supplier for future payments',
+        label='Use these details next time',
         help_text=(
-            'Future matching Monzo payments will be pre-filled with this '
-            'branch, supplier, category and description.'
+            'Future payments from this supplier will use the same allocation, '
+            'category, employee and description.'
         ),
     )
 
     def __init__(self, *args, bank_transaction=None, **kwargs):
         self.bank_transaction = bank_transaction
-        if bank_transaction and not args and 'initial' not in kwargs:
-            suggestion = expense_suggestion(bank_transaction)
+        suggestion = expense_suggestion(bank_transaction) if bank_transaction else {}
+        self.suggested_supplier = suggestion.get('supplier', 'Monzo payment')
+        if suggestion and not args and 'initial' not in kwargs:
             kwargs['initial'] = {
                 key: value
                 for key, value in suggestion.items()
@@ -316,10 +325,21 @@ class BankExpenseReviewForm(forms.Form):
             }
         super().__init__(*args, **kwargs)
         self.fields['employee'].queryset = Employee.objects.filter(active=True)
-        self.fields['category'].choices = [(value, label) for value, label in Expense.Category.choices if value != Expense.Category.MILEAGE]
-        self.fields['property'].queryset = Property.objects.filter(
-            active=True
-        ).select_related('customer')
+        review_labels = {
+            Expense.Category.MATERIALS: 'Materials',
+            Expense.Category.TOOLS: 'Tools & equipment',
+            Expense.Category.FUEL: 'Fuel',
+            Expense.Category.WASTE: 'Waste disposal',
+            Expense.Category.SUBCONTRACTOR: 'Subcontractor',
+            Expense.Category.PAYROLL: 'Payroll',
+            Expense.Category.INSURANCE: 'Insurance & professional fees',
+            Expense.Category.OFFICE: 'Office, software & phone',
+            Expense.Category.OTHER: 'Other',
+        }
+        self.fields['category'].choices = list(review_labels.items())
+        if bank_transaction and is_fuel_transaction(bank_transaction):
+            self.fields['category'].initial = Expense.Category.FUEL
+            self.fields['category'].disabled = True
 
     def clean(self):
         cleaned = super().clean()
@@ -327,16 +347,15 @@ class BankExpenseReviewForm(forms.Form):
             raise forms.ValidationError('Select an outgoing GBP transaction.')
         category = cleaned.get('category')
         employee = cleaned.get('employee')
-        supplier = (cleaned.get('supplier') or '').strip()
         if category == Expense.Category.PAYROLL:
             if not employee:
                 self.add_error('employee', 'Select the employee paid.')
-            elif not supplier:
+            else:
                 cleaned['supplier'] = employee.display_name
         elif employee:
             self.add_error('employee', 'Employee is only used for payroll expenses.')
-        if category != Expense.Category.PAYROLL and not supplier:
-            self.add_error('supplier', 'Enter the supplier or payee.')
+        else:
+            cleaned['supplier'] = self.suggested_supplier
         fuel = is_fuel_transaction(self.bank_transaction) or cleaned.get('category') == Expense.Category.FUEL
         if fuel:
             cleaned['category'] = Expense.Category.FUEL
@@ -359,10 +378,6 @@ class BankExpenseReviewForm(forms.Form):
             payment_ref = claim.payment_reference.strip().casefold()
             if claim.number.casefold() in text or (payment_ref and payment_ref in [reference, bank_id]):
                 raise forms.ValidationError('This payment reimburses an existing mileage claim. Mark it paid through Mileage; do not create another expense.')
-        property_record = cleaned.get('property')
-        branch = cleaned.get('branch')
-        if property_record and property_record.customer.branch != branch:
-            self.add_error('property', 'Select a property from the chosen branch.')
         return cleaned
 
 

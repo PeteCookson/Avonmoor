@@ -53,6 +53,11 @@ urlpatterns = [
         name='expense-bank-restore',
     ),
     path(
+        'expenses/shared/<int:pk>/edit/',
+        views.SharedExpenseUpdateView.as_view(),
+        name='shared-expense-edit',
+    ),
+    path(
         'payments/import/',
         banking_views.BankCSVImportView.as_view(),
         name='payment-import',

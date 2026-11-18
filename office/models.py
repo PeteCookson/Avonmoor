@@ -202,6 +202,11 @@ class WorkEntry(models.Model):
 class Expense(models.Model):
     """An auditable business expense kept separate by trading branch."""
 
+    class Branch(models.TextChoices):
+        GARDEN = BusinessBranch.GARDEN, 'Garden & Property'
+        RAINWATER = BusinessBranch.RAINWATER, 'Rainwater Harvesting'
+        SHARED = 'shared', 'Shared across both branches'
+
     class Category(models.TextChoices):
         MATERIALS = 'materials', 'Materials and supplies'
         TOOLS = 'tools', 'Tools and equipment'
@@ -222,8 +227,8 @@ class Expense(models.Model):
 
     branch = models.CharField(
         max_length=12,
-        choices=BusinessBranch.choices,
-        default=BusinessBranch.GARDEN,
+        choices=Branch.choices,
+        default=Branch.GARDEN,
         db_index=True,
     )
     expense_date = models.DateField(default=timezone.localdate, db_index=True)
@@ -299,8 +304,11 @@ class Expense(models.Model):
         errors = {}
         if self.amount is not None and self.amount <= 0:
             errors['amount'] = 'Amount must be greater than zero.'
-        if self.property_id and self.property.customer.branch != self.branch:
-            errors['property'] = 'The property must belong to this expense branch.'
+        if self.property_id:
+            if self.branch == self.Branch.SHARED:
+                errors['property'] = 'A shared company expense cannot be linked to one property.'
+            elif self.property.customer.branch != self.branch:
+                errors['property'] = 'The property must belong to this expense branch.'
         if self.category == self.Category.PAYROLL and not self.employee_id:
             errors['employee'] = 'Select the employee for a payroll expense.'
         if self.category != self.Category.PAYROLL and self.employee_id:
@@ -673,7 +681,7 @@ class ExpenseImportRule(models.Model):
     """Remember how a recurring Monzo supplier should be categorised."""
 
     match_text = models.CharField(max_length=160, unique=True)
-    branch = models.CharField(max_length=12, choices=BusinessBranch.choices)
+    branch = models.CharField(max_length=12, choices=Expense.Branch.choices)
     supplier = models.CharField(max_length=160)
     category = models.CharField(max_length=20, choices=Expense.Category.choices)
     description = models.CharField(max_length=300)
