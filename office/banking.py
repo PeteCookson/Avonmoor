@@ -210,7 +210,7 @@ FUEL_TRANSACTION_PATTERN = re.compile(
 
 
 def is_fuel_transaction(bank_transaction):
-    """Keep personally owned vehicle fuel outside company expenses."""
+    """Identify settled outgoing fuel transactions."""
 
     if not bank_transaction.is_outgoing:
         return False
@@ -238,6 +238,15 @@ def expense_rule_for_transaction(bank_transaction):
     return max(matches, key=lambda rule: len(rule.match_text), default=None)
 
 
+def expense_reference(bank_transaction):
+    """Return the concise customer-supplied part of the bank reference."""
+
+    reference = (bank_transaction.reference or '').strip()
+    if not reference:
+        return ''
+    return reference.split('·', 1)[0].strip()[:160]
+
+
 def expense_suggestion(bank_transaction):
     """Suggest editable expense fields without posting to the ledger."""
 
@@ -250,10 +259,7 @@ def expense_suggestion(bank_transaction):
         'category': Expense.Category.FUEL if is_fuel_transaction(bank_transaction) else (rule.category if rule else Expense.Category.OTHER),
         'employee': rule.employee if rule else None,
         'description': rule.description if rule else supplier,
-        # Monzo's stored reference includes raw audit metadata and is often far
-        # too noisy for an accounting description. The source transaction keeps
-        # that evidence; this field is for an optional receipt/invoice reference.
-        'reference': '',
+        'reference': expense_reference(bank_transaction),
     }
 
 

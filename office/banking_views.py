@@ -1,5 +1,4 @@
 import json
-from decimal import Decimal, ROUND_HALF_UP
 import logging
 import secrets
 from datetime import timedelta
@@ -22,6 +21,7 @@ from .banking import (
     auto_match_transaction,
     delete_monzo_webhook,
     exchange_authorization_code,
+    expense_reference,
     fetch_monzo_transaction,
     import_bank_csv,
     import_monzo_transaction,
@@ -207,10 +207,10 @@ class BankExpenseReviewView(OfficeAccessMixin, View):
                     category=form.cleaned_data['category'],
                     employee=form.cleaned_data['employee'],
                     description=form.cleaned_data['description'],
-                    amount=(abs(bank_transaction.amount) * form.cleaned_data['business_percentage'] / 100).quantize(Decimal('0.01'), rounding=ROUND_HALF_UP),
-                    business_percentage=form.cleaned_data['business_percentage'],
+                    amount=abs(bank_transaction.amount),
+                    business_percentage=100,
                     payment_method=Expense.PaymentMethod.BANK,
-                    reference=form.cleaned_data['reference'],
+                    reference=expense_reference(bank_transaction),
                     bank_transaction=bank_transaction,
                     created_by=request.user,
                     updated_by=request.user,

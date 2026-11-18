@@ -336,7 +336,7 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         outgoing = self.bank_transaction(
             amount_minor=-1320,
             description='IONOS CLOUD LTD',
-            reference='Raw Monzo metadata that should not prefill the form',
+            reference='00002602961334 · www.1and1.co.uk · raw Monzo metadata',
         )
         self.client.force_login(self.owner)
         url = reverse('office:expense-bank-review', args=[outgoing.pk])
@@ -348,18 +348,37 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
             [
                 'branch',
                 'category',
-                'business_percentage',
                 'employee',
                 'description',
-                'reference',
                 'remember_supplier',
             ],
         )
-        self.assertEqual(response.context['form']['reference'].value(), '')
         self.assertContains(response, 'Shared across both branches')
         self.assertNotContains(response, 'Supplier / payee')
+        self.assertNotContains(response, 'Business use (%)')
+        self.assertNotContains(response, 'Receipt / invoice reference')
         self.assertNotContains(response, '<label for="id_property">')
         self.assertNotContains(response, '<label for="id_notes">')
+        self.assertContains(
+            response,
+            'data-field-name="employee" hidden',
+            html=False,
+        )
+
+        payroll_response = self.client.post(
+            url,
+            {
+                'branch': Expense.Branch.SHARED,
+                'category': Expense.Category.PAYROLL,
+                'description': 'Weekly payroll',
+            },
+        )
+        self.assertContains(payroll_response, 'Select the employee paid.')
+        self.assertNotContains(
+            payroll_response,
+            'data-field-name="employee" hidden',
+            html=False,
+        )
 
         response = self.client.post(
             url,
@@ -367,7 +386,6 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
                 'branch': Expense.Branch.SHARED,
                 'category': Expense.Category.OFFICE,
                 'description': 'Domain hosting',
-                'reference': 'IONOS November',
                 'remember_supplier': 'on',
             },
         )
@@ -377,7 +395,7 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertEqual(expense.branch, Expense.Branch.SHARED)
         self.assertEqual(expense.supplier, 'IONOS CLOUD LTD')
         self.assertEqual(expense.description, 'Domain hosting')
-        self.assertEqual(expense.reference, 'IONOS November')
+        self.assertEqual(expense.reference, '00002602961334')
         self.assertEqual(expense.amount, Decimal('13.20'))
         self.assertEqual(expense.business_percentage, Decimal('100'))
         self.assertIsNone(expense.property)
@@ -405,32 +423,25 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertRedirects(second, reverse('office:expense-inbox'))
         self.assertEqual(Expense.objects.count(), 1)
 
-    def test_fuel_requires_business_share_and_records_linked_actual_cost(self):
+    def test_fuel_records_full_linked_actual_cost_without_business_share(self):
         fuel = self.bank_transaction(amount_minor=-6500, description='SHELL SOUTH BRENT', reference='Diesel')
         self.client.force_login(self.owner)
         self.assertContains(self.client.get(reverse('office:expense-inbox')), 'SHELL SOUTH BRENT')
         url = reverse('office:expense-bank-review', args=[fuel.pk])
         self.assertEqual(self.client.get(url).status_code, 200)
         response = self.client.post(url, self.expense_post_data())
-        self.assertContains(response, 'Confirm the business-use percentage')
-        self.assertFalse(Expense.objects.exists())
-        response = self.client.post(url, self.expense_post_data(business_percentage='90'))
         self.assertEqual(response.status_code, 302)
         expense = Expense.objects.get()
-        self.assertEqual(expense.amount, Decimal('58.50'))
+        self.assertEqual(expense.amount, Decimal('65.00'))
         self.assertEqual(expense.category, Expense.Category.FUEL)
-        self.assertEqual(expense.business_percentage, Decimal('90'))
+        self.assertEqual(expense.business_percentage, Decimal('100'))
         self.assertEqual(expense.bank_transaction_id, fuel.pk)
-        self.client.post(url, self.expense_post_data(business_percentage='90'))
+        self.client.post(url, self.expense_post_data())
         self.assertEqual(Expense.objects.count(), 1)
 
-    def test_fuel_share_out_of_range_and_restore(self):
+    def test_fuel_can_be_excluded_and_restored(self):
         fuel = self.bank_transaction(amount_minor=-6500, description='SHELL')
         self.client.force_login(self.owner)
-        url = reverse('office:expense-bank-review', args=[fuel.pk])
-        for share in ['0', '-1', '101']:
-            self.assertEqual(self.client.post(url, self.expense_post_data(business_percentage=share)).status_code, 200)
-            self.assertFalse(Expense.objects.exists())
         self.client.post(reverse('office:expense-bank-ignore', args=[fuel.pk]))
         self.client.post(reverse('office:expense-bank-restore', args=[fuel.pk]))
         fuel.refresh_from_db()
@@ -439,7 +450,7 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
     def test_fuel_expense_export_and_edit_preserve_allocation(self):
         fuel = self.bank_transaction(amount_minor=-6500, description='SHELL')
         self.client.force_login(self.owner)
-        self.client.post(reverse('office:expense-bank-review', args=[fuel.pk]), self.expense_post_data(business_percentage='90'))
+        self.client.post(reverse('office:expense-bank-review', args=[fuel.pk]), self.expense_post_data())
         expense = Expense.objects.get()
         from .forms import ExpenseForm
         form = ExpenseForm(instance=expense, branch='garden')
@@ -447,7 +458,6 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertTrue(form.fields['category'].disabled)
         response = self.client.get(reverse('office:expense-export', args=['garden']))
         self.assertContains(response, 'Business use percent')
-        self.assertContains(response, '58.50')
         self.assertContains(response, '65.00')
 
     def test_existing_finalized_mileage_blocks_fuel_for_same_tax_year(self):

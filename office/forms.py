@@ -285,25 +285,12 @@ class BankExpenseReviewForm(forms.Form):
         choices=[('', 'Choose where this expense belongs'), *Expense.Branch.choices],
     )
     category = forms.ChoiceField(choices=Expense.Category.choices)
-    business_percentage = forms.DecimalField(
-        label='Business use (%)',
-        min_value=0.01,
-        max_value=100,
-        decimal_places=2,
-        required=False,
-        help_text='Fuel only: enter the business share. The bank payment remains unchanged.',
-    )
     employee = forms.ModelChoiceField(
         queryset=Employee.objects.none(),
         required=False,
         help_text='Select the employee paid.',
     )
     description = forms.CharField(max_length=300)
-    reference = forms.CharField(
-        max_length=160,
-        required=False,
-        label='Receipt / invoice reference',
-    )
     remember_supplier = forms.BooleanField(
         required=False,
         label='Use these details next time',
@@ -359,16 +346,11 @@ class BankExpenseReviewForm(forms.Form):
         fuel = is_fuel_transaction(self.bank_transaction) or cleaned.get('category') == Expense.Category.FUEL
         if fuel:
             cleaned['category'] = Expense.Category.FUEL
-            if cleaned.get('business_percentage') is None:
-                self.add_error('business_percentage', 'Confirm the business-use percentage for this fuel payment.')
             from .mileage import tax_year
             from .models import MileageClaimLine
             day = (self.bank_transaction.settled_at or self.bank_transaction.transaction_at).date()
             if MileageClaimLine.objects.filter(active=True, tax_year=tax_year(day), claim__status__in=['approved', 'paid']).exists():
                 raise forms.ValidationError('A finalized mileage claim exists in this tax year. Reconcile it before recording actual vehicle fuel costs.')
-        else:
-            from decimal import Decimal
-            cleaned['business_percentage'] = Decimal('100')
         # Reimbursement settles the existing mileage expense; it is not a second cost.
         from .models import MileageClaim
         reference = (self.bank_transaction.reference or '').strip().casefold()
