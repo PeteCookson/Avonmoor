@@ -22,6 +22,7 @@ from .models import (
     WorkEntry,
 )
 from .mailbox import append_message_to_sent
+from .pdf import _address_lines, build_invoice_pdf
 from .views import available_work_entries_for_update
 
 
@@ -1044,6 +1045,24 @@ class InvoiceWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertIn('GPM-20261102-001.pdf', response['Content-Disposition'])
         self.assertTrue(response.content.startswith(b'%PDF'))
         self.assertGreater(len(response.content), 5000)
+
+    def test_invoice_pdf_deduplicates_bill_to_name_and_omits_branch(self):
+        self.customer.display_name = 'Stella Gillingham'
+        self.customer.contact_name = '  stella   gillingham  '
+        self.customer.save(update_fields=['display_name', 'contact_name'])
+        invoice = self.make_invoice().issue()
+
+        self.assertEqual(
+            _address_lines(invoice.billing_details).count('Stella Gillingham'),
+            1,
+        )
+        with patch.object(
+            invoice,
+            'get_branch_display',
+            side_effect=AssertionError('Branch must not be rendered'),
+        ):
+            pdf = build_invoice_pdf(invoice)
+        self.assertTrue(pdf.startswith(b'%PDF'))
 
     def test_draft_pdf_download_is_blocked(self):
         invoice = self.make_invoice()

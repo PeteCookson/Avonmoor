@@ -55,19 +55,26 @@ def _money(value):
 
 
 def _address_lines(snapshot):
-    return [
-        value
-        for value in (
-            snapshot.get('display_name'),
-            snapshot.get('contact_name'),
-            snapshot.get('billing_address_1'),
-            snapshot.get('billing_address_2'),
-            snapshot.get('town'),
-            snapshot.get('county'),
-            snapshot.get('postcode'),
-        )
-        if value
-    ]
+    lines = []
+    seen = set()
+    for value in (
+        snapshot.get('display_name'),
+        snapshot.get('contact_name'),
+        snapshot.get('billing_address_1'),
+        snapshot.get('billing_address_2'),
+        snapshot.get('town'),
+        snapshot.get('county'),
+        snapshot.get('postcode'),
+    ):
+        if not value:
+            continue
+        cleaned = str(value).strip()
+        key = ' '.join(cleaned.split()).casefold()
+        if not key or key in seen:
+            continue
+        seen.add(key)
+        lines.append(cleaned)
+    return lines
 
 
 def build_invoice_pdf(invoice):
@@ -177,7 +184,6 @@ def build_invoice_pdf(invoice):
 
     invoice_meta = Paragraph(
         f'<b>Invoice number</b>&nbsp;&nbsp; {invoice.display_number}<br/>'
-        f'<b>Branch</b>&nbsp;&nbsp; {invoice.get_branch_display()}<br/>'
         f'<b>Invoice date</b>&nbsp;&nbsp; '
         f'{date_format(invoice.issue_date, "d/m/Y")}',
         right,
