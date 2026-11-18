@@ -11,6 +11,7 @@
         if (employee && employeeField) {
             const isPayroll = category.value === 'payroll';
             employeeField.hidden = !isPayroll;
+            employeeField.style.display = isPayroll ? '' : 'none';
             employee.required = isPayroll;
             if (!isPayroll) employee.value = '';
         }

@@ -361,7 +361,7 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertNotContains(response, '<label for="id_notes">')
         self.assertContains(
             response,
-            'data-field-name="employee" hidden',
+            'data-field-name="employee" hidden style="display: none;"',
             html=False,
         )
 
@@ -376,7 +376,7 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertContains(payroll_response, 'Select the employee paid.')
         self.assertNotContains(
             payroll_response,
-            'data-field-name="employee" hidden',
+            'data-field-name="employee" hidden style="display: none;"',
             html=False,
         )
 
