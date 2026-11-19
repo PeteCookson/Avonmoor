@@ -2,8 +2,12 @@ import json
 import logging
 import secrets
 from datetime import timedelta
+from io import BytesIO
 from pathlib import Path
 from urllib.parse import urlencode
+
+from PIL import Image, ImageOps, UnidentifiedImageError
+from pillow_heif import register_heif_opener
 
 from django.conf import settings
 from django.contrib import messages
@@ -54,6 +58,10 @@ from .views import OfficeAccessMixin, OwnerOnlyMixin
 logger = logging.getLogger(__name__)
 
 MAX_RECEIPT_BYTES = 8 * 1024 * 1024
+MAX_RECEIPT_PIXELS = 40_000_000
+MAX_RECEIPT_DIMENSION = 2000
+
+register_heif_opener(thumbnails=False)
 
 
 def receipt_content_type(content):
@@ -72,6 +80,34 @@ def receipt_content_type(content):
     ):
         return 'image/heic'
     return ''
+
+
+def normalise_receipt_image(content):
+    """Return a browser-safe, rotated and size-limited JPEG receipt."""
+
+    try:
+        with Image.open(BytesIO(content)) as source:
+            if source.width * source.height > MAX_RECEIPT_PIXELS:
+                raise ValueError('Receipt image dimensions are too large.')
+            image = ImageOps.exif_transpose(source)
+            image.thumbnail(
+                (MAX_RECEIPT_DIMENSION, MAX_RECEIPT_DIMENSION),
+                Image.Resampling.LANCZOS,
+            )
+            if image.mode in {'RGBA', 'LA'} or (
+                image.mode == 'P' and 'transparency' in image.info
+            ):
+                rgba = image.convert('RGBA')
+                background = Image.new('RGB', rgba.size, 'white')
+                background.paste(rgba, mask=rgba.getchannel('A'))
+                image = background
+            else:
+                image = image.convert('RGB')
+            output = BytesIO()
+            image.save(output, format='JPEG', quality=84, optimize=True)
+            return output.getvalue()
+    except (UnidentifiedImageError, OSError) as error:
+        raise ValueError('Receipt image could not be read.') from error
 
 
 def expense_inbox_redirect(status):
@@ -309,11 +345,16 @@ class BankExpenseReceiptUploadView(OfficeAccessMixin, View):
                 'Use a JPEG, PNG, WebP or HEIC receipt image.',
             )
             return expense_inbox_redirect(request.POST.get('status'))
+        try:
+            content = normalise_receipt_image(content)
+        except ValueError as error:
+            messages.error(request, str(error))
+            return expense_inbox_redirect(request.POST.get('status'))
+        original_name = Path(uploaded.name).name
+        filename = f'{Path(original_name).stem or "receipt"}.jpg'
         bank_transaction.receipt_image = content
-        bank_transaction.receipt_content_type = detected_type
-        bank_transaction.receipt_filename = get_valid_filename(
-            Path(uploaded.name).name
-        )[:180]
+        bank_transaction.receipt_content_type = 'image/jpeg'
+        bank_transaction.receipt_filename = get_valid_filename(filename)[:180]
         bank_transaction.receipt_uploaded_at = timezone.now()
         bank_transaction.receipt_uploaded_by = request.user
         bank_transaction.save(
@@ -339,9 +380,17 @@ class BankExpenseReceiptView(OfficeAccessMixin, View):
             currency='GBP',
             receipt_image__isnull=False,
         )
+        content = bytes(bank_transaction.receipt_image)
+        content_type = bank_transaction.receipt_content_type
+        if content_type != 'image/jpeg':
+            try:
+                content = normalise_receipt_image(content)
+                content_type = 'image/jpeg'
+            except ValueError:
+                pass
         response = HttpResponse(
-            bytes(bank_transaction.receipt_image),
-            content_type=bank_transaction.receipt_content_type,
+            content,
+            content_type=content_type,
         )
         filename = bank_transaction.receipt_filename or f'receipt-{pk}'
         safe_filename = filename.replace('"', '')

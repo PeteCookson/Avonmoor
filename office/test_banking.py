@@ -1,7 +1,10 @@
 import json
 from datetime import date
 from decimal import Decimal
+from io import BytesIO
 from unittest.mock import patch
+
+from PIL import Image
 
 from django.contrib.auth import get_user_model
 from django.core.files.uploadedfile import SimpleUploadedFile
@@ -433,13 +436,15 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertContains(inbox, 'capture="environment"')
         self.assertContains(inbox, 'Photograph receipt')
 
-        jpeg = b'\xff\xd8\xff\xe0' + b'test-receipt-image'
+        source = BytesIO()
+        Image.new('RGB', (120, 80), 'white').save(source, format='PNG')
+        source_image = source.getvalue()
         response = self.client.post(
             reverse('office:expense-bank-receipt-upload', args=[outgoing.pk]),
             {
                 'status': 'review',
                 'receipt': SimpleUploadedFile(
-                    'receipt.jpg', jpeg, content_type='image/jpeg'
+                    'receipt.png', source_image, content_type='image/png'
                 ),
             },
         )
@@ -449,7 +454,8 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
             f'{reverse("office:expense-inbox")}?status=review',
         )
         outgoing.refresh_from_db()
-        self.assertEqual(bytes(outgoing.receipt_image), jpeg)
+        stored_image = bytes(outgoing.receipt_image)
+        self.assertTrue(stored_image.startswith(b'\xff\xd8\xff'))
         self.assertEqual(outgoing.receipt_content_type, 'image/jpeg')
         self.assertEqual(outgoing.receipt_filename, 'receipt.jpg')
         self.assertEqual(outgoing.receipt_uploaded_by, self.owner)
@@ -459,7 +465,7 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
             reverse('office:expense-bank-receipt', args=[outgoing.pk])
         )
         self.assertEqual(receipt.status_code, 200)
-        self.assertEqual(receipt.content, jpeg)
+        self.assertEqual(receipt.content, stored_image)
         self.assertEqual(receipt['Content-Type'], 'image/jpeg')
         self.assertEqual(receipt['Cache-Control'], 'private, no-store')
 
@@ -487,6 +493,31 @@ class ExpenseInboxTests(BankingFixtureMixin, TestCase):
         self.assertContains(response, 'Use a JPEG, PNG, WebP or HEIC receipt image.')
         outgoing.refresh_from_db()
         self.assertIsNone(outgoing.receipt_image)
+
+    def test_existing_heic_receipt_is_converted_for_browser_viewing(self):
+        heic = BytesIO()
+        Image.new('RGB', (120, 80), 'white').save(
+            heic, format='HEIF', quality=80
+        )
+        outgoing = self.bank_transaction(
+            amount_minor=-1320,
+            description='IONOS CLOUD LTD',
+        )
+        outgoing.receipt_image = heic.getvalue()
+        outgoing.receipt_content_type = 'image/heic'
+        outgoing.receipt_filename = 'IMG_1001.HEIC'
+        outgoing.receipt_uploaded_at = timezone.now()
+        outgoing.receipt_uploaded_by = self.owner
+        outgoing.save()
+        self.client.force_login(self.owner)
+
+        receipt = self.client.get(
+            reverse('office:expense-bank-receipt', args=[outgoing.pk])
+        )
+
+        self.assertEqual(receipt.status_code, 200)
+        self.assertEqual(receipt['Content-Type'], 'image/jpeg')
+        self.assertTrue(receipt.content.startswith(b'\xff\xd8\xff'))
 
     def test_fuel_records_full_linked_actual_cost_without_business_share(self):
         fuel = self.bank_transaction(amount_minor=-6500, description='SHELL SOUTH BRENT', reference='Diesel')
