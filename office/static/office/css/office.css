@@ -129,6 +129,7 @@ h2 { color: var(--green); font-size: 23px; font-weight: 500; }
 .work-entry-picker input { flex: 0 0 auto; width: 20px; min-height: 20px; margin-top: 1px; }
 .work-entry-picker label:has(input:checked) { border-color: var(--leaf); background: var(--pale-green); }
 .form-actions { margin-top: 8px; }
+.delete-form { margin-top: 18px; padding-top: 18px; border-top: 1px solid var(--line); }
 .back-link { min-height: 44px; display: inline-flex; align-items: center; margin-bottom: 15px; text-decoration: none; }
 .search-form { display: grid; grid-template-columns: 1fr auto; gap: 10px; margin-bottom: 17px; }
 .table-panel { padding: 0; overflow: hidden; }

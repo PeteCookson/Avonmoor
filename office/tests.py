@@ -272,6 +272,60 @@ class PropertyWorkflowTests(OfficeFixtureMixin, TestCase):
         self.assertNotContains(rainwater_response, self.customer.display_name)
 
 
+class WorkEntryWorkflowTests(OfficeFixtureMixin, TestCase):
+    def setUp(self):
+        super().setUp()
+        self.client.force_login(self.staff)
+
+    def test_owner_can_delete_uninvoiced_work(self):
+        response = self.client.post(
+            reverse('office:work-delete', args=[self.work.pk])
+        )
+
+        self.assertRedirects(response, reverse('office:work-list'))
+        self.assertFalse(WorkEntry.objects.filter(pk=self.work.pk).exists())
+
+    def test_invoiced_work_cannot_be_deleted(self):
+        self.make_invoice()
+
+        response = self.client.post(
+            reverse('office:work-delete', args=[self.work.pk]),
+            follow=True,
+        )
+
+        self.assertTrue(WorkEntry.objects.filter(pk=self.work.pk).exists())
+        self.assertContains(response, 'Invoiced work cannot be deleted')
+
+    def test_work_cannot_be_deleted_through_the_wrong_branch(self):
+        response = self.client.post(
+            reverse(
+                'office:work-delete',
+                args=[BusinessBranch.RAINWATER, self.work.pk],
+            )
+        )
+
+        self.assertEqual(response.status_code, 404)
+        self.assertTrue(WorkEntry.objects.filter(pk=self.work.pk).exists())
+
+    def test_accountant_cannot_delete_work(self):
+        self.client.force_login(self.accountant)
+
+        response = self.client.post(
+            reverse('office:work-delete', args=[self.work.pk])
+        )
+
+        self.assertEqual(response.status_code, 403)
+        self.assertTrue(WorkEntry.objects.filter(pk=self.work.pk).exists())
+
+    def test_delete_action_is_only_shown_to_owner(self):
+        response = self.client.get(reverse('office:work-list'))
+        self.assertContains(response, 'Delete')
+
+        self.client.force_login(self.accountant)
+        response = self.client.get(reverse('office:work-list'))
+        self.assertNotContains(response, 'Delete')
+
+
 class ExpenseWorkflowTests(OfficeFixtureMixin, TestCase):
     def expense_data(self, **overrides):
         data = {

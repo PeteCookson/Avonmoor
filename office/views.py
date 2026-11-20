@@ -761,8 +761,41 @@ class WorkEntryUpdateView(BranchContextMixin, OfficeAccessMixin, UpdateView):
 
     def get_context_data(self, **kwargs):
         context = super().get_context_data(**kwargs)
-        context.update(page_title='Edit work entry', submit_label='Save changes')
+        context.update(
+            page_title='Edit work entry',
+            submit_label='Save changes',
+            delete_url=self.branch_reverse('work-delete', pk=self.object.pk),
+            delete_label='Delete work entry',
+            delete_confirmation='Delete this work entry? This cannot be undone.',
+        )
         return context
+
+
+class WorkEntryDeleteView(BranchContextMixin, OwnerOnlyMixin, View):
+    def post(self, request, branch, pk):
+        with transaction.atomic():
+            entry = get_object_or_404(
+                WorkEntry.objects.select_for_update(),
+                pk=pk,
+                property__customer__branch=self.branch,
+            )
+            if entry.is_invoiced:
+                messages.error(
+                    request,
+                    'Invoiced work cannot be deleted. It must remain in the '
+                    'accounting record.',
+                )
+                return redirect('office:work-list', branch=self.branch)
+            try:
+                entry.delete()
+            except ProtectedError:
+                messages.error(
+                    request,
+                    'This work entry is linked to an invoice and cannot be deleted.',
+                )
+            else:
+                messages.success(request, 'Work entry deleted.')
+        return redirect('office:work-list', branch=self.branch)
 
 
 class ExpenseListView(BranchContextMixin, OfficeAccessMixin, ListView):

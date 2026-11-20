@@ -157,6 +157,11 @@ urlpatterns = [
         views.WorkEntryUpdateView.as_view(),
         name='work-edit',
     ),
+    path(
+        '<branch:branch>/work/<int:pk>/delete/',
+        views.WorkEntryDeleteView.as_view(),
+        name='work-delete',
+    ),
     path('<branch:branch>/expenses/', views.ExpenseListView.as_view(), name='expense-list'),
     path('<branch:branch>/expenses/new/', views.ExpenseCreateView.as_view(), name='expense-create'),
     path(
@@ -237,6 +242,7 @@ urlpatterns = [
     path('work/', views.WorkEntryListView.as_view(), {'branch': 'garden'}, name='work-list'),
     path('work/new/', views.WorkEntryCreateView.as_view(), {'branch': 'garden'}, name='work-create'),
     path('work/<int:pk>/edit/', views.WorkEntryUpdateView.as_view(), {'branch': 'garden'}, name='work-edit'),
+    path('work/<int:pk>/delete/', views.WorkEntryDeleteView.as_view(), {'branch': 'garden'}, name='work-delete'),
     path('invoices/', views.InvoiceListView.as_view(), {'branch': 'garden'}, name='invoice-list'),
     path('exports/customers.csv', views.CustomerExportView.as_view(), {'branch': 'garden'}, name='customer-export'),
     path('exports/invoices.csv', views.InvoiceExportView.as_view(), {'branch': 'garden'}, name='invoice-export'),

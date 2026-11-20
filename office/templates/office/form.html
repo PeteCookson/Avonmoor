@@ -32,6 +32,12 @@
             <a class="button button-quiet" href="javascript:history.back()">Cancel</a>
         </div>
     </form>
+    {% if delete_url and request.user.is_superuser %}
+    <form method="post" action="{{ delete_url }}" class="delete-form" onsubmit="return confirm('{{ delete_confirmation|escapejs }}');">
+        {% csrf_token %}
+        <button class="button button-danger" type="submit">{{ delete_label }}</button>
+    </form>
+    {% endif %}
 </section>
 {% if invoice_form %}<script src="{% static 'office/js/invoice_form.js' %}?v=20261102-1" defer></script>{% endif %}
 {% if expense_form %}<script src="{% static 'office/js/expense_form.js' %}?v=20261114-1" defer></script>{% endif %}
